@@ -1,0 +1,4 @@
+interface:
+  display_name: "Technical Article Visualizer"
+  short_description: "Turn technical articles into interactive visual HTML"
+  default_prompt: "Use $technical-article-visualizer to turn this technical article into a Chinese-first interactive HTML explainer."
