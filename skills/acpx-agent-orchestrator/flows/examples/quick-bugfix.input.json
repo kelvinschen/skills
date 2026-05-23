@@ -1,0 +1,8 @@
+{
+  "task": "Fix the smallest bug described by the user, then have an independent agent verify the behavior.",
+  "cwd": "/tmp/acpx-quick-bugfix-smoke",
+  "implAgent": "trae",
+  "testAgent": "aiden",
+  "testHints": "Prefer black-box verification that reproduces the bug before checking the fix.",
+  "maxFixRounds": 0
+}
