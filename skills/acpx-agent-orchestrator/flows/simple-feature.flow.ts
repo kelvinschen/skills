@@ -198,6 +198,7 @@ export default defineFlow({
       profile: AGENT_PROFILES.plan,
       session: { handle: "plan" },
       cwd: ({ outputs }) => spec(outputs).cwd,
+      timeoutMs: 40 * 60 * 1000,
       statusDetail: "Planning simple feature",
       prompt: ({ outputs }) => {
         const input = spec(outputs);
@@ -255,6 +256,7 @@ Implement the task in the working directory. Do not revert unrelated user change
       profile: AGENT_PROFILES.review,
       session: { handle: "decide_1" },
       cwd: ({ outputs }) => spec(outputs).cwd,
+      timeoutMs: 10 * 60 * 1000,
       statusDetail: "Deciding whether simple feature needs one fix round",
       choices: DECISION_CHOICES,
       question: ({ outputs }) => `Decide whether the simple feature workflow should pass or run one fix round.

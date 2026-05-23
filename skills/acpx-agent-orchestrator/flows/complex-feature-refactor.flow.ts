@@ -224,6 +224,7 @@ export default defineFlow({
       profile: AGENT_PROFILES.plan,
       session: { handle: "plan" },
       cwd: ({ outputs }) => spec(outputs).cwd,
+      timeoutMs: 40 * 60 * 1000,
       statusDetail: "Planning complex feature/refactor",
       prompt: ({ outputs }) => {
         const input = spec(outputs);
@@ -243,6 +244,7 @@ Create a detailed but concise implementation plan. Do not edit files. Include in
       profile: AGENT_PROFILES.review,
       session: { handle: "plan_review" },
       cwd: ({ outputs }) => spec(outputs).cwd,
+      timeoutMs: 60 * 60 * 1000,
       statusDetail: "Reviewing complex plan",
       prompt: ({ outputs }) => {
         const input = spec(outputs);
@@ -303,6 +305,7 @@ Implement the task in the working directory. Do not revert unrelated user change
       profile: AGENT_PROFILES.review,
       session: { handle: "decide_1" },
       cwd: ({ outputs }) => spec(outputs).cwd,
+      timeoutMs: 10 * 60 * 1000,
       statusDetail: "Deciding whether complex workflow needs fix round 1",
       choices: DECISION_CHOICES,
       question: ({ outputs }) => `Decide whether the complex feature/refactor workflow should pass or run fix round 1.
@@ -377,6 +380,7 @@ Fix only the issues identified above. Do not do unrelated refactors and do not r
       profile: AGENT_PROFILES.review,
       session: { handle: "decide_2" },
       cwd: ({ outputs }) => spec(outputs).cwd,
+      timeoutMs: 10 * 60 * 1000,
       statusDetail: "Deciding whether complex workflow needs final fix round",
       choices: DECISION_CHOICES,
       question: ({ outputs }) => `Decide whether the complex feature/refactor workflow should pass or run the final fix round.
