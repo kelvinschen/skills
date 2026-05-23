@@ -117,7 +117,7 @@ Fix the bug with the smallest safe scoped change. Do not revert unrelated user c
       profile: AGENT_PROFILES.test,
       session: { handle: "test" },
       cwd: ({ outputs }) => spec(outputs).cwd,
-      timeoutMs: 40 * 60 * 1000,
+      timeoutMs: 30 * 60 * 1000,
       statusDetail: "Independently testing quick bugfix",
       prompt: ({ outputs }) => {
         const input = spec(outputs);
