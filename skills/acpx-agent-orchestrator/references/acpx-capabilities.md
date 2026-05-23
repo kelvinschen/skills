@@ -11,13 +11,13 @@ This skill should reuse acpx native capabilities instead of rebuilding them in l
 | Fresh session | `acpx <agent> sessions new -s <name>` |
 | One-shot task | `acpx <agent> exec "prompt"` |
 | Prompt file or stdin | `-f <path>` or `-f -` |
-| Async queueing | `--no-wait` |
+| Agent-session async queueing | `--no-wait` |
 | Cancel in-flight work | `acpx <agent> cancel -s <name>` |
 | Session metadata | `acpx --format json <agent> sessions show <name>` |
 | Recent/full output | `sessions history --limit <n>` and `sessions read --tail <n>` |
 | Cleanup and portability | `sessions close/export/import/prune` |
 | Permissions | `--approve-all`, `--approve-reads`, `--deny-all`, `--allowed-tools`, `--no-terminal` |
-| Multi-agent workflow | `acpx flow run <file>` with `acpx/flows` |
+| Multi-agent workflow | `acpx flow run <file>` with `acpx/flows`; run long flows non-blockingly |
 
 ## Status Boundary
 
@@ -30,7 +30,9 @@ acpx --format json <agent> sessions read --tail 3 <name>
 acpx --format json <agent> sessions history --limit 5 <name>
 ```
 
-For long-running multi-step orchestration, prefer `acpx flow run`, which records run state, node outputs, traces, and artifacts under `~/.acpx/flows/runs/<runId>/`.
+For long-running multi-step orchestration, prefer `acpx flow run`, which records run state, node outputs, traces, and artifacts under `~/.acpx/flows/runs/<runId>/`. `acpx flow run` should not be used as a foreground long wait from a constrained main-agent shell. Start long flows non-blockingly and monitor the run bundle instead.
+
+Use acpx-native capabilities before adding shell mechanics. `--no-wait` is agent-session queueing for prompts such as `acpx trae --no-wait -s impl ...`.
 
 ## Token-Effective Tracking
 
@@ -43,7 +45,7 @@ RUN=~/.acpx/flows/runs/<runId>
 cat "$RUN/projections/live.json"
 ```
 
-`live.json` exposes the flow status, current node, and `sessionBindings`. When a binding contains:
+`live.json` exposes the flow `status`, current node details, and `sessionBindings`. When a binding contains:
 
 ```json
 {
@@ -61,6 +63,22 @@ acpx --cwd /repo --format json trae sessions read --tail 3 simple-feature-impl-.
 ```
 
 `sessions read --tail` returns a small JSON envelope with `entries[]` containing `role`, `timestamp`, and `textPreview`. That is usually token-effective enough for a main agent to understand progress without a custom formatter.
+
+For a non-blocking flow launch, run the workflow in the background and keep the PID, log, and run bundle:
+
+```bash
+FLOW_LOG=/tmp/acpx-flow-simple-feature.log
+nohup acpx --approve-all flow run flows/simple-feature.flow.ts \
+  --input-file flows/examples/simple-feature.input.json \
+  >"$FLOW_LOG" 2>&1 &
+FLOW_PID=$!
+echo "pid=$FLOW_PID log=$FLOW_LOG"
+
+RUN=$(ls -td ~/.acpx/flows/runs/* 2>/dev/null | head -1)
+cat "$RUN/projections/live.json"
+```
+
+If multiple flows may be active, correlate the run bundle with `flowName`, `startedAt`, and the log path before treating the newest directory as the target run.
 
 Recommended polling cadence for active work:
 
@@ -105,17 +123,23 @@ Inspect recent output:
 acpx --format json trae sessions read --tail 3 impl
 ```
 
-Choose a multi-complexity workflow when a coding task should be delegated through agents:
+Choose a multi-complexity workflow when a coding task should be delegated through agents. Start long flow runs non-blockingly. Do not rely on foreground `--timeout` values to outlast the main agent's shell limit:
 
 ```bash
-acpx --approve-all --timeout 1800 flow run flows/quick-bugfix.flow.ts \
-  --input-file flows/examples/quick-bugfix.input.json
+FLOW_LOG=/tmp/acpx-flow-quick-bugfix.log
+nohup acpx --approve-all flow run flows/quick-bugfix.flow.ts \
+  --input-file flows/examples/quick-bugfix.input.json \
+  >"$FLOW_LOG" 2>&1 &
 
-acpx --approve-all --timeout 2400 flow run flows/simple-feature.flow.ts \
-  --input-file flows/examples/simple-feature.input.json
+FLOW_LOG=/tmp/acpx-flow-simple-feature.log
+nohup acpx --approve-all flow run flows/simple-feature.flow.ts \
+  --input-file flows/examples/simple-feature.input.json \
+  >"$FLOW_LOG" 2>&1 &
 
-acpx --approve-all --timeout 3600 flow run flows/complex-feature-refactor.flow.ts \
-  --input-file flows/examples/complex-feature-refactor.input.json
+FLOW_LOG=/tmp/acpx-flow-complex-feature-refactor.log
+nohup acpx --approve-all flow run flows/complex-feature-refactor.flow.ts \
+  --input-file flows/examples/complex-feature-refactor.input.json \
+  >"$FLOW_LOG" 2>&1 &
 ```
 
 `quick-bugfix` is a short implementation plus independent test lane. `simple-feature` adds plan/review and at most one automatic fix round. `complex-feature-refactor` adds plan review and at most two automatic fix rounds. None of these templates use infinite loops.
