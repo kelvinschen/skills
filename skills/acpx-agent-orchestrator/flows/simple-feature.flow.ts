@@ -11,18 +11,32 @@ type FlowInput = {
   maxFixRounds?: number;
 };
 
+const AGENT_PROFILES = {
+  plan: "aiden",
+  impl: "trae",
+  test: "aiden",
+  review: "aiden",
+} as const;
+
 type NormalizedInput = {
   task: string;
   cwd: string;
-  planAgent: "aiden";
-  implAgent: "trae";
-  testAgent: "aiden";
-  reviewAgent: "aiden";
+  planAgent: string;
+  implAgent: string;
+  testAgent: string;
+  reviewAgent: string;
   testHints: string;
   maxFixRounds: 1;
 };
 
 const DECISION_CHOICES = ["pass", "fix"] as const;
+
+function profileAgent(profile: string, field: string): string {
+  if (!profile.trim()) {
+    throw new Error(`Flow profile \`${field}\` must be a non-empty string.`);
+  }
+  return profile.trim();
+}
 
 function normalizeInput(input: unknown): NormalizedInput {
   const record = input && typeof input === "object" ? (input as FlowInput) : {};
@@ -30,28 +44,16 @@ function normalizeInput(input: unknown): NormalizedInput {
   if (!task) {
     throw new Error("Input field `task` is required.");
   }
-  if (record.planAgent && record.planAgent !== "aiden") {
-    throw new Error("This template currently supports planAgent=aiden only.");
-  }
-  if (record.implAgent && record.implAgent !== "trae") {
-    throw new Error("This template currently supports implAgent=trae only.");
-  }
-  if (record.testAgent && record.testAgent !== "aiden") {
-    throw new Error("This template currently supports testAgent=aiden only.");
-  }
-  if (record.reviewAgent && record.reviewAgent !== "aiden") {
-    throw new Error("This template currently supports reviewAgent=aiden only.");
-  }
   if (record.maxFixRounds !== undefined && record.maxFixRounds !== 1) {
-    throw new Error("simple-feature.flow.ts supports maxFixRounds=1 only.");
+    throw new Error("simple-feature.flow.ts requires maxFixRounds=1.");
   }
   return {
     task,
     cwd: typeof record.cwd === "string" && record.cwd.trim() ? record.cwd.trim() : process.cwd(),
-    planAgent: "aiden",
-    implAgent: "trae",
-    testAgent: "aiden",
-    reviewAgent: "aiden",
+    planAgent: profileAgent(AGENT_PROFILES.plan, "plan"),
+    implAgent: profileAgent(AGENT_PROFILES.impl, "impl"),
+    testAgent: profileAgent(AGENT_PROFILES.test, "test"),
+    reviewAgent: profileAgent(AGENT_PROFILES.review, "review"),
     testHints: typeof record.testHints === "string" ? record.testHints.trim() : "",
     maxFixRounds: 1,
   };
@@ -193,10 +195,10 @@ export default defineFlow({
       }),
     }),
     plan: acp({
-      profile: "aiden",
+      profile: AGENT_PROFILES.plan,
       session: { handle: "plan" },
       cwd: ({ outputs }) => spec(outputs).cwd,
-      statusDetail: "Planning simple feature with aiden",
+      statusDetail: "Planning simple feature",
       prompt: ({ outputs }) => {
         const input = spec(outputs);
         return `You are the planning agent in a simple feature workflow.
@@ -212,11 +214,11 @@ Create a concise implementation plan. Do not edit files. Include intended behavi
       parse: trimText,
     }),
     implement_1: acp({
-      profile: "trae",
+      profile: AGENT_PROFILES.impl,
       session: { handle: "impl" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 30 * 60 * 1000,
-      statusDetail: "Implementing simple feature with trae",
+      statusDetail: "Implementing simple feature",
       prompt: ({ outputs }) => {
         const input = spec(outputs);
         return `You are the implementation agent in a simple feature workflow.
@@ -232,25 +234,25 @@ Implement the task in the working directory. Do not revert unrelated user change
       parse: trimText,
     }),
     agent_test_1: acp({
-      profile: "aiden",
+      profile: AGENT_PROFILES.test,
       session: { handle: "test_1" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 20 * 60 * 1000,
-      statusDetail: "Independently testing simple feature round 1 with aiden",
+      statusDetail: "Independently testing simple feature round 1",
       prompt: testPrompt(1, "implement_1"),
       parse: trimText,
     }),
     review_1: acp({
-      profile: "aiden",
+      profile: AGENT_PROFILES.review,
       session: { handle: "review_1" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 20 * 60 * 1000,
-      statusDetail: "Reviewing simple feature round 1 with aiden",
+      statusDetail: "Reviewing simple feature round 1",
       prompt: reviewPrompt(1, "implement_1", "agent_test_1"),
       parse: trimText,
     }),
     decide_1: decision({
-      profile: "aiden",
+      profile: AGENT_PROFILES.review,
       session: { handle: "decide_1" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       statusDetail: "Deciding whether simple feature needs one fix round",
@@ -271,11 +273,11 @@ ${String(outputs.review_1 || "")}
 Return only JSON with route and reason.`,
     }),
     implement_fix_1: acp({
-      profile: "trae",
+      profile: AGENT_PROFILES.impl,
       session: { handle: "impl" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 30 * 60 * 1000,
-      statusDetail: "Applying simple feature fix round 1 with trae",
+      statusDetail: "Applying simple feature fix round 1",
       prompt: ({ outputs }) => {
         const input = spec(outputs);
         return `You are the implementation agent applying the only automatic fix round in a simple feature workflow.
@@ -303,20 +305,20 @@ Fix only the issues identified above. Do not do unrelated refactors and do not r
       parse: trimText,
     }),
     agent_test_2: acp({
-      profile: "aiden",
+      profile: AGENT_PROFILES.test,
       session: { handle: "test_2" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 20 * 60 * 1000,
-      statusDetail: "Independently testing simple feature fix round with aiden",
+      statusDetail: "Independently testing simple feature fix round",
       prompt: testPrompt(2, "implement_fix_1"),
       parse: trimText,
     }),
     review_2: acp({
-      profile: "aiden",
+      profile: AGENT_PROFILES.review,
       session: { handle: "review_2" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 20 * 60 * 1000,
-      statusDetail: "Reviewing simple feature fix round with aiden",
+      statusDetail: "Reviewing simple feature fix round",
       prompt: reviewPrompt(2, "implement_fix_1", "agent_test_2"),
       parse: trimText,
     }),

@@ -9,14 +9,26 @@ type FlowInput = {
   maxFixRounds?: number;
 };
 
+const AGENT_PROFILES = {
+  impl: "trae",
+  test: "aiden",
+} as const;
+
 type NormalizedInput = {
   task: string;
   cwd: string;
-  implAgent: "trae";
-  testAgent: "aiden";
+  implAgent: string;
+  testAgent: string;
   testHints: string;
   maxFixRounds: 0;
 };
+
+function profileAgent(profile: string, field: string): string {
+  if (!profile.trim()) {
+    throw new Error(`Flow profile \`${field}\` must be a non-empty string.`);
+  }
+  return profile.trim();
+}
 
 function normalizeInput(input: unknown): NormalizedInput {
   const record = input && typeof input === "object" ? (input as FlowInput) : {};
@@ -24,20 +36,14 @@ function normalizeInput(input: unknown): NormalizedInput {
   if (!task) {
     throw new Error("Input field `task` is required.");
   }
-  if (record.implAgent && record.implAgent !== "trae") {
-    throw new Error("This template currently supports implAgent=trae only.");
-  }
-  if (record.testAgent && record.testAgent !== "aiden") {
-    throw new Error("This template currently supports testAgent=aiden only.");
-  }
   if (record.maxFixRounds !== undefined && record.maxFixRounds !== 0) {
-    throw new Error("quick-bugfix.flow.ts supports maxFixRounds=0 only.");
+    throw new Error("quick-bugfix.flow.ts requires maxFixRounds=0.");
   }
   return {
     task,
     cwd: typeof record.cwd === "string" && record.cwd.trim() ? record.cwd.trim() : process.cwd(),
-    implAgent: "trae",
-    testAgent: "aiden",
+    implAgent: profileAgent(AGENT_PROFILES.impl, "impl"),
+    testAgent: profileAgent(AGENT_PROFILES.test, "test"),
     testHints: typeof record.testHints === "string" ? record.testHints.trim() : "",
     maxFixRounds: 0,
   };
@@ -88,11 +94,11 @@ export default defineFlow({
       }),
     }),
     implement: acp({
-      profile: "trae",
+      profile: AGENT_PROFILES.impl,
       session: { handle: "impl" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 30 * 60 * 1000,
-      statusDetail: "Applying quick bugfix with trae",
+      statusDetail: "Applying quick bugfix",
       prompt: ({ outputs }) => {
         const input = spec(outputs);
         return `You are the implementation agent in a quick bugfix workflow.
@@ -108,11 +114,11 @@ Fix the bug with the smallest safe scoped change. Do not revert unrelated user c
       parse: trimText,
     }),
     agent_test: acp({
-      profile: "aiden",
+      profile: AGENT_PROFILES.test,
       session: { handle: "test" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 20 * 60 * 1000,
-      statusDetail: "Independently testing quick bugfix with aiden",
+      statusDetail: "Independently testing quick bugfix",
       prompt: ({ outputs }) => {
         const input = spec(outputs);
         return `You are the independent testing agent in a quick bugfix workflow.

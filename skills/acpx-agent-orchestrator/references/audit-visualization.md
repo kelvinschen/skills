@@ -8,7 +8,7 @@ Use `scripts/acpx-visualize` for ended flow/session audit reports. It is intenti
 scripts/acpx-visualize --flow-run ~/.acpx/flows/runs/<runId>
 scripts/acpx-visualize --flow-run latest --output /tmp/acpx-audit.html
 scripts/acpx-visualize --session-json session-show.json --output /tmp/acpx-session-audit.html
-scripts/acpx-visualize --agent trae --cwd /repo --session impl
+scripts/acpx-visualize --agent <agent> --cwd /repo --session impl
 ```
 
 ## Data Sources

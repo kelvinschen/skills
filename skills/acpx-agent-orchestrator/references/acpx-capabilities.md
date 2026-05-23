@@ -17,7 +17,7 @@ This skill should reuse acpx native capabilities instead of rebuilding them in l
 | Recent/full output | `sessions history --limit <n>` and `sessions read --tail <n>` |
 | Cleanup and portability | `sessions close/export/import/prune` |
 | Permissions | `--approve-all`, `--approve-reads`, `--deny-all`, `--allowed-tools`, `--no-terminal` |
-| Multi-agent workflow | `acpx flow run <file>` with `acpx/flows`; run long flows non-blockingly |
+| Multi-agent workflow | `acpx flow run <file>` with `acpx/flows`; use `scripts/acpx-flow-run` for per-lane agent profiles |
 
 ## Status Boundary
 
@@ -26,13 +26,14 @@ This skill should reuse acpx native capabilities instead of rebuilding them in l
 Do not use `status` alone as proof that a specific prompt turn has completed. For task output and completion evidence, prefer token-effective reads:
 
 ```bash
-acpx --format json <agent> sessions read --tail 3 <name>
-acpx --format json <agent> sessions history --limit 5 <name>
+AGENT=trae
+acpx --format json "$AGENT" sessions read --tail 3 impl
+acpx --format json "$AGENT" sessions history --limit 5 impl
 ```
 
 For long-running multi-step orchestration, prefer `acpx flow run`, which records run state, node outputs, traces, and artifacts under `~/.acpx/flows/runs/<runId>/`. `acpx flow run` should not be used as a foreground long wait from a constrained main-agent shell. Start long flows non-blockingly and monitor the run bundle instead.
 
-Use acpx-native capabilities before adding shell mechanics. `--no-wait` is agent-session queueing for prompts such as `acpx trae --no-wait -s impl ...`.
+Use acpx-native capabilities before adding shell mechanics. `--no-wait` is agent-session queueing for prompts such as `acpx <agent> --no-wait -s impl ...`.
 
 ## Token-Effective Tracking
 
@@ -50,7 +51,7 @@ cat "$RUN/projections/live.json"
 ```json
 {
   "handle": "impl",
-  "agentName": "trae",
+  "agentName": "<agent>",
   "cwd": "/repo",
   "name": "simple-feature-impl-..."
 }
@@ -59,23 +60,29 @@ cat "$RUN/projections/live.json"
 read that agent's recent output:
 
 ```bash
-acpx --cwd /repo --format json trae sessions read --tail 3 simple-feature-impl-...
+AGENT=trae
+acpx --cwd /repo --format json "$AGENT" sessions read --tail 3 simple-feature-impl-...
 ```
 
 `sessions read --tail` returns a small JSON envelope with `entries[]` containing `role`, `timestamp`, and `textPreview`. That is usually token-effective enough for a main agent to understand progress without a custom formatter.
 
-For a non-blocking flow launch, run the workflow in the background and keep the PID, log, and run bundle:
+For per-lane flow orchestration, use `scripts/acpx-flow-run` to materialize static node profiles and launch the workflow:
 
 ```bash
 FLOW_LOG=/tmp/acpx-flow-simple-feature.log
-nohup acpx --approve-all flow run flows/simple-feature.flow.ts \
+scripts/acpx-flow-run simple-feature \
   --input-file flows/examples/simple-feature.input.json \
-  >"$FLOW_LOG" 2>&1 &
-FLOW_PID=$!
-echo "pid=$FLOW_PID log=$FLOW_LOG"
+  --log "$FLOW_LOG"
 
 RUN=$(ls -td ~/.acpx/flows/runs/* 2>/dev/null | head -1)
 cat "$RUN/projections/live.json"
+```
+
+The launcher defaults to background execution and `--approve-all`. Flow templates provide default profiles. Input role fields override template defaults, and environment variables override input role fields:
+
+```bash
+PLAN_AGENT=aiden IMPLEMENT_AGENT=trae TEST_AGENT=trae REVIEW_AGENT=aiden \
+  scripts/acpx-flow-run simple-feature --input-file flows/examples/simple-feature.input.json
 ```
 
 If multiple flows may be active, correlate the run bundle with `flowName`, `startedAt`, and the log path before treating the newest directory as the target run.
@@ -94,8 +101,10 @@ At each poll, read `live.json` or the relevant `sessions read --tail 3` output. 
 For ordinary named sessions:
 
 ```bash
-acpx --cwd /repo --format json aiden sessions read --tail 3 review
-acpx --cwd /repo --format json trae sessions read --tail 3 impl
+REVIEW_AGENT=aiden
+IMPLEMENT_AGENT=trae
+acpx --cwd /repo --format json "$REVIEW_AGENT" sessions read --tail 3 review
+acpx --cwd /repo --format json "$IMPLEMENT_AGENT" sessions read --tail 3 impl
 ```
 
 Use `sessions history --limit 5` when you need a short history index. Use `sessions show` only when metadata or full messages are specifically needed; it is much heavier than `read --tail`.
@@ -107,43 +116,46 @@ For low-frequency post-run audit reports, see [audit-visualization.md](audit-vis
 Simple planning or review:
 
 ```bash
-acpx aiden -s review --approve-reads --no-terminal --cwd /repo \
+REVIEW_AGENT=aiden
+acpx "$REVIEW_AGENT" -s review --approve-reads --no-terminal --cwd /repo \
   "Review the current diff for bugs, regressions, and missing tests."
 ```
 
 Bounded implementation:
 
 ```bash
-acpx trae -s impl --approve-all --cwd /repo -f task.md
+IMPLEMENT_AGENT=trae
+acpx "$IMPLEMENT_AGENT" -s impl --approve-all --cwd /repo -f task.md
 ```
 
 Inspect recent output:
 
 ```bash
-acpx --format json trae sessions read --tail 3 impl
+AGENT=trae
+acpx --format json "$AGENT" sessions read --tail 3 impl
 ```
 
 Choose a multi-complexity workflow when a coding task should be delegated through agents. Start long flow runs non-blockingly. Do not rely on foreground `--timeout` values to outlast the main agent's shell limit:
 
 ```bash
 FLOW_LOG=/tmp/acpx-flow-quick-bugfix.log
-nohup acpx --approve-all flow run flows/quick-bugfix.flow.ts \
+scripts/acpx-flow-run quick-bugfix \
   --input-file flows/examples/quick-bugfix.input.json \
-  >"$FLOW_LOG" 2>&1 &
+  --log "$FLOW_LOG"
 
 FLOW_LOG=/tmp/acpx-flow-simple-feature.log
-nohup acpx --approve-all flow run flows/simple-feature.flow.ts \
+scripts/acpx-flow-run simple-feature \
   --input-file flows/examples/simple-feature.input.json \
-  >"$FLOW_LOG" 2>&1 &
+  --log "$FLOW_LOG"
 
 FLOW_LOG=/tmp/acpx-flow-complex-feature-refactor.log
-nohup acpx --approve-all flow run flows/complex-feature-refactor.flow.ts \
+scripts/acpx-flow-run complex-feature-refactor \
   --input-file flows/examples/complex-feature-refactor.input.json \
-  >"$FLOW_LOG" 2>&1 &
+  --log "$FLOW_LOG"
 ```
 
 `quick-bugfix` is a short implementation plus independent test lane. `simple-feature` adds plan/review and at most one automatic fix round. `complex-feature-refactor` adds plan review and at most two automatic fix rounds. None of these templates use infinite loops.
 
-Agent testing is a quality signal, not a live tracking mechanism. The test lane runs as `aiden` with the same flow-level permissions as the rest of the run, so its "do not change unrelated production code" rule is enforced by prompt discipline and post-run audit rather than a separate acpx permission boundary. Use `scripts/acpx-visualize` after completion to inspect the test agent's tools, commands, file writes, and outputs.
+Agent testing is a quality signal, not a live tracking mechanism. Test lanes run with the same flow-level permissions as the rest of the run, so their "do not change unrelated production code" rule is enforced by prompt discipline and post-run audit rather than a separate acpx permission boundary. Use `scripts/acpx-visualize` after completion to inspect the test agent's tools, commands, file writes, and outputs.
 
 The bundled flows create the target `cwd` before invoking ACP agents, because agent subprocesses cannot spawn with a missing working directory.
