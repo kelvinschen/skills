@@ -17,8 +17,14 @@ echo "== acpx config =="
 acpx config show
 echo
 
+if [[ "$#" -gt 0 ]]; then
+  AGENTS=("$@")
+else
+  read -r -a AGENTS <<<"${ACPX_HEALTHCHECK_AGENTS:-trae aiden}"
+fi
+
 echo "== local commands =="
-for cmd in trae aiden acpx; do
+for cmd in "${AGENTS[@]}" acpx; do
   if command -v "$cmd" >/dev/null 2>&1; then
     printf '%-8s %s\n' "$cmd" "$(command -v "$cmd")"
   else
@@ -27,9 +33,8 @@ for cmd in trae aiden acpx; do
 done
 echo
 
-echo "== trae help =="
-acpx trae --help | sed -n '1,120p'
-echo
-
-echo "== aiden help =="
-acpx aiden --help | sed -n '1,120p'
+for agent in "${AGENTS[@]}"; do
+  echo "== ${agent} help =="
+  acpx "$agent" --help | sed -n '1,120p'
+  echo
+done

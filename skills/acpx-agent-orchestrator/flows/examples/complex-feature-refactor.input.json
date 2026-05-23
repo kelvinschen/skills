@@ -3,7 +3,7 @@
   "cwd": "/tmp/acpx-complex-feature-smoke",
   "planAgent": "aiden",
   "implAgent": "trae",
-  "testAgent": "aiden",
+  "testAgent": "trae",
   "reviewAgent": "aiden",
   "testHints": "Cover migration risk, regressions, and black-box behavior. Prefer exercising the real command surface when possible.",
   "maxFixRounds": 2

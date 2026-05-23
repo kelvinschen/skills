@@ -11,18 +11,32 @@ type FlowInput = {
   maxFixRounds?: number;
 };
 
+const AGENT_PROFILES = {
+  plan: "aiden",
+  impl: "trae",
+  test: "aiden",
+  review: "aiden",
+} as const;
+
 type NormalizedInput = {
   task: string;
   cwd: string;
-  planAgent: "aiden";
-  implAgent: "trae";
-  testAgent: "aiden";
-  reviewAgent: "aiden";
+  planAgent: string;
+  implAgent: string;
+  testAgent: string;
+  reviewAgent: string;
   testHints: string;
   maxFixRounds: 2;
 };
 
 const DECISION_CHOICES = ["pass", "fix"] as const;
+
+function profileAgent(profile: string, field: string): string {
+  if (!profile.trim()) {
+    throw new Error(`Flow profile \`${field}\` must be a non-empty string.`);
+  }
+  return profile.trim();
+}
 
 function normalizeInput(input: unknown): NormalizedInput {
   const record = input && typeof input === "object" ? (input as FlowInput) : {};
@@ -30,28 +44,16 @@ function normalizeInput(input: unknown): NormalizedInput {
   if (!task) {
     throw new Error("Input field `task` is required.");
   }
-  if (record.planAgent && record.planAgent !== "aiden") {
-    throw new Error("This template currently supports planAgent=aiden only.");
-  }
-  if (record.implAgent && record.implAgent !== "trae") {
-    throw new Error("This template currently supports implAgent=trae only.");
-  }
-  if (record.testAgent && record.testAgent !== "aiden") {
-    throw new Error("This template currently supports testAgent=aiden only.");
-  }
-  if (record.reviewAgent && record.reviewAgent !== "aiden") {
-    throw new Error("This template currently supports reviewAgent=aiden only.");
-  }
   if (record.maxFixRounds !== undefined && record.maxFixRounds !== 2) {
-    throw new Error("complex-feature-refactor.flow.ts supports maxFixRounds=2 only.");
+    throw new Error("complex-feature-refactor.flow.ts requires maxFixRounds=2.");
   }
   return {
     task,
     cwd: typeof record.cwd === "string" && record.cwd.trim() ? record.cwd.trim() : process.cwd(),
-    planAgent: "aiden",
-    implAgent: "trae",
-    testAgent: "aiden",
-    reviewAgent: "aiden",
+    planAgent: profileAgent(AGENT_PROFILES.plan, "plan"),
+    implAgent: profileAgent(AGENT_PROFILES.impl, "impl"),
+    testAgent: profileAgent(AGENT_PROFILES.test, "test"),
+    reviewAgent: profileAgent(AGENT_PROFILES.review, "review"),
     testHints: typeof record.testHints === "string" ? record.testHints.trim() : "",
     maxFixRounds: 2,
   };
@@ -219,10 +221,10 @@ export default defineFlow({
       }),
     }),
     plan: acp({
-      profile: "aiden",
+      profile: AGENT_PROFILES.plan,
       session: { handle: "plan" },
       cwd: ({ outputs }) => spec(outputs).cwd,
-      statusDetail: "Planning complex feature/refactor with aiden",
+      statusDetail: "Planning complex feature/refactor",
       prompt: ({ outputs }) => {
         const input = spec(outputs);
         return `You are the planning agent in a complex feature/refactor workflow.
@@ -238,10 +240,10 @@ Create a detailed but concise implementation plan. Do not edit files. Include in
       parse: trimText,
     }),
     plan_review: acp({
-      profile: "aiden",
+      profile: AGENT_PROFILES.review,
       session: { handle: "plan_review" },
       cwd: ({ outputs }) => spec(outputs).cwd,
-      statusDetail: "Reviewing complex plan with aiden",
+      statusDetail: "Reviewing complex plan",
       prompt: ({ outputs }) => {
         const input = spec(outputs);
         return `You are the plan review agent in a complex feature/refactor workflow.
@@ -257,11 +259,11 @@ Review the plan before implementation. Do not edit files. Identify missing const
       parse: trimText,
     }),
     implement_1: acp({
-      profile: "trae",
+      profile: AGENT_PROFILES.impl,
       session: { handle: "impl" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 45 * 60 * 1000,
-      statusDetail: "Implementing complex feature/refactor with trae",
+      statusDetail: "Implementing complex feature/refactor",
       prompt: ({ outputs }) => {
         const input = spec(outputs);
         return `You are the implementation agent in a complex feature/refactor workflow.
@@ -280,25 +282,25 @@ Implement the task in the working directory. Do not revert unrelated user change
       parse: trimText,
     }),
     agent_test_1: acp({
-      profile: "aiden",
+      profile: AGENT_PROFILES.test,
       session: { handle: "test_1" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 25 * 60 * 1000,
-      statusDetail: "Independently testing complex feature/refactor round 1 with aiden",
+      statusDetail: "Independently testing complex feature/refactor round 1",
       prompt: testPrompt(1, "implement_1"),
       parse: trimText,
     }),
     review_1: acp({
-      profile: "aiden",
+      profile: AGENT_PROFILES.review,
       session: { handle: "review_1" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 25 * 60 * 1000,
-      statusDetail: "Reviewing complex feature/refactor round 1 with aiden",
+      statusDetail: "Reviewing complex feature/refactor round 1",
       prompt: reviewPrompt(1, "implement_1", "agent_test_1", false),
       parse: trimText,
     }),
     decide_1: decision({
-      profile: "aiden",
+      profile: AGENT_PROFILES.review,
       session: { handle: "decide_1" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       statusDetail: "Deciding whether complex workflow needs fix round 1",
@@ -319,11 +321,11 @@ ${String(outputs.review_1 || "")}
 Return only JSON with route and reason.`,
     }),
     implement_fix_1: acp({
-      profile: "trae",
+      profile: AGENT_PROFILES.impl,
       session: { handle: "impl" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 45 * 60 * 1000,
-      statusDetail: "Applying complex fix round 1 with trae",
+      statusDetail: "Applying complex fix round 1",
       prompt: ({ outputs }) => {
         const input = spec(outputs);
         return `You are the implementation agent applying fix round 1 in a complex feature/refactor workflow.
@@ -354,25 +356,25 @@ Fix only the issues identified above. Do not do unrelated refactors and do not r
       parse: trimText,
     }),
     agent_test_2: acp({
-      profile: "aiden",
+      profile: AGENT_PROFILES.test,
       session: { handle: "test_2" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 25 * 60 * 1000,
-      statusDetail: "Independently testing complex fix round 1 with aiden",
+      statusDetail: "Independently testing complex fix round 1",
       prompt: testPrompt(2, "implement_fix_1"),
       parse: trimText,
     }),
     review_2: acp({
-      profile: "aiden",
+      profile: AGENT_PROFILES.review,
       session: { handle: "review_2" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 25 * 60 * 1000,
-      statusDetail: "Reviewing complex fix round 1 with aiden",
+      statusDetail: "Reviewing complex fix round 1",
       prompt: reviewPrompt(2, "implement_fix_1", "agent_test_2", false),
       parse: trimText,
     }),
     decide_2: decision({
-      profile: "aiden",
+      profile: AGENT_PROFILES.review,
       session: { handle: "decide_2" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       statusDetail: "Deciding whether complex workflow needs final fix round",
@@ -394,11 +396,11 @@ ${String(outputs.review_2 || "")}
 Return only JSON with route and reason.`,
     }),
     implement_fix_2: acp({
-      profile: "trae",
+      profile: AGENT_PROFILES.impl,
       session: { handle: "impl" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 45 * 60 * 1000,
-      statusDetail: "Applying final complex fix round with trae",
+      statusDetail: "Applying final complex fix round",
       prompt: ({ outputs }) => {
         const input = spec(outputs);
         return `You are the implementation agent applying the final automatic fix round in a complex feature/refactor workflow.
@@ -436,20 +438,20 @@ Fix only the issues identified above. This is the final automatic fix round. Do 
       parse: trimText,
     }),
     agent_test_3: acp({
-      profile: "aiden",
+      profile: AGENT_PROFILES.test,
       session: { handle: "test_3" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 25 * 60 * 1000,
-      statusDetail: "Independently testing final complex fix round with aiden",
+      statusDetail: "Independently testing final complex fix round",
       prompt: testPrompt(3, "implement_fix_2"),
       parse: trimText,
     }),
     review_3: acp({
-      profile: "aiden",
+      profile: AGENT_PROFILES.review,
       session: { handle: "review_3" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 25 * 60 * 1000,
-      statusDetail: "Reviewing final complex fix round with aiden",
+      statusDetail: "Reviewing final complex fix round",
       prompt: reviewPrompt(3, "implement_fix_2", "agent_test_3", true),
       parse: trimText,
     }),

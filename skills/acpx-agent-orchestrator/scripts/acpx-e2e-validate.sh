@@ -56,5 +56,12 @@ run_session_probe() {
 echo "Using: acpx"
 echo "Timeout: ${TIMEOUT_SECONDS}s"
 
-run_session_probe trae
-run_session_probe aiden
+if [[ "$#" -gt 0 ]]; then
+  AGENTS=("$@")
+else
+  read -r -a AGENTS <<<"${ACPX_E2E_AGENTS:-trae aiden}"
+fi
+
+for agent in "${AGENTS[@]}"; do
+  run_session_probe "$agent"
+done

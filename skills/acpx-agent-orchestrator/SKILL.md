@@ -1,6 +1,6 @@
 ---
 name: acpx-agent-orchestrator
-description: Use this skill when a general AI agent needs to orchestrate specialized coding agents through openclaw/acpx and the Agent Client Protocol. It covers acpx setup, session-based delegation, and routing work between the supported trae and aiden agents.
+description: Use this skill when a general AI agent needs to orchestrate specialized coding agents through openclaw/acpx and the Agent Client Protocol. It covers acpx setup, session-based delegation, flow-first orchestration, and routing work across registered acpx agents (eg: `aiden`, `trae`).
 ---
 
 # ACPX Agent Orchestrator
@@ -9,7 +9,7 @@ Use `acpx` as the orchestration boundary. The current agent should coordinate, i
 
 ## Core Rules
 
-- Assume `acpx`, `trae`, and `aiden` are ready. Do not run validation up front during normal work.
+- Assume `acpx` is ready and registered agents are available. Examples use `aiden` and `trae`. Do not run validation up front during normal work.
 - Read [references/acpx-capabilities.md](references/acpx-capabilities.md) for command boundaries and [references/agent-routing.md](references/agent-routing.md) for routing detail.
 - Before changing acpx config, read [references/acpx-config.md](references/acpx-config.md). `trae` is native; keep only custom agents acpx does not provide.
 - Use `status` only for local process/session-owner health, not as proof that a prompt or flow completed.
@@ -20,32 +20,32 @@ Use `acpx` as the orchestration boundary. The current agent should coordinate, i
 | Stage | Default | Required output/check |
 | --- | --- | --- |
 | Intake | Orchestrator inspects `git status --short`, likely files, manifests, and tests before delegation. | Restate task, deliverables, constraints, and risk. Ask only for product intent that cannot be derived from the repo. |
-| Plan | Prefer `aiden` in read-only mode. | Target behavior, likely edits, risks, and tests. |
-| Implement | Prefer non-blocking flow templates. Use direct `trae -s impl` only for lightweight bounded work outside a flow. | Keep scope bounded; use worktrees or explicit stop points for high-risk repos. |
-| Review | Prefer `aiden` in read-only mode. | Findings with file references, severity, and concrete fixes. |
+| Plan | Use a registered planning agent in read-only mode. | Target behavior, likely edits, risks, and tests. |
+| Implement | Prefer non-blocking flow templates. Use a direct implementation agent session only for lightweight bounded work outside a flow. | Keep scope bounded; use worktrees or explicit stop points for high-risk repos. |
+| Review | Use a registered review agent in read-only mode. | Findings with file references, severity, and concrete fixes. |
 | Verify | Ask the implementer to run agreed checks, then inspect directly. | Final `git status --short`, relevant diffs, and test/build result before reporting completion. |
 
 Direct lanes are supplemental and should use named sessions such as `-s plan`, `-s impl`, and `-s review` for continuity.
 
 ## Non-Blocking Flow-First Orchestration
 
-For normal delegation, prefer bundled flow templates over custom helper scripts. Choose the lightest template that matches the task risk, then start it non-blockingly. Do not fix main-agent bash timeouts by increasing `--timeout`; long flow work must return control to the orchestrator and be monitored through run artifacts.
+For normal delegation, prefer bundled flow templates launched through `scripts/acpx-flow-run` so each lane can use its role agent. Choose the lightest template that matches the task risk, then start it non-blockingly. Do not fix main-agent bash timeouts by increasing `--timeout`; long flow work must return control to the orchestrator and be monitored through run artifacts.
 
 | Flow | Use when | Behavior |
 | --- | --- | --- |
-| `quick-bugfix` | Small, clear, low-risk fixes. | `trae` implements; `aiden` tests; no auto-fix. |
-| `simple-feature` | Local feature work. | `aiden` plans/tests/reviews; `trae` implements; at most one fix round. |
+| `quick-bugfix` | Small, clear, low-risk fixes. | Implements and independently tests; no auto-fix. |
+| `simple-feature` | Local feature work. | Plans, implements, tests, reviews; at most one fix round. |
 | `complex-feature-refactor` | Cross-file features, refactors, migrations, high-risk changes. | Adds plan review; at most two fix rounds. |
 
 ```bash
-FLOW=quick-bugfix
+FLOW=simple-feature
 FLOW_LOG=/tmp/acpx-flow-$FLOW.log
-nohup acpx --approve-all flow run "flows/$FLOW.flow.ts" \
+scripts/acpx-flow-run "$FLOW" \
   --input-file "flows/examples/$FLOW.input.json" \
-  >"$FLOW_LOG" 2>&1 &
-FLOW_PID=$!
-echo "pid=$FLOW_PID log=$FLOW_LOG"
+  --log "$FLOW_LOG"
 ```
+
+Flow templates include default profiles. Override lane agents through input fields or environment variables: `PLAN_AGENT`, `IMPLEMENT_AGENT`, `TEST_AGENT`, and `REVIEW_AGENT`. Environment variables override input role fields.
 
 After launch, record the PID and log path, then identify the newest run bundle. If other flows may be active, correlate the bundle with `flowName`, `startedAt`, and the log path before treating it as the target run:
 
@@ -61,7 +61,8 @@ The bundled templates create the input `cwd` before starting agent nodes. For se
 ## Permissions
 
 - Use `--approve-reads` for planning, analysis, and review.
-- Use `--approve-all` only for the implementation lane after scope is clear.
+- `scripts/acpx-flow-run` defaults to `--approve-all`; pass explicit acpx flags after `--` only when overriding permissions.
+- Use `--approve-all` for direct implementation sessions only after scope is clear.
 - Use `--deny-all` or `--non-interactive-permissions fail` for pure summarization.
 - Avoid `--agent` raw command aliases except for temporary, probed commands.
 
@@ -74,8 +75,10 @@ The bundled templates create the input `cwd` before starting agent nodes. For se
   ```
 - For ordinary named sessions, use compact reads:
   ```bash
-  acpx --cwd /repo --format json aiden sessions read --tail 3 review
-  acpx --cwd /repo --format json trae sessions read --tail 3 impl
+  REVIEW_AGENT=aiden
+  IMPLEMENT_AGENT=trae
+  acpx --cwd /repo --format json "$REVIEW_AGENT" sessions read --tail 3 review
+  acpx --cwd /repo --format json "$IMPLEMENT_AGENT" sessions read --tail 3 impl
   ```
 - Use `sessions history --limit 5` for a short history index. Avoid `sessions show` and raw `.stream.ndjson` for routine tracking.
 - Poll active flow/session status with a long-to-short cadence to avoid both stale waiting and context waste: 120s x 2, then 90s x 3, then 60s x 4, then stay at 60s unless the user asks for faster monitoring.
@@ -86,5 +89,5 @@ For low-frequency post-run audit reports, read [references/audit-visualization.m
 
 - If a session is stale, use `<agent> sessions` and `<agent> sessions ensure --name <lane>`.
 - If a prompt is stuck, use `<agent> cancel -s <lane>`, then retry once with a narrower prompt.
-- If `trae` or `aiden` fails, do not silently route to unrelated agents. Run `scripts/acpx-e2e-validate.sh` only when the failure reason is unclear and a fresh session probe is needed.
+- If an agent fails, do not silently route to an unrelated agent. Run `scripts/acpx-e2e-validate.sh <agent>` only when the failure reason is unclear and a fresh session probe is needed.
 - If `acpx` is absent, report the missing dependency instead of using `npx`.

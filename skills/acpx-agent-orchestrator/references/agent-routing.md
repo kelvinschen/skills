@@ -7,24 +7,24 @@ The orchestrator owns product judgment, decomposition, status, and final accepta
 Planning lane:
 
 - Purpose: turn ambiguous user intent into an implementation plan.
-- Preferred agent: `aiden`.
-- Fallback: `trae` only if `aiden` is unavailable.
+- Agent: any registered acpx agent suitable for planning.
+- Example: `aiden`.
 - Permissions: `--approve-reads --no-terminal`.
 - Required output: target behavior, files/modules likely touched, risks, test plan.
 
 Implementation lane:
 
 - Purpose: apply accepted code changes.
-- Preferred agent: `trae`.
-- Fallback: `aiden` only for bounded implementation tasks.
+- Agent: any registered acpx agent suitable for code edits.
+- Example: `trae`.
 - Permissions: `--approve-all` after scope is accepted.
 - Required output: change summary, tests run, unresolved issues.
 
 Review lane:
 
 - Purpose: find regressions, missed requirements, unsafe edits, and missing tests.
-- Preferred agent: `aiden`.
-- Fallback: `trae` in read-only mode.
+- Agent: any registered acpx agent suitable for review.
+- Example: `aiden`.
 - Permissions: `--approve-reads --no-terminal`.
 - Required output: findings first, ordered by severity, with file references.
 

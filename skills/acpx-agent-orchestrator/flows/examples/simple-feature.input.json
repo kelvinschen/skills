@@ -3,7 +3,7 @@
   "cwd": "/tmp/acpx-simple-feature-smoke",
   "planAgent": "aiden",
   "implAgent": "trae",
-  "testAgent": "aiden",
+  "testAgent": "trae",
   "reviewAgent": "aiden",
   "testHints": "Create black-box checks that validate the user-visible behavior, not only implementation details.",
   "maxFixRounds": 1
