@@ -130,6 +130,7 @@ function parseSessionRecord(record, options = {}) {
   const sessionLabel = binding?.handle || record.name || record.acpxRecordId || "session";
   const conversation = [];
   const tools = [];
+  let lastAssistantText = "";
   let messageIndex = 0;
 
   for (const message of Array.isArray(record.messages) ? record.messages : []) {
@@ -148,6 +149,7 @@ function parseSessionRecord(record, options = {}) {
     const toolResults = message.Agent.tool_results || {};
     for (const part of content) {
       if (typeof part?.Text === "string" && part.Text.trim()) {
+        lastAssistantText = part.Text;
         conversation.push({
           type: "assistant",
           messageIndex,
@@ -189,10 +191,54 @@ function parseSessionRecord(record, options = {}) {
       closed: Boolean(record.closed),
       messageCount: Array.isArray(record.messages) ? record.messages.length : 0,
       toolCount: tools.length,
+      lastAssistantText,
     },
     conversation,
     tools,
   };
+}
+
+function sessionLookupKeys(session) {
+  return [
+    session.binding?.bundleId,
+    session.binding?.handle,
+    session.binding?.name,
+    session.binding?.acpxRecordId,
+    session.binding?.acpSessionId,
+    session.summary?.id,
+    session.summary?.name,
+    session.label,
+  ].filter(Boolean);
+}
+
+function stepSessionLookupKeys(step) {
+  return [
+    step.session?.bundleId,
+    step.session?.handle,
+    step.session?.name,
+    step.session?.acpxRecordId,
+    step.session?.acpSessionId,
+    step.sessionHandle,
+    step.sessionName,
+  ].filter(Boolean);
+}
+
+function buildSessionLookup(sessions) {
+  const lookup = new Map();
+  for (const session of sessions) {
+    for (const key of sessionLookupKeys(session)) {
+      if (!lookup.has(key)) lookup.set(key, session);
+    }
+  }
+  return lookup;
+}
+
+function findTimelineSession(step, sessionLookup) {
+  for (const key of stepSessionLookupKeys(step)) {
+    const session = sessionLookup.get(key);
+    if (session) return session;
+  }
+  return null;
 }
 
 function resolveLatestFlowRun() {
@@ -225,21 +271,30 @@ function loadFlowRun(inputPath) {
     if (!record) continue;
     sessions.push(parseSessionRecord(record, { binding }));
   }
+  const sessionLookup = buildSessionLookup(sessions);
 
-  const timeline = steps.map((step) => ({
-    nodeId: step.nodeId,
-    nodeType: step.nodeType,
-    outcome: step.outcome,
-    startedAt: step.startedAt,
-    finishedAt: step.finishedAt,
-    durationMs: step.durationMs ?? durationMs(step.startedAt, step.finishedAt),
-    agentName: step.agent?.agentName || step.session?.agentName || null,
-    sessionHandle: step.session?.handle || null,
-    sessionName: step.session?.name || null,
-    outputSummary: stringifyPreview(step.output),
-    error: step.error || null,
-    traceKeys: Object.keys(step.trace || {}),
-  }));
+  const timeline = steps.map((step) => {
+    const session = findTimelineSession(step, sessionLookup);
+    const timelineStep = {
+      nodeId: step.nodeId,
+      nodeType: step.nodeType,
+      outcome: step.outcome,
+      startedAt: step.startedAt,
+      finishedAt: step.finishedAt,
+      durationMs: step.durationMs ?? durationMs(step.startedAt, step.finishedAt),
+      agentName: step.agent?.agentName || step.session?.agentName || null,
+      sessionHandle: step.session?.handle || null,
+      sessionName: step.session?.name || null,
+      outputSummary: stringifyPreview(step.output),
+      error: step.error || null,
+      traceKeys: Object.keys(step.trace || {}),
+    };
+    const lastAssistantText = session?.summary?.lastAssistantText;
+    if (lastAssistantText) {
+      timelineStep.outputSummary = truncate(lastAssistantText);
+    }
+    return timelineStep;
+  });
 
   return {
     type: "flow",
@@ -399,10 +454,11 @@ function renderTimeline(audit) {
 
 function renderConversationItem(item) {
   if (item.type === "user" || item.type === "assistant") {
+    const fullText = item.text || "";
     return `
-      <article class="message message-${esc(item.type)} searchable" data-search="${esc(item.text)}">
+      <article class="message message-${esc(item.type)} searchable" data-search="${esc(truncate(fullText))}">
         <div class="message-title">${esc(item.type)}</div>
-        <pre>${esc(item.text || "")}</pre>
+        <pre>${esc(fullText)}</pre>
       </article>
     `;
   }
