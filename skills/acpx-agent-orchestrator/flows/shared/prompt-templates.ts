@@ -15,7 +15,7 @@ Do not duplicate content already captured in other artifacts, such as PRDs, plan
 Redact sensitive information, such as API keys, passwords, tokens, secrets, or personally identifiable information.
 Tailor the handoff to this next focus: ${options.nextFocus}
 
-End your response with these marker lines:
+End your response with these handoff marker lines when possible. They improve flow summaries, but the response itself should still be a useful handoff if the markers are missed:
 HANDOFF_PATH: ${options.targetPath}
 HANDOFF_SUMMARY: <compact summary>${extraMarkers}`;
 }
@@ -32,7 +32,7 @@ Return:
 }
 
 export function testVerdictMarkerPrompt(): string {
-  return `Include exactly one verdict marker line:
+  return `The following verdict marker drives flow routing. Include exactly one of these marker lines at the end of your response:
 TEST_VERDICT: pass
 or
 TEST_VERDICT: fail`;
@@ -57,14 +57,13 @@ Include a compact handoff and reference detailed artifacts by path instead of co
 
 export function reviewVerdictMarkerPrompt(options: { finalRound?: boolean } = {}): string {
   if (options.finalRound) {
-    return `Include exactly one final verdict marker line:
+    return `The following final verdict marker drives flow routing and summary. **Include exactly** one of these marker lines at the end of your response:
 FINAL_VERDICT: pass
 or
 FINAL_VERDICT: needs_human_orchestrator_decision`;
   }
-  return `Include exactly one review verdict marker line:
+  return `The following review verdict marker drives flow routing. **Include exactly** one of these marker lines at the end of your response:
 REVIEW_VERDICT: pass
 or
 REVIEW_VERDICT: fix`;
 }
-

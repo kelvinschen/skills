@@ -87,7 +87,7 @@ PLAN_AGENT=aiden IMPLEMENT_AGENT=trae TEST_AGENT=trae REVIEW_AGENT=aiden \
 
 If multiple flows may be active, correlate the run bundle with `flowName`, `startedAt`, and the log path before treating the newest directory as the target run.
 
-Bundled flow templates instruct each lane agent to write its own handoff file, then pass compact handoff refs through the flow context. Prefer those files for cross-lane context and use full session reads only when deeper inspection is needed.
+Bundled flow templates instruct each lane agent to write its own handoff file, then pass that agent's final response forward as the next lane's handoff context. Prefer flow outputs and handoff paths for monitoring, and use full session reads only when deeper inspection is needed.
 Shared prompt wording for bundled flows lives in `flows/shared/prompt-templates.ts`; update that file before duplicating prompt text in individual flow templates.
 
 Recommended polling cadence for active work:

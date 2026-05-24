@@ -1,5 +1,4 @@
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
 import * as path from "node:path";
 import { acp, compute, defineFlow, shell } from "acpx/flows";
 import { handoffPrompt, independentTestingGuidance, testVerdictMarkerPrompt } from "./shared/prompt-templates";
@@ -45,12 +44,17 @@ type SeverityCounts = {
 
 type HandoffRef = {
   node: string;
-  handoffPath: string;
-  summary: string;
+  responseText: string;
+  handoffPath?: string;
+  summaryPreview: string;
   nextFocus: string;
   rawChars: number;
   verdict?: string;
   severityCounts?: SeverityCounts;
+};
+
+type HandoffSummary = Omit<HandoffRef, "responseText"> & {
+  responsePreview: string;
 };
 
 function profileAgent(profile: string, field: string): string {
@@ -120,7 +124,7 @@ function expectedHandoffPath(outputs: Record<string, unknown>, state: { runId: s
 function compactText(text: string, maxChars = 1800): string {
   const value = text.trim();
   if (value.length <= maxChars) return value;
-  return `${value.slice(0, maxChars).trimEnd()}\n... [truncated; read the handoff file for full detail]`;
+  return `${value.slice(0, maxChars).trimEnd()}\n... [truncated; inspect the flow run or handoff file for full detail]`;
 }
 
 function nextFocus(text: string): string {
@@ -131,11 +135,14 @@ function nextFocus(text: string): string {
 function testVerdictText(text: string): "pass" | "fail" | "unknown" {
   if (/^\s*TEST_VERDICT:\s*fail\s*$/im.test(text)) return "fail";
   if (/^\s*TEST_VERDICT:\s*pass\s*$/im.test(text)) return "pass";
+  if (/\b(typecheck|tests?|unit tests?|checks?)\b[^\n]*(failed|failing|failure|error)/i.test(text)) return "fail";
+  if (/\b(all\s+)?(tests?|unit tests?|checks?)\b[^\n]*(pass(ed|ing)?|clean|green)/i.test(text)) return "pass";
+  if (/\btypecheck:\s*clean\b/i.test(text)) return "pass";
   return "unknown";
 }
 
 function asHandoff(value: unknown): HandoffRef | null {
-  if (value && typeof value === "object" && "handoffPath" in value) {
+  if (value && typeof value === "object" && "responseText" in value) {
     return value as HandoffRef;
   }
   return null;
@@ -151,28 +158,35 @@ function isWithin(parent: string, child: string): boolean {
   return Boolean(relative) && !relative.startsWith("..") && !path.isAbsolute(relative);
 }
 
-function parseHandoff(node: string, text: string, context: FlowContext, verdict?: string): HandoffRef {
-  const handoffPath = markerValue(text, "HANDOFF_PATH");
-  const summary = markerValue(text, "HANDOFF_SUMMARY");
+function inferHandoffPath(text: string, context: FlowContext): string | undefined {
   const root = handoffRoot(context.outputs, context.state);
-  if (!handoffPath) {
-    throw new Error(`${node} response missing HANDOFF_PATH marker.`);
+  const input = spec(context.outputs);
+  const candidates = [
+    markerValue(text, "HANDOFF_PATH"),
+    ...Array.from(text.matchAll(/(?:^|[\s:])((?:~|\.{1,2}|\/)?[^\s`'")]*tmp\/flow_handoffs\/[^\s`'")]+\.md)/g), (match) => match[1]),
+  ].filter(Boolean);
+  const bases = Array.from(new Set([input.cwd, repoRoot(input.cwd), input.handoffDir, root]));
+  for (const rawCandidate of candidates) {
+    const raw = rawCandidate.replace(/^["'`]+|["'`.,;:]+$/g, "");
+    const resolvedCandidates = path.isAbsolute(raw)
+      ? [raw]
+      : bases.map((base) => path.resolve(base, raw));
+    const accepted = resolvedCandidates.find((candidate) => isWithin(root, candidate));
+    if (accepted) return accepted;
   }
-  if (!summary) {
-    throw new Error(`${node} response missing HANDOFF_SUMMARY marker.`);
-  }
-  if (!isWithin(root, handoffPath)) {
-    throw new Error(`${node} HANDOFF_PATH must be inside ${root}.`);
-  }
-  if (!existsSync(handoffPath)) {
-    throw new Error(`${node} HANDOFF_PATH does not exist: ${handoffPath}`);
-  }
+  return undefined;
+}
+
+function parseHandoff(node: string, text: string, context: FlowContext, verdict?: string): HandoffRef {
+  const responseText = text.trim();
+  const summary = markerValue(text, "HANDOFF_SUMMARY") || responseText;
   return {
     node,
-    handoffPath,
-    summary: compactText(summary),
+    responseText,
+    handoffPath: inferHandoffPath(text, context),
+    summaryPreview: compactText(summary),
     nextFocus: nextFocus(summary),
-    rawChars: text.trim().length,
+    rawChars: responseText.length,
     verdict,
   };
 }
@@ -189,21 +203,33 @@ function handoffBlock(items: Array<[string, unknown]>): string {
   return items.map(([label, value]) => {
     const ref = asHandoff(value);
     if (!ref) return `${label}: (missing)`;
-    const severity = ref.severityCounts
-      ? `\n- severity: P0=${ref.severityCounts.P0} P1=${ref.severityCounts.P1} P2=${ref.severityCounts.P2} P3=${ref.severityCounts.P3}`
-      : "";
     return `${label}:
-- handoff: ${ref.handoffPath}
-- verdict: ${ref.verdict || "n/a"}${severity}
-- summary:
-${ref.summary || "(empty)"}`;
+- handoff: ${ref.handoffPath || "(not specified; use the agent response below)"}
+- verdict: ${ref.verdict || "n/a"}
+- agent response:
+${ref.responseText || "(empty)"}`;
   }).join("\n\n");
 }
 
-function handoffIndex(outputs: Record<string, unknown>, keys: string[]): Record<string, HandoffRef> {
-  const index: Record<string, HandoffRef> = {};
+function handoffSummary(value: unknown): HandoffSummary | null {
+  const ref = asHandoff(value);
+  if (!ref) return null;
+  return {
+    node: ref.node,
+    handoffPath: ref.handoffPath,
+    summaryPreview: ref.summaryPreview,
+    responsePreview: compactText(ref.responseText),
+    nextFocus: ref.nextFocus,
+    rawChars: ref.rawChars,
+    verdict: ref.verdict,
+    severityCounts: ref.severityCounts,
+  };
+}
+
+function handoffIndex(outputs: Record<string, unknown>, keys: string[]): Record<string, HandoffSummary> {
+  const index: Record<string, HandoffSummary> = {};
   for (const key of keys) {
-    const ref = asHandoff(outputs[key]);
+    const ref = handoffSummary(outputs[key]);
     if (ref) index[key] = ref;
   }
   return index;

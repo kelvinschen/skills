@@ -55,7 +55,7 @@ echo "run=$RUN"
 cat "$RUN/projections/live.json"
 ```
 
-The flow runtime persists run state and artifacts under `~/.acpx/flows/runs/<runId>/`. Lane agents write handoff files under the configured handoff directory and return compact handoff refs through flow outputs; use those refs before reading full session output.
+The flow runtime persists run state and artifacts under `~/.acpx/flows/runs/<runId>/`. Lane agents write handoff files under the configured handoff directory and pass their final responses forward as the next lane's handoff context; use flow outputs and handoff paths first, then read full session output only when deeper inspection is needed.
 The bundled templates create the input `cwd` before starting agent nodes. For self-healing templates, audit test-agent behavior after completion with `scripts/acpx-visualize`.
 
 ## Permissions
