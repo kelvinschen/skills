@@ -11,7 +11,9 @@ type FlowInput = {
   task?: string;
   cwd?: string;
   planAgent?: string;
+  planReviewAgent?: string;
   implAgent?: string;
+  validateAgent?: string;
   testAgent?: string;
   reviewAgent?: string;
   testHints?: string;
@@ -21,14 +23,18 @@ type FlowInput = {
 
 const AGENT_PROFILES = {
   plan: "aiden",
+  planReview: "trae",
   impl: "trae",
+  validate: "aiden",
 } as const;
 
 type NormalizedInput = {
   task: string;
   cwd: string;
   planAgent: string;
+  planReviewAgent: string;
   implAgent: string;
+  validateAgent: string;
   testHints: string;
   handoffDir: string;
   maxFixRounds: 2;
@@ -85,7 +91,9 @@ function normalizeInput(input: unknown): NormalizedInput {
     task,
     cwd,
     planAgent: profileAgent(AGENT_PROFILES.plan, "plan"),
+    planReviewAgent: profileAgent(AGENT_PROFILES.planReview, "planReview"),
     implAgent: profileAgent(AGENT_PROFILES.impl, "impl"),
+    validateAgent: profileAgent(AGENT_PROFILES.validate, "validate"),
     testHints: typeof record.testHints === "string" ? record.testHints.trim() : "",
     handoffDir: normalizeHandoffDir(record.handoffDir, cwd),
     maxFixRounds: 2,
@@ -357,7 +365,7 @@ function validatePrompt(round: number, implementationKey: "implement_1" | "imple
   return ({ outputs, state }: { outputs: Record<string, unknown>; state: { runId: string } }) => {
     const input = spec(outputs);
     const node = round === 1 ? "validate_1" : round === 2 ? "validate_2" : "validate_3";
-    return `You are the same-session validation reviewer in a complex feature/refactor workflow. You are continuing in the implementation session.
+    return `You are the independent validation agent in a complex feature/refactor workflow.
 
 Round: ${round}
 
@@ -440,7 +448,7 @@ ${handoffInstructions(outputs, state, "plan", "plan review before implementation
       parse: (text, context) => parseHandoff("plan", text, context),
     }),
     plan_review: acp({
-      profile: AGENT_PROFILES.plan,
+      profile: AGENT_PROFILES.planReview,
       session: { handle: "plan_review" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 20 * 60 * 1000,
@@ -482,13 +490,13 @@ ${handoffBlock([["Plan review", outputs.plan_review]])}
 
 Implement the task in the working directory. Do not revert unrelated user changes. Keep the change scoped to the task and plan. Run relevant checks when feasible.
 
-${handoffInstructions(outputs, state, "implement_1", "same-session validation review of the implementation")}`;
+${handoffInstructions(outputs, state, "implement_1", "independent validation review of the implementation")}`;
       },
       parse: (text, context) => parseHandoff("implement_1", text, context),
     }),
     validate_1: acp({
-      profile: AGENT_PROFILES.impl,
-      session: { handle: "impl" },
+      profile: AGENT_PROFILES.validate,
+      session: { handle: "validate" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 45 * 60 * 1000,
       statusDetail: "Validating complex feature/refactor round 1",
@@ -499,8 +507,8 @@ ${handoffInstructions(outputs, state, "implement_1", "same-session validation re
       }),
     }),
     decide_1: decision({
-      profile: AGENT_PROFILES.impl,
-      session: { handle: "impl" },
+      profile: AGENT_PROFILES.validate,
+      session: { handle: "validate" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 5 * 60 * 1000,
       statusDetail: "Deciding whether complex workflow needs fix round 1",
@@ -549,13 +557,13 @@ ${JSON.stringify(outputs.decide_1 || {}, null, 2)}
 
 Fix only the issues identified above. Do not do unrelated refactors and do not revert unrelated user changes. Run relevant checks when feasible.
 
-${handoffInstructions(outputs, state, "implement_fix_1", "same-session validation of fix round 1")}`;
+${handoffInstructions(outputs, state, "implement_fix_1", "independent validation of fix round 1")}`;
       },
       parse: (text, context) => parseHandoff("implement_fix_1", text, context),
     }),
     validate_2: acp({
-      profile: AGENT_PROFILES.impl,
-      session: { handle: "impl" },
+      profile: AGENT_PROFILES.validate,
+      session: { handle: "validate" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 45 * 60 * 1000,
       statusDetail: "Validating complex fix round 1",
@@ -566,8 +574,8 @@ ${handoffInstructions(outputs, state, "implement_fix_1", "same-session validatio
       }),
     }),
     decide_2: decision({
-      profile: AGENT_PROFILES.impl,
-      session: { handle: "impl" },
+      profile: AGENT_PROFILES.validate,
+      session: { handle: "validate" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 5 * 60 * 1000,
       statusDetail: "Deciding whether complex workflow needs final fix round",
@@ -624,13 +632,13 @@ ${JSON.stringify(outputs.decide_2 || {}, null, 2)}
 
 Fix only the issues identified above. This is the final automatic fix round. Do not do unrelated refactors and do not revert unrelated user changes. Run relevant checks when feasible.
 
-${handoffInstructions(outputs, state, "implement_fix_2", "same-session validation of the final fix round")}`;
+${handoffInstructions(outputs, state, "implement_fix_2", "independent validation of the final fix round")}`;
       },
       parse: (text, context) => parseHandoff("implement_fix_2", text, context),
     }),
     validate_3: acp({
-      profile: AGENT_PROFILES.impl,
-      session: { handle: "impl" },
+      profile: AGENT_PROFILES.validate,
+      session: { handle: "validate" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 45 * 60 * 1000,
       statusDetail: "Validating final complex fix round",
@@ -663,8 +671,9 @@ ${handoffInstructions(outputs, state, "implement_fix_2", "same-session validatio
           template: "complex-feature-refactor",
           agents: {
             plan: input.planAgent,
+            planReview: input.planReviewAgent,
             implement: input.implAgent,
-            validation: input.implAgent,
+            validation: input.validateAgent,
           },
           maxFixRounds: input.maxFixRounds,
           fixRoundsUsed,

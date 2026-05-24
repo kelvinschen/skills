@@ -81,8 +81,8 @@ cat "$RUN/projections/live.json"
 The launcher defaults to background execution and `--approve-all`. Flow templates provide default profiles. Input role fields override template defaults, and environment variables override input role fields. A flow input may set `handoffDir`; otherwise the default handoff path is `<repo>/tmp/flow_handoffs/<runId>/<node>.md` and the shared memory index is `<repo>/tmp/flow_handoffs/<runId>/flow-memory.md`.
 
 ```bash
-PLAN_AGENT=aiden IMPLEMENT_AGENT=trae \
-  scripts/acpx-flow-run simple-feature --input-file flows/examples/simple-feature.input.json
+PLAN_AGENT=aiden PLAN_REVIEW_AGENT=trae IMPLEMENT_AGENT=trae VALIDATE_AGENT=aiden \
+  scripts/acpx-flow-run complex-feature-refactor --input-file flows/examples/complex-feature-refactor.input.json
 ```
 
 If multiple flows may be active, correlate the run bundle with `flowName`, `startedAt`, and the log path before treating the newest directory as the target run.
@@ -157,8 +157,8 @@ scripts/acpx-flow-run complex-feature-refactor \
   --log "$FLOW_LOG"
 ```
 
-`quick-bugfix` is a short implementation plus independent test lane. `simple-feature` adds planning, same-session validation review, and at most one automatic fix round. `complex-feature-refactor` adds plan review, same-session validation review, and at most two automatic fix rounds. None of these templates use infinite loops.
+`quick-bugfix` is a short implementation plus independent test lane. `simple-feature` adds planning, independent validation review, and at most one automatic fix round. `complex-feature-refactor` adds plan review, independent validation review, and at most two automatic fix rounds. None of these templates use infinite loops.
 
-Agent validation is a quality signal, not a live tracking mechanism. Same-session validation runs with the same flow-level permissions as the rest of the run, so its "do not edit production code in validation" rule is enforced by prompt discipline and post-run audit rather than a separate acpx permission boundary. Use `scripts/acpx-visualize` after completion to inspect validation tools, commands, file writes, and outputs.
+Agent validation is a quality signal, not a live tracking mechanism. Feature-flow validation runs in an independent validation lane with the same flow-level permissions as the rest of the run, so its "do not edit production code in validation" rule is enforced by prompt discipline and post-run audit rather than a separate acpx permission boundary. Use `scripts/acpx-visualize` after completion to inspect validation tools, commands, file writes, and outputs.
 
 The bundled flows create the target `cwd` before invoking ACP agents, because agent subprocesses cannot spawn with a missing working directory.

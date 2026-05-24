@@ -34,8 +34,8 @@ For normal delegation, prefer bundled flow templates launched through `scripts/a
 | Flow | Use when | Behavior |
 | --- | --- | --- |
 | `quick-bugfix` | Small, clear, low-risk fixes. | Implements and independently tests; no auto-fix. |
-| `simple-feature` | Local feature work. | Plans, implements, validates in the implementation session; at most one fix round. |
-| `complex-feature-refactor` | Cross-file features, refactors, migrations, high-risk changes. | Adds plan review and same-session validation; at most two fix rounds. |
+| `simple-feature` | Local feature work. | Plans, implements, independently validates; at most one fix round. |
+| `complex-feature-refactor` | Cross-file features, refactors, migrations, high-risk changes. | Adds plan review and independent validation; at most two fix rounds. |
 
 ```bash
 FLOW=simple-feature
@@ -45,7 +45,7 @@ scripts/acpx-flow-run "$FLOW" \
   --log "$FLOW_LOG"
 ```
 
-Flow templates include default profiles. Override lane agents through input fields or environment variables: `PLAN_AGENT` and `IMPLEMENT_AGENT` for feature flows, plus `TEST_AGENT` for `quick-bugfix`. Environment variables override input role fields. If the caller confirms a handoff location, pass `handoffDir` in the flow input; otherwise nodes use `<repo>/tmp/flow_handoffs/<runId>/<node>.md` and the shared memory index at `<repo>/tmp/flow_handoffs/<runId>/flow-memory.md`.
+Flow templates include default profiles. Feature flow defaults are `PLAN_AGENT=aiden`, `PLAN_REVIEW_AGENT=trae`, `IMPLEMENT_AGENT=trae`, and `VALIDATE_AGENT=aiden`; `quick-bugfix` also supports `TEST_AGENT`. Environment variables override input role fields. If the caller confirms a handoff location, pass `handoffDir` in the flow input; otherwise nodes use `<repo>/tmp/flow_handoffs/<runId>/<node>.md` and the shared memory index at `<repo>/tmp/flow_handoffs/<runId>/flow-memory.md`.
 
 After launch, record the PID and log path, then identify the newest run bundle. If other flows may be active, correlate the bundle with `flowName`, `startedAt`, and the log path before treating it as the target run:
 
@@ -56,7 +56,7 @@ cat "$RUN/projections/live.json"
 ```
 
 The flow runtime persists run state and artifacts under `~/.acpx/flows/runs/<runId>/`. Lane agents write handoff files under the configured handoff directory and append compact entries to `flow-memory.md`. Use flow outputs, `flowMemoryPath`, the memory index, and handoff paths first; read full session output only when deeper inspection is needed.
-The bundled templates create the input `cwd` before starting agent nodes. For self-healing templates, audit same-session validation behavior after completion with `scripts/acpx-visualize`.
+The bundled templates create the input `cwd` before starting agent nodes. For self-healing templates, audit validation behavior after completion with `scripts/acpx-visualize`.
 
 ## Permissions
 

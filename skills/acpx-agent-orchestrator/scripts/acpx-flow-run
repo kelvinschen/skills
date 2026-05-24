@@ -8,20 +8,24 @@ const { spawn, spawnSync } = require("node:child_process");
 
 const ROLE_FIELDS = {
   "quick-bugfix": ["implAgent", "testAgent"],
-  "simple-feature": ["planAgent", "implAgent"],
-  "complex-feature-refactor": ["planAgent", "implAgent"],
+  "simple-feature": ["planAgent", "implAgent", "validateAgent"],
+  "complex-feature-refactor": ["planAgent", "planReviewAgent", "implAgent", "validateAgent"],
 };
 
 const ENV_AGENT_NAMES = {
   planAgent: ["PLAN_AGENT", "PLANNING_AGENT"],
+  planReviewAgent: ["PLAN_REVIEW_AGENT", "PLAN_REVIEWING_AGENT"],
   implAgent: ["IMPLEMENT_AGENT", "IMPLEMENTATION_AGENT", "IMPL_AGENT"],
+  validateAgent: ["VALIDATE_AGENT", "VALIDATION_AGENT"],
   testAgent: ["TEST_AGENT"],
   reviewAgent: ["REVIEW_AGENT"],
 };
 
 const PROFILE_KEYS = {
   planAgent: "plan",
+  planReviewAgent: "planReview",
   implAgent: "impl",
+  validateAgent: "validate",
   testAgent: "test",
   reviewAgent: "review",
 };
@@ -32,12 +36,12 @@ function usage() {
 
 Defaults:
   Runs in the background and passes --approve-all unless another permission flag is supplied.
-  Agent env vars override input role fields: PLAN_AGENT, IMPLEMENT_AGENT.
+  Agent env vars override input role fields: PLAN_AGENT, PLAN_REVIEW_AGENT, IMPLEMENT_AGENT, VALIDATE_AGENT, TEST_AGENT.
   Missing role agents fall back to the flow template AGENT_PROFILES defaults.
 
 Examples:
   scripts/acpx-flow-run simple-feature --input-file flows/examples/simple-feature.input.json
-  PLAN_AGENT=aiden IMPLEMENT_AGENT=trae scripts/acpx-flow-run complex-feature-refactor --input-json '{"task":"..."}' --dry-run`);
+  PLAN_AGENT=aiden PLAN_REVIEW_AGENT=trae IMPLEMENT_AGENT=trae VALIDATE_AGENT=aiden scripts/acpx-flow-run complex-feature-refactor --input-json '{"task":"..."}' --dry-run`);
 }
 
 function fail(message) {
@@ -143,6 +147,9 @@ function sanitizeInput(input, flowName, defaultProfiles) {
   }
 
   const sanitized = { ...input };
+  if (!sanitized.validateAgent && typeof sanitized.reviewAgent === "string" && sanitized.reviewAgent.trim()) {
+    sanitized.validateAgent = sanitized.reviewAgent;
+  }
   for (const field of Object.keys(PROFILE_KEYS)) {
     if (!ROLE_FIELDS[flowName].includes(field)) delete sanitized[field];
   }

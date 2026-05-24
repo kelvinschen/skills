@@ -12,6 +12,7 @@ type FlowInput = {
   cwd?: string;
   planAgent?: string;
   implAgent?: string;
+  validateAgent?: string;
   testAgent?: string;
   reviewAgent?: string;
   testHints?: string;
@@ -22,6 +23,7 @@ type FlowInput = {
 const AGENT_PROFILES = {
   plan: "aiden",
   impl: "trae",
+  validate: "aiden",
 } as const;
 
 type NormalizedInput = {
@@ -29,6 +31,7 @@ type NormalizedInput = {
   cwd: string;
   planAgent: string;
   implAgent: string;
+  validateAgent: string;
   testHints: string;
   handoffDir: string;
   maxFixRounds: 1;
@@ -86,6 +89,7 @@ function normalizeInput(input: unknown): NormalizedInput {
     cwd,
     planAgent: profileAgent(AGENT_PROFILES.plan, "plan"),
     implAgent: profileAgent(AGENT_PROFILES.impl, "impl"),
+    validateAgent: profileAgent(AGENT_PROFILES.validate, "validate"),
     testHints: typeof record.testHints === "string" ? record.testHints.trim() : "",
     handoffDir: normalizeHandoffDir(record.handoffDir, cwd),
     maxFixRounds: 1,
@@ -339,7 +343,7 @@ function validatePrompt(round: number, implementationKey: "implement_1" | "imple
   return ({ outputs, state }: { outputs: Record<string, unknown>; state: { runId: string } }) => {
     const input = spec(outputs);
     const node = round === 1 ? "validate_1" : "validate_2";
-    return `You are the same-session validation reviewer in a simple feature workflow. You are continuing in the implementation session.
+    return `You are the independent validation agent in a simple feature workflow.
 
 Round: ${round}
 
@@ -428,13 +432,13 @@ ${handoffBlock([["Plan", outputs.plan]])}
 
 Implement the task in the working directory. Do not revert unrelated user changes. Keep the change scoped. Run relevant checks when feasible.
 
-${handoffInstructions(outputs, state, "implement_1", "same-session validation review of the implementation")}`;
+${handoffInstructions(outputs, state, "implement_1", "independent validation review of the implementation")}`;
       },
       parse: (text, context) => parseHandoff("implement_1", text, context),
     }),
     validate_1: acp({
-      profile: AGENT_PROFILES.impl,
-      session: { handle: "impl" },
+      profile: AGENT_PROFILES.validate,
+      session: { handle: "validate" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 45 * 60 * 1000,
       statusDetail: "Validating simple feature round 1",
@@ -445,8 +449,8 @@ ${handoffInstructions(outputs, state, "implement_1", "same-session validation re
       }),
     }),
     decide_1: decision({
-      profile: AGENT_PROFILES.impl,
-      session: { handle: "impl" },
+      profile: AGENT_PROFILES.validate,
+      session: { handle: "validate" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 5 * 60 * 1000,
       statusDetail: "Deciding whether simple feature needs one fix round",
@@ -492,13 +496,13 @@ ${JSON.stringify(outputs.decide_1 || {}, null, 2)}
 
 Fix only the issues identified above. Do not do unrelated refactors and do not revert unrelated user changes. Run relevant checks when feasible.
 
-${handoffInstructions(outputs, state, "implement_fix_1", "same-session validation of the fix round")}`;
+${handoffInstructions(outputs, state, "implement_fix_1", "independent validation of the fix round")}`;
       },
       parse: (text, context) => parseHandoff("implement_fix_1", text, context),
     }),
     validate_2: acp({
-      profile: AGENT_PROFILES.impl,
-      session: { handle: "impl" },
+      profile: AGENT_PROFILES.validate,
+      session: { handle: "validate" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 45 * 60 * 1000,
       statusDetail: "Validating simple feature fix round",
@@ -521,7 +525,7 @@ ${handoffInstructions(outputs, state, "implement_fix_1", "same-session validatio
           agents: {
             plan: input.planAgent,
             implement: input.implAgent,
-            validation: input.implAgent,
+            validation: input.validateAgent,
           },
           maxFixRounds: input.maxFixRounds,
           fixRoundsUsed: usedFixRound ? 1 : 0,
