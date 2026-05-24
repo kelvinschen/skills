@@ -62,6 +62,15 @@ function writeFile(filePath, content) {
   fs.writeFileSync(filePath, content, "utf8");
 }
 
+function maybeReadText(filePath) {
+  try {
+    if (!filePath || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return null;
+    return fs.readFileSync(filePath, "utf8");
+  } catch {
+    return null;
+  }
+}
+
 function safeId(value) {
   return String(value || "audit").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "audit";
 }
@@ -99,6 +108,81 @@ function stringifyPreview(value) {
     return truncate([value.stdout ? `stdout:\n${value.stdout}` : "", value.stderr ? `stderr:\n${value.stderr}` : ""].filter(Boolean).join("\n\n"));
   }
   return truncate(JSON.stringify(value, null, 2));
+}
+
+function unique(values) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function collectFlowMemoryCandidates(value, candidates = []) {
+  if (!value || typeof value !== "object") return candidates;
+  if (Array.isArray(value)) {
+    for (const item of value) collectFlowMemoryCandidates(item, candidates);
+    return candidates;
+  }
+  for (const [key, item] of Object.entries(value)) {
+    if ((key === "flowMemoryPath" || key === "memoryFile") && typeof item === "string") {
+      candidates.push(item);
+      continue;
+    }
+    if (key === "handoffRoot" && typeof item === "string") {
+      candidates.push(path.join(item, "flow-memory.md"));
+      continue;
+    }
+    collectFlowMemoryCandidates(item, candidates);
+  }
+  return candidates;
+}
+
+function resolveRepoRoot(cwd) {
+  if (!cwd) return null;
+  const result = spawnSync("git", ["-C", cwd, "rev-parse", "--show-toplevel"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  if (result.status === 0 && result.stdout.trim()) return result.stdout.trim();
+  return cwd;
+}
+
+function loadFlowMemory(runProjection, steps) {
+  const runId = runProjection.runId;
+  const input = runProjection.input && typeof runProjection.input === "object" ? runProjection.input : {};
+  const candidates = [
+    ...collectFlowMemoryCandidates(runProjection),
+    ...collectFlowMemoryCandidates(steps),
+  ];
+  if (typeof input.handoffDir === "string" && input.handoffDir.trim() && runId) {
+    const rawHandoffDir = expandHome(input.handoffDir.trim());
+    const base = typeof input.cwd === "string" && input.cwd.trim() ? path.resolve(expandHome(input.cwd.trim())) : process.cwd();
+    const handoffDir = path.isAbsolute(rawHandoffDir) ? rawHandoffDir : path.resolve(base, rawHandoffDir);
+    candidates.push(path.join(handoffDir, runId, "flow-memory.md"));
+  }
+  if (typeof input.cwd === "string" && input.cwd.trim() && runId) {
+    const cwd = path.resolve(expandHome(input.cwd.trim()));
+    const repoRoot = resolveRepoRoot(cwd);
+    if (repoRoot) candidates.push(path.join(repoRoot, "tmp", "flow_handoffs", runId, "flow-memory.md"));
+  }
+
+  const paths = unique(candidates.map((candidate) => path.resolve(expandHome(candidate))));
+  for (const filePath of paths) {
+    const content = maybeReadText(filePath);
+    if (content != null) {
+      return {
+        path: filePath,
+        exists: true,
+        content,
+        size: Buffer.byteLength(content, "utf8"),
+        candidates: paths,
+      };
+    }
+  }
+  return paths.length > 0 ? {
+    path: paths[0],
+    exists: false,
+    content: "",
+    size: 0,
+    candidates: paths,
+  } : null;
 }
 
 function parseRawInput(rawInput) {
@@ -316,6 +400,7 @@ function loadFlowRun(inputPath) {
     flow: {
       timeline,
     },
+    flowMemory: loadFlowMemory(runProjection, steps),
     sessions,
   };
 }
@@ -452,6 +537,36 @@ function renderTimeline(audit) {
   `;
 }
 
+function renderFlowMemory(audit) {
+  if (audit.type !== "flow") return "";
+  const memory = audit.flowMemory;
+  if (!memory) {
+    return `
+      <section>
+        <h2>Shared Flow Memory</h2>
+        <p class="muted">No flow memory path was found in this run bundle.</p>
+      </section>
+    `;
+  }
+  const candidates = memory.candidates?.length > 1
+    ? `<details><summary>Candidate paths</summary><pre>${esc(memory.candidates.join("\n"))}</pre></details>`
+    : "";
+  const content = memory.exists
+    ? `<pre>${esc(memory.content || "(empty)")}</pre>`
+    : `<p class="warning">Shared flow memory file was referenced but not found.</p>`;
+  return `
+    <section class="searchable" data-search="${esc([memory.path, memory.content].join(" "))}">
+      <h2>Shared Flow Memory</h2>
+      <div class="session-meta">
+        <span>Path: <strong>${esc(memory.path || "-")}</strong></span>
+        <span>Size: <strong>${esc(memory.size || 0)} bytes</strong></span>
+      </div>
+      ${content}
+      ${candidates}
+    </section>
+  `;
+}
+
 function renderConversationItem(item) {
   if (item.type === "user" || item.type === "assistant") {
     const fullText = item.text || "";
@@ -529,6 +644,7 @@ function renderHtml(audit) {
     .toolbar { display: flex; gap: 12px; align-items: center; margin: 18px 0; }
     input[type="search"] { width: min(520px, 100%); padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; font: inherit; }
     .warning { background: #fff6dc; border: 1px solid #e0c16c; color: #6b4a00; border-radius: 6px; padding: 10px 12px; margin: 12px 0; }
+    .muted { color: var(--muted); margin: 0; }
     .table-wrap { overflow: auto; }
     table { width: 100%; border-collapse: collapse; }
     th, td { border-bottom: 1px solid var(--line); padding: 9px; text-align: left; vertical-align: top; }
@@ -568,6 +684,7 @@ function renderHtml(audit) {
       <span id="match-count"></span>
     </div>
     ${renderTimeline(audit)}
+    ${renderFlowMemory(audit)}
     ${renderSessions(audit)}
   </main>
   <footer>Generated by acpx-visualize</footer>

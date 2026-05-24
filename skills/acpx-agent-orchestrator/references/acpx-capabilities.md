@@ -78,16 +78,16 @@ RUN=$(ls -td ~/.acpx/flows/runs/* 2>/dev/null | head -1)
 cat "$RUN/projections/live.json"
 ```
 
-The launcher defaults to background execution and `--approve-all`. Flow templates provide default profiles. Input role fields override template defaults, and environment variables override input role fields. A flow input may set `handoffDir`; otherwise the default handoff path is `<repo>/tmp/flow_handoffs/<runId>/<node>.md`.
+The launcher defaults to background execution and `--approve-all`. Flow templates provide default profiles. Input role fields override template defaults, and environment variables override input role fields. A flow input may set `handoffDir`; otherwise the default handoff path is `<repo>/tmp/flow_handoffs/<runId>/<node>.md` and the shared memory index is `<repo>/tmp/flow_handoffs/<runId>/flow-memory.md`.
 
 ```bash
-PLAN_AGENT=aiden IMPLEMENT_AGENT=trae TEST_AGENT=trae REVIEW_AGENT=aiden \
+PLAN_AGENT=aiden IMPLEMENT_AGENT=trae \
   scripts/acpx-flow-run simple-feature --input-file flows/examples/simple-feature.input.json
 ```
 
 If multiple flows may be active, correlate the run bundle with `flowName`, `startedAt`, and the log path before treating the newest directory as the target run.
 
-Bundled flow templates instruct each lane agent to write its own handoff file, then pass that agent's final response forward as the next lane's handoff context. Prefer flow outputs and handoff paths for monitoring, and use full session reads only when deeper inspection is needed.
+Bundled flow templates instruct each lane agent to write its own handoff file and append a compact index entry to `flow-memory.md`. Downstream prompts receive compact references to the memory file and handoff files, not full upstream agent output. Prefer flow outputs, `flowMemoryPath`, the memory index, and handoff paths for monitoring; use full session reads only when deeper inspection is needed.
 Shared prompt wording for bundled flows lives in `flows/shared/prompt-templates.ts`; update that file before duplicating prompt text in individual flow templates.
 
 Recommended polling cadence for active work:
@@ -157,8 +157,8 @@ scripts/acpx-flow-run complex-feature-refactor \
   --log "$FLOW_LOG"
 ```
 
-`quick-bugfix` is a short implementation plus independent test lane. `simple-feature` adds plan/review and at most one automatic fix round. `complex-feature-refactor` adds plan review and at most two automatic fix rounds. None of these templates use infinite loops.
+`quick-bugfix` is a short implementation plus independent test lane. `simple-feature` adds planning, same-session validation review, and at most one automatic fix round. `complex-feature-refactor` adds plan review, same-session validation review, and at most two automatic fix rounds. None of these templates use infinite loops.
 
-Agent testing is a quality signal, not a live tracking mechanism. Test lanes run with the same flow-level permissions as the rest of the run, so their "do not change unrelated production code" rule is enforced by prompt discipline and post-run audit rather than a separate acpx permission boundary. Use `scripts/acpx-visualize` after completion to inspect the test agent's tools, commands, file writes, and outputs.
+Agent validation is a quality signal, not a live tracking mechanism. Same-session validation runs with the same flow-level permissions as the rest of the run, so its "do not edit production code in validation" rule is enforced by prompt discipline and post-run audit rather than a separate acpx permission boundary. Use `scripts/acpx-visualize` after completion to inspect validation tools, commands, file writes, and outputs.
 
 The bundled flows create the target `cwd` before invoking ACP agents, because agent subprocesses cannot spawn with a missing working directory.

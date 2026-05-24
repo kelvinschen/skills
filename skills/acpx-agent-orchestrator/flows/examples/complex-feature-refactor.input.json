@@ -1,10 +1,8 @@
 {
-  "task": "Implement a complex feature or refactor with plan review, independent testing, review, and up to two automatic fix rounds.",
+  "task": "Implement a complex feature or refactor with plan review, same-session validation review, and up to two automatic fix rounds.",
   "cwd": "/tmp/acpx-complex-feature-smoke",
   "planAgent": "aiden",
   "implAgent": "trae",
-  "testAgent": "trae",
-  "reviewAgent": "aiden",
   "testHints": "Cover migration risk, regressions, and black-box behavior. Prefer exercising the real command surface when possible.",
   "maxFixRounds": 2
 }

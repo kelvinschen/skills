@@ -1,5 +1,6 @@
 type HandoffPromptOptions = {
   targetPath: string;
+  memoryPath: string;
   nextFocus: string;
   extraMarkers?: string;
 };
@@ -10,10 +11,24 @@ export function handoffPrompt(options: HandoffPromptOptions): string {
 Save it to: ${options.targetPath}
 Create the parent directory if it does not exist.
 
+Also append a compact index entry to the shared flow memory file:
+${options.memoryPath}
+
+Use this flow memory entry format:
+## <node> - <short status>
+- Status/verdict:
+- Key results:
+- Changed/relevant files:
+- Checks:
+- Findings:
+- Handoff file: ${options.targetPath}
+- Next focus:
+
 Include a "suggested skills" section for skills the next agent should invoke.
 Do not duplicate content already captured in other artifacts, such as PRDs, plans, ADRs, issues, commits, diffs, logs, or test outputs. Reference them by path or URL instead.
 Redact sensitive information, such as API keys, passwords, tokens, secrets, or personally identifiable information.
 Tailor the handoff to this next focus: ${options.nextFocus}
+Keep both the handoff and memory entry concise. Do not include step-by-step internal monologue, large logs, full diffs, or full test output; reference paths instead.
 
 End your response with these handoff marker lines when possible. They improve flow summaries, but the response itself should still be a useful handoff if the markers are missed:
 HANDOFF_PATH: ${options.targetPath}
@@ -38,11 +53,13 @@ or
 TEST_VERDICT: fail`;
 }
 
-export function reviewGuidance(options: { finalRound?: boolean } = {}): string {
+export function validationReviewGuidance(options: { finalRound?: boolean } = {}): string {
   const finalRoundGuidance = options.finalRound
-    ? "\nFor the final review, use FINAL_VERDICT: needs_human_orchestrator_decision only for unresolved P0/P1 or unknown validation state."
+    ? "\nFor the final validation round, use FINAL_VERDICT: needs_human_orchestrator_decision only for unresolved P0/P1 or unknown validation state."
     : "";
-  return `Review the current working tree for bugs, regressions, missing tests, scope drift, and refactor safety. Do not edit files. Findings must include severity markers and concrete file references when possible.
+  return `Run task-focused validation and a focused implementation review. Do not edit production code in this validation phase; report issues for the next fix phase instead.
+
+Start with git diff --stat, the changed files, the implementation handoff, the plan scope, and task-relevant tests or checks. Do not perform a full repository audit or broad monorepo scan. Inspect deeper only where these task-related signals show risk.
 
 Severity rubric:
 - P0: must-fix blocker, such as security/privacy/data loss, deterministic crash, required validation failure, or an explicit user must-have that is broken.
@@ -50,20 +67,20 @@ Severity rubric:
 - P2: medium-risk edge case, maintainability issue, or useful coverage improvement; informational for routing.
 - P3: low-risk nit, style, docs, or optional cleanup.
 
-Return findings first. If there are no blocking findings, say that clearly and mention residual risk.
-Use REVIEW_VERDICT: fix only for true P0 findings or P1 findings that should be fixed in this flow. P2/P3 alone must not produce REVIEW_VERDICT: fix.${finalRoundGuidance}
+Return validation commands/actions, results, and findings. Put P0/P1 findings first. Keep P2/P3 concise. If there are no blocking findings, say that clearly and mention residual risk.
+Use VALIDATION_VERDICT: fix only for true P0 findings, failed task-relevant checks, or P1 findings that should be fixed in this flow. P2/P3 alone must not produce VALIDATION_VERDICT: fix.${finalRoundGuidance}
 Include a compact handoff and reference detailed artifacts by path instead of copying large logs or diffs. Redact secrets and sensitive personal data.`;
 }
 
-export function reviewVerdictMarkerPrompt(options: { finalRound?: boolean } = {}): string {
+export function validationVerdictMarkerPrompt(options: { finalRound?: boolean } = {}): string {
   if (options.finalRound) {
     return `The following final verdict marker drives flow routing and summary. **Include exactly** one of these marker lines at the end of your response:
 FINAL_VERDICT: pass
 or
 FINAL_VERDICT: needs_human_orchestrator_decision`;
   }
-  return `The following review verdict marker drives flow routing. **Include exactly** one of these marker lines at the end of your response:
-REVIEW_VERDICT: pass
+  return `The following validation verdict marker drives flow routing. **Include exactly** one of these marker lines at the end of your response:
+VALIDATION_VERDICT: pass
 or
-REVIEW_VERDICT: fix`;
+VALIDATION_VERDICT: fix`;
 }

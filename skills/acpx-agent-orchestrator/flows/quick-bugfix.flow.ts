@@ -45,6 +45,7 @@ type SeverityCounts = {
 type HandoffRef = {
   node: string;
   responseText: string;
+  memoryFile: string;
   handoffPath?: string;
   summaryPreview: string;
   nextFocus: string;
@@ -53,9 +54,7 @@ type HandoffRef = {
   severityCounts?: SeverityCounts;
 };
 
-type HandoffSummary = Omit<HandoffRef, "responseText"> & {
-  responsePreview: string;
-};
+type HandoffSummary = Omit<HandoffRef, "responseText">;
 
 function profileAgent(profile: string, field: string): string {
   if (!profile.trim()) {
@@ -121,10 +120,20 @@ function expectedHandoffPath(outputs: Record<string, unknown>, state: { runId: s
   return path.join(handoffRoot(outputs, state), `${node.replace(/[^a-z0-9_-]/gi, "_")}.md`);
 }
 
+function flowMemoryPath(outputs: Record<string, unknown>, state: { runId: string }): string {
+  return path.join(handoffRoot(outputs, state), "flow-memory.md");
+}
+
 function compactText(text: string, maxChars = 1800): string {
   const value = text.trim();
   if (value.length <= maxChars) return value;
   return `${value.slice(0, maxChars).trimEnd()}\n... [truncated; inspect the flow run or handoff file for full detail]`;
+}
+
+function compactTailText(text: string, maxChars = 1200): string {
+  const value = text.trim();
+  if (value.length <= maxChars) return value;
+  return `[truncated; inspect the flow memory or handoff file for full detail]\n${value.slice(-maxChars).trimStart()}`;
 }
 
 function nextFocus(text: string): string {
@@ -179,10 +188,11 @@ function inferHandoffPath(text: string, context: FlowContext): string | undefine
 
 function parseHandoff(node: string, text: string, context: FlowContext, verdict?: string): HandoffRef {
   const responseText = text.trim();
-  const summary = markerValue(text, "HANDOFF_SUMMARY") || responseText;
+  const summary = markerValue(text, "HANDOFF_SUMMARY") || compactTailText(responseText);
   return {
     node,
     responseText,
+    memoryFile: flowMemoryPath(context.outputs, context.state),
     handoffPath: inferHandoffPath(text, context),
     summaryPreview: compactText(summary),
     nextFocus: nextFocus(summary),
@@ -195,20 +205,26 @@ function handoffInstructions(outputs: Record<string, unknown>, state: { runId: s
   const targetPath = expectedHandoffPath(outputs, state, node);
   return handoffPrompt({
     targetPath,
+    memoryPath: flowMemoryPath(outputs, state),
     nextFocus: focus,
   });
 }
 
 function handoffBlock(items: Array<[string, unknown]>): string {
-  return items.map(([label, value]) => {
+  const body = items.map(([label, value]) => {
     const ref = asHandoff(value);
     if (!ref) return `${label}: (missing)`;
     return `${label}:
-- handoff: ${ref.handoffPath || "(not specified; use the agent response below)"}
+- flow memory: ${ref.memoryFile}
+- handoff: ${ref.handoffPath || "(not specified; read the flow memory entry and session tail if needed)"}
 - verdict: ${ref.verdict || "n/a"}
-- agent response:
-${ref.responseText || "(empty)"}`;
+- summary preview:
+${ref.summaryPreview || "(empty)"}
+- next focus:
+${ref.nextFocus || "(not specified)"}
+- raw response chars: ${ref.rawChars}`;
   }).join("\n\n");
+  return `Read the shared flow memory first, then open referenced handoff files only when more detail is needed. Do not rely on omitted raw agent responses.\n\n${body}`;
 }
 
 function handoffSummary(value: unknown): HandoffSummary | null {
@@ -216,9 +232,9 @@ function handoffSummary(value: unknown): HandoffSummary | null {
   if (!ref) return null;
   return {
     node: ref.node,
+    memoryFile: ref.memoryFile,
     handoffPath: ref.handoffPath,
     summaryPreview: ref.summaryPreview,
-    responsePreview: compactText(ref.responseText),
     nextFocus: ref.nextFocus,
     rawChars: ref.rawChars,
     verdict: ref.verdict,
@@ -339,6 +355,7 @@ ${handoffInstructions(outputs, state, "agent_test", "orchestrator review of test
           flowRunId: state.runId,
           artifactHint: `~/.acpx/flows/runs/${state.runId}/`,
           handoffRoot: handoffRoot(outputs, state),
+          flowMemoryPath: flowMemoryPath(outputs, state),
           handoffs: handoffIndex(outputs, ["implement", "agent_test"]),
         };
       },

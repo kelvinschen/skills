@@ -8,8 +8,8 @@ const { spawn, spawnSync } = require("node:child_process");
 
 const ROLE_FIELDS = {
   "quick-bugfix": ["implAgent", "testAgent"],
-  "simple-feature": ["planAgent", "implAgent", "testAgent", "reviewAgent"],
-  "complex-feature-refactor": ["planAgent", "implAgent", "testAgent", "reviewAgent"],
+  "simple-feature": ["planAgent", "implAgent"],
+  "complex-feature-refactor": ["planAgent", "implAgent"],
 };
 
 const ENV_AGENT_NAMES = {
@@ -32,12 +32,12 @@ function usage() {
 
 Defaults:
   Runs in the background and passes --approve-all unless another permission flag is supplied.
-  Agent env vars override input role fields: PLAN_AGENT, IMPLEMENT_AGENT, TEST_AGENT, REVIEW_AGENT.
+  Agent env vars override input role fields: PLAN_AGENT, IMPLEMENT_AGENT.
   Missing role agents fall back to the flow template AGENT_PROFILES defaults.
 
 Examples:
   scripts/acpx-flow-run simple-feature --input-file flows/examples/simple-feature.input.json
-  PLAN_AGENT=aiden IMPLEMENT_AGENT=trae TEST_AGENT=trae REVIEW_AGENT=aiden scripts/acpx-flow-run complex-feature-refactor --input-json '{"task":"..."}' --dry-run`);
+  PLAN_AGENT=aiden IMPLEMENT_AGENT=trae scripts/acpx-flow-run complex-feature-refactor --input-json '{"task":"..."}' --dry-run`);
 }
 
 function fail(message) {
