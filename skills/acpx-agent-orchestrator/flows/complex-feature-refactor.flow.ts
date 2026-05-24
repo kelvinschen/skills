@@ -1,3 +1,6 @@
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import * as path from "node:path";
 import { acp, compute, decision, decisionEdge, defineFlow, shell } from "acpx/flows";
 
 type FlowInput = {
@@ -8,6 +11,7 @@ type FlowInput = {
   testAgent?: string;
   reviewAgent?: string;
   testHints?: string;
+  handoffDir?: string;
   maxFixRounds?: number;
 };
 
@@ -26,7 +30,32 @@ type NormalizedInput = {
   testAgent: string;
   reviewAgent: string;
   testHints: string;
+  handoffDir: string;
   maxFixRounds: 2;
+};
+
+type FlowContext = {
+  outputs: Record<string, unknown>;
+  state: {
+    runId: string;
+  };
+};
+
+type SeverityCounts = {
+  P0: number;
+  P1: number;
+  P2: number;
+  P3: number;
+};
+
+type HandoffRef = {
+  node: string;
+  handoffPath: string;
+  summary: string;
+  nextFocus: string;
+  rawChars: number;
+  verdict?: string;
+  severityCounts?: SeverityCounts;
 };
 
 const DECISION_CHOICES = ["pass", "fix"] as const;
@@ -47,14 +76,16 @@ function normalizeInput(input: unknown): NormalizedInput {
   if (record.maxFixRounds !== undefined && record.maxFixRounds !== 2) {
     throw new Error("complex-feature-refactor.flow.ts requires maxFixRounds=2.");
   }
+  const cwd = typeof record.cwd === "string" && record.cwd.trim() ? record.cwd.trim() : process.cwd();
   return {
     task,
-    cwd: typeof record.cwd === "string" && record.cwd.trim() ? record.cwd.trim() : process.cwd(),
+    cwd,
     planAgent: profileAgent(AGENT_PROFILES.plan, "plan"),
     implAgent: profileAgent(AGENT_PROFILES.impl, "impl"),
     testAgent: profileAgent(AGENT_PROFILES.test, "test"),
     reviewAgent: profileAgent(AGENT_PROFILES.review, "review"),
     testHints: typeof record.testHints === "string" ? record.testHints.trim() : "",
+    handoffDir: normalizeHandoffDir(record.handoffDir, cwd),
     maxFixRounds: 2,
   };
 }
@@ -67,8 +98,161 @@ function spec(outputs: Record<string, unknown>): NormalizedInput {
   return value as NormalizedInput;
 }
 
-function trimText(text: string): string {
-  return text.trim();
+function repoRoot(cwd: string): string {
+  try {
+    const root = execFileSync("git", ["-C", cwd, "rev-parse", "--show-toplevel"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    return root || cwd;
+  } catch {
+    return cwd;
+  }
+}
+
+function normalizeHandoffDir(value: unknown, cwd: string): string {
+  if (typeof value === "string" && value.trim()) {
+    const raw = value.trim();
+    return path.isAbsolute(raw) ? raw : path.resolve(cwd, raw);
+  }
+  return path.join(repoRoot(cwd), "tmp", "flow_handoffs");
+}
+
+function handoffRoot(outputs: Record<string, unknown>, state: { runId: string }): string {
+  return path.join(spec(outputs).handoffDir, state.runId);
+}
+
+function expectedHandoffPath(outputs: Record<string, unknown>, state: { runId: string }, node: string): string {
+  return path.join(handoffRoot(outputs, state), `${node.replace(/[^a-z0-9_-]/gi, "_")}.md`);
+}
+
+function compactText(text: string, maxChars = 1800): string {
+  const value = text.trim();
+  if (value.length <= maxChars) return value;
+  return `${value.slice(0, maxChars).trimEnd()}\n... [truncated; read the handoff file for full detail]`;
+}
+
+function nextFocus(text: string): string {
+  const match = text.match(/(?:next focus|next steps?|handoff)\s*:?\s*([\s\S]{1,800})/i);
+  return compactText(match?.[1] || text, 600);
+}
+
+function testVerdictText(text: string): "pass" | "fail" | "unknown" {
+  if (/^\s*TEST_VERDICT:\s*fail\s*$/im.test(text)) return "fail";
+  if (/^\s*TEST_VERDICT:\s*pass\s*$/im.test(text)) return "pass";
+  return "unknown";
+}
+
+function reviewVerdictText(text: string): "pass" | "fix" | "unknown" {
+  if (/^\s*REVIEW_VERDICT:\s*fix\s*$/im.test(text)) return "fix";
+  if (/^\s*REVIEW_VERDICT:\s*pass\s*$/im.test(text)) return "pass";
+  return "unknown";
+}
+
+function finalReviewVerdictText(text: string): "pass" | "needs_human_orchestrator_decision" | "unknown" {
+  if (/^\s*FINAL_VERDICT:\s*pass\s*$/im.test(text)) return "pass";
+  if (/^\s*FINAL_VERDICT:\s*needs_human_orchestrator_decision\s*$/im.test(text)) {
+    return "needs_human_orchestrator_decision";
+  }
+  return "unknown";
+}
+
+function asHandoff(value: unknown): HandoffRef | null {
+  if (value && typeof value === "object" && "handoffPath" in value) {
+    return value as HandoffRef;
+  }
+  return null;
+}
+
+function markerValue(text: string, marker: string): string {
+  const match = text.match(new RegExp(`^\\s*${marker}:\\s*(.+?)\\s*$`, "im"));
+  return match?.[1]?.trim() || "";
+}
+
+function isWithin(parent: string, child: string): boolean {
+  const relative = path.relative(path.resolve(parent), path.resolve(child));
+  return Boolean(relative) && !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
+function parseSeverityCounts(text: string): SeverityCounts {
+  const marker = markerValue(text, "SEVERITY_COUNTS");
+  const source = marker || text;
+  return {
+    P0: Number(source.match(/\bP0\s*=\s*(\d+)/i)?.[1] || 0),
+    P1: Number(source.match(/\bP1\s*=\s*(\d+)/i)?.[1] || 0),
+    P2: Number(source.match(/\bP2\s*=\s*(\d+)/i)?.[1] || 0),
+    P3: Number(source.match(/\bP3\s*=\s*(\d+)/i)?.[1] || 0),
+  };
+}
+
+function parseHandoff(node: string, text: string, context: FlowContext, options: {
+  verdict?: string;
+  includeSeverity?: boolean;
+} = {}): HandoffRef {
+  const handoffPath = markerValue(text, "HANDOFF_PATH");
+  const summary = markerValue(text, "HANDOFF_SUMMARY");
+  const root = handoffRoot(context.outputs, context.state);
+  if (!handoffPath) {
+    throw new Error(`${node} response missing HANDOFF_PATH marker.`);
+  }
+  if (!summary) {
+    throw new Error(`${node} response missing HANDOFF_SUMMARY marker.`);
+  }
+  if (!isWithin(root, handoffPath)) {
+    throw new Error(`${node} HANDOFF_PATH must be inside ${root}.`);
+  }
+  if (!existsSync(handoffPath)) {
+    throw new Error(`${node} HANDOFF_PATH does not exist: ${handoffPath}`);
+  }
+  return {
+    node,
+    handoffPath,
+    summary: compactText(summary),
+    nextFocus: nextFocus(summary),
+    rawChars: text.trim().length,
+    verdict: options.verdict,
+    severityCounts: options.includeSeverity ? parseSeverityCounts(text) : undefined,
+  };
+}
+
+function handoffInstructions(outputs: Record<string, unknown>, state: { runId: string }, node: string, focus: string, extraMarkers = ""): string {
+  const targetPath = expectedHandoffPath(outputs, state, node);
+  return `Write a handoff document summarizing this node's work so a fresh agent can continue from here.
+Save it to: ${targetPath}
+Create the parent directory if it does not exist.
+
+Include a "suggested skills" section for skills the next agent should invoke.
+Do not duplicate content already captured in other artifacts, such as PRDs, plans, ADRs, issues, commits, diffs, logs, or test outputs. Reference them by path or URL instead.
+Redact sensitive information, such as API keys, passwords, tokens, secrets, or personally identifiable information.
+Tailor the handoff to this next focus: ${focus}
+
+End your response with these marker lines:
+HANDOFF_PATH: ${targetPath}
+HANDOFF_SUMMARY: <compact summary>${extraMarkers}`;
+}
+
+function handoffBlock(items: Array<[string, unknown]>): string {
+  return items.map(([label, value]) => {
+    const ref = asHandoff(value);
+    if (!ref) return `${label}: (missing)`;
+    const severity = ref.severityCounts
+      ? `\n- severity: P0=${ref.severityCounts.P0} P1=${ref.severityCounts.P1} P2=${ref.severityCounts.P2} P3=${ref.severityCounts.P3}`
+      : "";
+    return `${label}:
+- handoff: ${ref.handoffPath}
+- verdict: ${ref.verdict || "n/a"}${severity}
+- summary:
+${ref.summary || "(empty)"}`;
+  }).join("\n\n");
+}
+
+function handoffIndex(outputs: Record<string, unknown>, keys: string[]): Record<string, HandoffRef> {
+  const index: Record<string, HandoffRef> = {};
+  for (const key of keys) {
+    const ref = asHandoff(outputs[key]);
+    if (ref) index[key] = ref;
+  }
+  return index;
 }
 
 function routeOf(value: unknown): string {
@@ -79,26 +263,21 @@ function routeOf(value: unknown): string {
 }
 
 function testVerdict(text: unknown): "pass" | "fail" | "unknown" {
-  const value = String(text || "");
-  if (/^\s*TEST_VERDICT:\s*fail\s*$/im.test(value)) return "fail";
-  if (/^\s*TEST_VERDICT:\s*pass\s*$/im.test(value)) return "pass";
-  return "unknown";
+  const ref = asHandoff(text);
+  if (ref?.verdict === "pass" || ref?.verdict === "fail") return ref.verdict;
+  return testVerdictText(String(text || ""));
 }
 
 function reviewVerdict(text: unknown): "pass" | "fix" | "unknown" {
-  const value = String(text || "");
-  if (/^\s*REVIEW_VERDICT:\s*fix\s*$/im.test(value)) return "fix";
-  if (/^\s*REVIEW_VERDICT:\s*pass\s*$/im.test(value)) return "pass";
-  return "unknown";
+  const ref = asHandoff(text);
+  if (ref?.verdict === "pass" || ref?.verdict === "fix") return ref.verdict;
+  return reviewVerdictText(String(text || ""));
 }
 
 function finalReviewVerdict(text: unknown): "pass" | "needs_human_orchestrator_decision" | "unknown" {
-  const value = String(text || "");
-  if (/^\s*FINAL_VERDICT:\s*pass\s*$/im.test(value)) return "pass";
-  if (/^\s*FINAL_VERDICT:\s*needs_human_orchestrator_decision\s*$/im.test(value)) {
-    return "needs_human_orchestrator_decision";
-  }
-  return "unknown";
+  const ref = asHandoff(text);
+  if (ref?.verdict === "pass" || ref?.verdict === "needs_human_orchestrator_decision") return ref.verdict;
+  return finalReviewVerdictText(String(text || ""));
 }
 
 function finalStatusFrom(test: unknown, review: unknown, passStatus: string, finalRound: boolean): string {
@@ -114,8 +293,9 @@ function finalStatusFrom(test: unknown, review: unknown, passStatus: string, fin
 }
 
 function testPrompt(round: number, implementationKey: "implement_1" | "implement_fix_1" | "implement_fix_2") {
-  return ({ outputs }: { outputs: Record<string, unknown> }) => {
+  return ({ outputs, state }: { outputs: Record<string, unknown>; state: { runId: string } }) => {
     const input = spec(outputs);
+    const node = round === 1 ? "agent_test_1" : round === 2 ? "agent_test_2" : "agent_test_3";
     return `You are the independent testing agent in a complex feature/refactor workflow.
 
 Round: ${round}
@@ -123,14 +303,14 @@ Round: ${round}
 Task:
 ${input.task}
 
-Plan:
-${String(outputs.plan || "")}
+Plan reference:
+${handoffBlock([["Plan", outputs.plan]])}
 
-Plan review:
-${String(outputs.plan_review || "")}
+Plan review reference:
+${handoffBlock([["Plan review", outputs.plan_review]])}
 
 Implementation summary:
-${String(outputs[implementationKey] || "")}
+${handoffBlock([["Implementation", outputs[implementationKey]]])}
 
 User-provided test hints:
 ${input.testHints || "(none)"}
@@ -143,11 +323,14 @@ Return:
 - observed output
 - suspected cause if failed
 - residual risk
+- a compact handoff with references to any temporary test scripts or fixtures, with secrets and sensitive personal data redacted
 
-End with exactly one marker line:
+Include exactly one verdict marker line:
 TEST_VERDICT: pass
 or
-TEST_VERDICT: fail`;
+TEST_VERDICT: fail
+
+${handoffInstructions(outputs, state, node, "review of test evidence and current implementation", "\nTEST_VERDICT: pass|fail")}`;
   };
 }
 
@@ -157,14 +340,15 @@ function reviewPrompt(
   testKey: "agent_test_1" | "agent_test_2" | "agent_test_3",
   finalRound: boolean,
 ) {
-  return ({ outputs }: { outputs: Record<string, unknown> }) => {
+  return ({ outputs, state }: { outputs: Record<string, unknown>; state: { runId: string } }) => {
     const input = spec(outputs);
+    const node = round === 1 ? "review_1" : round === 2 ? "review_2" : "review_3";
     const verdictInstruction = finalRound
-      ? `End with exactly one marker line:
+      ? `Include exactly one final verdict marker line:
 FINAL_VERDICT: pass
 or
 FINAL_VERDICT: needs_human_orchestrator_decision`
-      : `End with exactly one marker line:
+      : `Include exactly one review verdict marker line:
 REVIEW_VERDICT: pass
 or
 REVIEW_VERDICT: fix`;
@@ -175,23 +359,42 @@ Round: ${round}
 Task:
 ${input.task}
 
-Plan:
-${String(outputs.plan || "")}
+Plan reference:
+${handoffBlock([["Plan", outputs.plan]])}
 
-Plan review:
-${String(outputs.plan_review || "")}
+Plan review reference:
+${handoffBlock([["Plan review", outputs.plan_review]])}
 
 Implementation summary:
-${String(outputs[implementationKey] || "")}
+${handoffBlock([["Implementation", outputs[implementationKey]]])}
 
 Independent test result:
-${String(outputs[testKey] || "")}
+${handoffBlock([["Independent test", outputs[testKey]]])}
 
-Review the current working tree for bugs, regressions, missing tests, scope drift, and refactor safety. Do not edit files. Findings must include severity markers P0/P1/P2/P3 and concrete file references when possible.
+Review the current working tree for bugs, regressions, missing tests, scope drift, and refactor safety. Do not edit files. Findings must include severity markers and concrete file references when possible.
+
+Severity rubric:
+- P0: must-fix blocker, such as security/privacy/data loss, deterministic crash, required validation failure, or an explicit user must-have that is broken.
+- P1: high-impact correctness regression or critical test gap that should be considered for this flow.
+- P2: medium-risk edge case, maintainability issue, or useful coverage improvement; informational for routing.
+- P3: low-risk nit, style, docs, or optional cleanup.
 
 Return findings first. If there are no blocking findings, say that clearly and mention residual risk.
+Use REVIEW_VERDICT: fix only for true P0 findings or P1 findings that should be fixed in this flow. P2/P3 alone must not produce REVIEW_VERDICT: fix.
+For the final review, use FINAL_VERDICT: needs_human_orchestrator_decision only for unresolved P0/P1 or unknown validation state.
+Include a compact handoff and reference detailed artifacts by path instead of copying large logs or diffs. Redact secrets and sensitive personal data.
 
-${verdictInstruction}`;
+${verdictInstruction}
+
+${handoffInstructions(
+      outputs,
+      state,
+      node,
+      finalRound ? "human orchestrator decision after final review" : "decision on whether another fix round is needed",
+      finalRound
+        ? "\nFINAL_VERDICT: pass|needs_human_orchestrator_decision\nSEVERITY_COUNTS: P0=0 P1=0 P2=0 P3=0"
+        : "\nREVIEW_VERDICT: pass|fix\nSEVERITY_COUNTS: P0=0 P1=0 P2=0 P3=0",
+    )}`;
   };
 }
 
@@ -226,7 +429,7 @@ export default defineFlow({
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 20 * 60 * 1000,
       statusDetail: "Planning complex feature/refactor",
-      prompt: ({ outputs }) => {
+      prompt: ({ outputs, state }) => {
         const input = spec(outputs);
         return `You are the planning agent in a complex feature/refactor workflow.
 
@@ -236,9 +439,11 @@ ${input.task}
 Working directory:
 ${input.cwd}
 
-Create a detailed but concise implementation plan. Do not edit files. Include intended behavior, affected areas, migration/refactor constraints, implementation phases, risks, rollback considerations, and verification strategy.`;
+Create a detailed but concise implementation plan. Do not edit files. Include intended behavior, affected areas, migration/refactor constraints, implementation phases, risks, rollback considerations, and verification strategy.
+
+${handoffInstructions(outputs, state, "plan", "plan review before implementation")}`;
       },
-      parse: trimText,
+      parse: (text, context) => parseHandoff("plan", text, context),
     }),
     plan_review: acp({
       profile: AGENT_PROFILES.review,
@@ -246,19 +451,21 @@ Create a detailed but concise implementation plan. Do not edit files. Include in
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 20 * 60 * 1000,
       statusDetail: "Reviewing complex plan",
-      prompt: ({ outputs }) => {
+      prompt: ({ outputs, state }) => {
         const input = spec(outputs);
         return `You are the plan review agent in a complex feature/refactor workflow.
 
 Task:
 ${input.task}
 
-Proposed plan:
-${String(outputs.plan || "")}
+Proposed plan reference:
+${handoffBlock([["Plan", outputs.plan]])}
 
-Review the plan before implementation. Do not edit files. Identify missing constraints, high-risk areas, edge cases, test strategy gaps, and any sequencing changes needed. Return a concise amended guidance section that the implementation agent should follow.`;
+Review the plan before implementation. Do not edit files. Identify missing constraints, high-risk areas, edge cases, test strategy gaps, and any sequencing changes needed. Return a concise amended guidance section that the implementation agent should follow.
+
+${handoffInstructions(outputs, state, "plan_review", "implementation using the reviewed plan")}`;
       },
-      parse: trimText,
+      parse: (text, context) => parseHandoff("plan_review", text, context),
     }),
     implement_1: acp({
       profile: AGENT_PROFILES.impl,
@@ -266,22 +473,24 @@ Review the plan before implementation. Do not edit files. Identify missing const
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 90 * 60 * 1000,
       statusDetail: "Implementing complex feature/refactor",
-      prompt: ({ outputs }) => {
+      prompt: ({ outputs, state }) => {
         const input = spec(outputs);
         return `You are the implementation agent in a complex feature/refactor workflow.
 
 Task:
 ${input.task}
 
-Accepted plan:
-${String(outputs.plan || "")}
+Accepted plan reference:
+${handoffBlock([["Plan", outputs.plan]])}
 
-Plan review guidance:
-${String(outputs.plan_review || "")}
+Plan review guidance reference:
+${handoffBlock([["Plan review", outputs.plan_review]])}
 
-Implement the task in the working directory. Do not revert unrelated user changes. Keep the change scoped to the task and plan. Run relevant checks when feasible, then summarize exactly what changed and what you verified.`;
+Implement the task in the working directory. Do not revert unrelated user changes. Keep the change scoped to the task and plan. Run relevant checks when feasible.
+
+${handoffInstructions(outputs, state, "implement_1", "independent testing of the implementation")}`;
       },
-      parse: trimText,
+      parse: (text, context) => parseHandoff("implement_1", text, context),
     }),
     agent_test_1: acp({
       profile: AGENT_PROFILES.test,
@@ -290,7 +499,9 @@ Implement the task in the working directory. Do not revert unrelated user change
       timeoutMs: 30 * 60 * 1000,
       statusDetail: "Independently testing complex feature/refactor round 1",
       prompt: testPrompt(1, "implement_1"),
-      parse: trimText,
+      parse: (text, context) => parseHandoff("agent_test_1", text, context, {
+        verdict: testVerdictText(text),
+      }),
     }),
     review_1: acp({
       profile: AGENT_PROFILES.review,
@@ -299,7 +510,10 @@ Implement the task in the working directory. Do not revert unrelated user change
       timeoutMs: 20 * 60 * 1000,
       statusDetail: "Reviewing complex feature/refactor round 1",
       prompt: reviewPrompt(1, "implement_1", "agent_test_1", false),
-      parse: trimText,
+      parse: (text, context) => parseHandoff("review_1", text, context, {
+        verdict: reviewVerdictText(text),
+        includeSeverity: true,
+      }),
     }),
     decide_1: decision({
       profile: AGENT_PROFILES.review,
@@ -312,14 +526,18 @@ Implement the task in the working directory. Do not revert unrelated user change
 
 Rules:
 - If the independent test contains TEST_VERDICT: fail, choose fix.
-- If review contains REVIEW_VERDICT: fix, P0, P1, P2, or explicit needs changes, choose fix.
+- If review contains a true P0, choose fix unless you explicitly identify it as a false-positive severity label.
+- If review contains REVIEW_VERDICT: fix or a P1 that should be fixed in this flow, choose fix.
+- P2 and P3 findings are reference material only and must not alone trigger fix.
 - Otherwise choose pass.
 
-Independent test:
-${String(outputs.agent_test_1 || "")}
+Parsed independent test verdict: ${testVerdict(outputs.agent_test_1)}
+Independent test reference:
+${handoffBlock([["Independent test", outputs.agent_test_1]])}
 
-Review:
-${String(outputs.review_1 || "")}
+Parsed review verdict: ${reviewVerdict(outputs.review_1)}
+Review reference:
+${handoffBlock([["Review", outputs.review_1]])}
 
 Return only JSON with route and reason.`,
     }),
@@ -329,34 +547,36 @@ Return only JSON with route and reason.`,
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 90 * 60 * 1000,
       statusDetail: "Applying complex fix round 1",
-      prompt: ({ outputs }) => {
+      prompt: ({ outputs, state }) => {
         const input = spec(outputs);
         return `You are the implementation agent applying fix round 1 in a complex feature/refactor workflow.
 
 Task:
 ${input.task}
 
-Original plan:
-${String(outputs.plan || "")}
+Original plan reference:
+${handoffBlock([["Plan", outputs.plan]])}
 
-Plan review guidance:
-${String(outputs.plan_review || "")}
+Plan review guidance reference:
+${handoffBlock([["Plan review", outputs.plan_review]])}
 
 Previous implementation summary:
-${String(outputs.implement_1 || "")}
+${handoffBlock([["Previous implementation", outputs.implement_1]])}
 
 Independent test result:
-${String(outputs.agent_test_1 || "")}
+${handoffBlock([["Independent test", outputs.agent_test_1]])}
 
 Review findings:
-${String(outputs.review_1 || "")}
+${handoffBlock([["Review", outputs.review_1]])}
 
 Decision:
 ${JSON.stringify(outputs.decide_1 || {}, null, 2)}
 
-Fix only the issues identified above. Do not do unrelated refactors and do not revert unrelated user changes. Run relevant checks when feasible, then summarize exactly what changed and what you verified.`;
+Fix only the issues identified above. Do not do unrelated refactors and do not revert unrelated user changes. Run relevant checks when feasible.
+
+${handoffInstructions(outputs, state, "implement_fix_1", "independent testing of fix round 1")}`;
       },
-      parse: trimText,
+      parse: (text, context) => parseHandoff("implement_fix_1", text, context),
     }),
     agent_test_2: acp({
       profile: AGENT_PROFILES.test,
@@ -365,7 +585,9 @@ Fix only the issues identified above. Do not do unrelated refactors and do not r
       timeoutMs: 30 * 60 * 1000,
       statusDetail: "Independently testing complex fix round 1",
       prompt: testPrompt(2, "implement_fix_1"),
-      parse: trimText,
+      parse: (text, context) => parseHandoff("agent_test_2", text, context, {
+        verdict: testVerdictText(text),
+      }),
     }),
     review_2: acp({
       profile: AGENT_PROFILES.review,
@@ -374,7 +596,10 @@ Fix only the issues identified above. Do not do unrelated refactors and do not r
       timeoutMs: 20 * 60 * 1000,
       statusDetail: "Reviewing complex fix round 1",
       prompt: reviewPrompt(2, "implement_fix_1", "agent_test_2", false),
-      parse: trimText,
+      parse: (text, context) => parseHandoff("review_2", text, context, {
+        verdict: reviewVerdictText(text),
+        includeSeverity: true,
+      }),
     }),
     decide_2: decision({
       profile: AGENT_PROFILES.review,
@@ -387,15 +612,19 @@ Fix only the issues identified above. Do not do unrelated refactors and do not r
 
 Rules:
 - If the independent test contains TEST_VERDICT: fail, choose fix.
-- If review contains REVIEW_VERDICT: fix, P0, P1, P2, or explicit needs changes, choose fix.
+- If review contains a true P0, choose fix unless you explicitly identify it as a false-positive severity label.
+- If review contains REVIEW_VERDICT: fix or a P1 that should be fixed in this flow, choose fix.
+- P2 and P3 findings are reference material only and must not alone trigger fix.
 - Otherwise choose pass.
 - This is the last decision point. If you choose fix, the flow will run one final fix/test/review pass and then stop for orchestrator review.
 
-Independent test:
-${String(outputs.agent_test_2 || "")}
+Parsed independent test verdict: ${testVerdict(outputs.agent_test_2)}
+Independent test reference:
+${handoffBlock([["Independent test", outputs.agent_test_2]])}
 
-Review:
-${String(outputs.review_2 || "")}
+Parsed review verdict: ${reviewVerdict(outputs.review_2)}
+Review reference:
+${handoffBlock([["Review", outputs.review_2]])}
 
 Return only JSON with route and reason.`,
     }),
@@ -405,41 +634,43 @@ Return only JSON with route and reason.`,
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 90 * 60 * 1000,
       statusDetail: "Applying final complex fix round",
-      prompt: ({ outputs }) => {
+      prompt: ({ outputs, state }) => {
         const input = spec(outputs);
         return `You are the implementation agent applying the final automatic fix round in a complex feature/refactor workflow.
 
 Task:
 ${input.task}
 
-Original plan:
-${String(outputs.plan || "")}
+Original plan reference:
+${handoffBlock([["Plan", outputs.plan]])}
 
-Plan review guidance:
-${String(outputs.plan_review || "")}
+Plan review guidance reference:
+${handoffBlock([["Plan review", outputs.plan_review]])}
 
 Previous implementation summaries:
 Round 1:
-${String(outputs.implement_1 || "")}
+${handoffBlock([["Round 1 implementation", outputs.implement_1]])}
 
 Fix round 1:
-${String(outputs.implement_fix_1 || "")}
+${handoffBlock([["Fix round 1 implementation", outputs.implement_fix_1]])}
 
 Latest independent test result:
-${String(outputs.agent_test_2 || "")}
+${handoffBlock([["Latest independent test", outputs.agent_test_2]])}
 
 Earlier independent test result:
-${String(outputs.agent_test_1 || "")}
+${handoffBlock([["Earlier independent test", outputs.agent_test_1]])}
 
 Latest review findings:
-${String(outputs.review_2 || "")}
+${handoffBlock([["Latest review", outputs.review_2]])}
 
 Decision:
 ${JSON.stringify(outputs.decide_2 || {}, null, 2)}
 
-Fix only the issues identified above. This is the final automatic fix round. Do not do unrelated refactors and do not revert unrelated user changes. Run relevant checks when feasible, then summarize exactly what changed and what you verified.`;
+Fix only the issues identified above. This is the final automatic fix round. Do not do unrelated refactors and do not revert unrelated user changes. Run relevant checks when feasible.
+
+${handoffInstructions(outputs, state, "implement_fix_2", "independent testing of the final fix round")}`;
       },
-      parse: trimText,
+      parse: (text, context) => parseHandoff("implement_fix_2", text, context),
     }),
     agent_test_3: acp({
       profile: AGENT_PROFILES.test,
@@ -448,7 +679,9 @@ Fix only the issues identified above. This is the final automatic fix round. Do 
       timeoutMs: 30 * 60 * 1000,
       statusDetail: "Independently testing final complex fix round",
       prompt: testPrompt(3, "implement_fix_2"),
-      parse: trimText,
+      parse: (text, context) => parseHandoff("agent_test_3", text, context, {
+        verdict: testVerdictText(text),
+      }),
     }),
     review_3: acp({
       profile: AGENT_PROFILES.review,
@@ -457,7 +690,10 @@ Fix only the issues identified above. This is the final automatic fix round. Do 
       timeoutMs: 20 * 60 * 1000,
       statusDetail: "Reviewing final complex fix round",
       prompt: reviewPrompt(3, "implement_fix_2", "agent_test_3", true),
-      parse: trimText,
+      parse: (text, context) => parseHandoff("review_3", text, context, {
+        verdict: finalReviewVerdictText(text),
+        includeSeverity: true,
+      }),
     }),
     summarize: compute({
       statusDetail: "Summarizing complex feature/refactor result",
@@ -497,27 +733,39 @@ Fix only the issues identified above. This is the final automatic fix round. Do 
           finalStatus,
           finalTestVerdict: testVerdict(finalTest),
           finalReviewVerdict: fixRoundsUsed === 2 ? finalReviewVerdict(finalReview) : reviewVerdict(finalReview),
-          plan: outputs.plan,
-          planReview: outputs.plan_review,
           firstPass: {
-            implementation: outputs.implement_1,
-            test: outputs.agent_test_1,
-            review: outputs.review_1,
+            implementation: asHandoff(outputs.implement_1),
+            test: asHandoff(outputs.agent_test_1),
+            review: asHandoff(outputs.review_1),
             decision: outputs.decide_1,
           },
           fixPass1: fixRoundsUsed >= 1 ? {
-            implementation: outputs.implement_fix_1,
-            test: outputs.agent_test_2,
-            review: outputs.review_2,
+            implementation: asHandoff(outputs.implement_fix_1),
+            test: asHandoff(outputs.agent_test_2),
+            review: asHandoff(outputs.review_2),
             decision: outputs.decide_2,
           } : null,
           fixPass2: fixRoundsUsed >= 2 ? {
-            implementation: outputs.implement_fix_2,
-            test: outputs.agent_test_3,
-            review: outputs.review_3,
+            implementation: asHandoff(outputs.implement_fix_2),
+            test: asHandoff(outputs.agent_test_3),
+            review: asHandoff(outputs.review_3),
           } : null,
           flowRunId: state.runId,
           artifactHint: `~/.acpx/flows/runs/${state.runId}/`,
+          handoffRoot: handoffRoot(outputs, state),
+          handoffs: handoffIndex(outputs, [
+            "plan",
+            "plan_review",
+            "implement_1",
+            "agent_test_1",
+            "review_1",
+            "implement_fix_1",
+            "agent_test_2",
+            "review_2",
+            "implement_fix_2",
+            "agent_test_3",
+            "review_3",
+          ]),
         };
       },
     }),

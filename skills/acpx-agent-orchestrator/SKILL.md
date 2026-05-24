@@ -45,7 +45,7 @@ scripts/acpx-flow-run "$FLOW" \
   --log "$FLOW_LOG"
 ```
 
-Flow templates include default profiles. Override lane agents through input fields or environment variables: `PLAN_AGENT`, `IMPLEMENT_AGENT`, `TEST_AGENT`, and `REVIEW_AGENT`. Environment variables override input role fields.
+Flow templates include default profiles. Override lane agents through input fields or environment variables: `PLAN_AGENT`, `IMPLEMENT_AGENT`, `TEST_AGENT`, and `REVIEW_AGENT`. Environment variables override input role fields. If the caller confirms a handoff location, pass `handoffDir` in the flow input; otherwise nodes use `<repo>/tmp/flow_handoffs/<runId>/<node>.md`.
 
 After launch, record the PID and log path, then identify the newest run bundle. If other flows may be active, correlate the bundle with `flowName`, `startedAt`, and the log path before treating it as the target run:
 
@@ -55,7 +55,7 @@ echo "run=$RUN"
 cat "$RUN/projections/live.json"
 ```
 
-The flow runtime persists run state and artifacts under `~/.acpx/flows/runs/<runId>/`. Use those artifacts, plus native `acpx sessions read/history`, for monitoring, recovery, and inspection.
+The flow runtime persists run state and artifacts under `~/.acpx/flows/runs/<runId>/`. Lane agents write handoff files under the configured handoff directory and return compact handoff refs through flow outputs; use those refs before reading full session output.
 The bundled templates create the input `cwd` before starting agent nodes. For self-healing templates, audit test-agent behavior after completion with `scripts/acpx-visualize`.
 
 ## Permissions

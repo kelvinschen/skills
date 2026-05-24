@@ -78,7 +78,7 @@ RUN=$(ls -td ~/.acpx/flows/runs/* 2>/dev/null | head -1)
 cat "$RUN/projections/live.json"
 ```
 
-The launcher defaults to background execution and `--approve-all`. Flow templates provide default profiles. Input role fields override template defaults, and environment variables override input role fields:
+The launcher defaults to background execution and `--approve-all`. Flow templates provide default profiles. Input role fields override template defaults, and environment variables override input role fields. A flow input may set `handoffDir`; otherwise the default handoff path is `<repo>/tmp/flow_handoffs/<runId>/<node>.md`.
 
 ```bash
 PLAN_AGENT=aiden IMPLEMENT_AGENT=trae TEST_AGENT=trae REVIEW_AGENT=aiden \
@@ -86,6 +86,8 @@ PLAN_AGENT=aiden IMPLEMENT_AGENT=trae TEST_AGENT=trae REVIEW_AGENT=aiden \
 ```
 
 If multiple flows may be active, correlate the run bundle with `flowName`, `startedAt`, and the log path before treating the newest directory as the target run.
+
+Bundled flow templates instruct each lane agent to write its own handoff file, then pass compact handoff refs through the flow context. Prefer those files for cross-lane context and use full session reads only when deeper inspection is needed.
 
 Recommended polling cadence for active work:
 

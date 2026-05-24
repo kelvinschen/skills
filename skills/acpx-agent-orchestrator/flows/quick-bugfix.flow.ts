@@ -1,3 +1,6 @@
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import * as path from "node:path";
 import { acp, compute, defineFlow, shell } from "acpx/flows";
 
 type FlowInput = {
@@ -6,6 +9,7 @@ type FlowInput = {
   implAgent?: string;
   testAgent?: string;
   testHints?: string;
+  handoffDir?: string;
   maxFixRounds?: number;
 };
 
@@ -20,7 +24,32 @@ type NormalizedInput = {
   implAgent: string;
   testAgent: string;
   testHints: string;
+  handoffDir: string;
   maxFixRounds: 0;
+};
+
+type FlowContext = {
+  outputs: Record<string, unknown>;
+  state: {
+    runId: string;
+  };
+};
+
+type SeverityCounts = {
+  P0: number;
+  P1: number;
+  P2: number;
+  P3: number;
+};
+
+type HandoffRef = {
+  node: string;
+  handoffPath: string;
+  summary: string;
+  nextFocus: string;
+  rawChars: number;
+  verdict?: string;
+  severityCounts?: SeverityCounts;
 };
 
 function profileAgent(profile: string, field: string): string {
@@ -39,12 +68,14 @@ function normalizeInput(input: unknown): NormalizedInput {
   if (record.maxFixRounds !== undefined && record.maxFixRounds !== 0) {
     throw new Error("quick-bugfix.flow.ts requires maxFixRounds=0.");
   }
+  const cwd = typeof record.cwd === "string" && record.cwd.trim() ? record.cwd.trim() : process.cwd();
   return {
     task,
-    cwd: typeof record.cwd === "string" && record.cwd.trim() ? record.cwd.trim() : process.cwd(),
+    cwd,
     implAgent: profileAgent(AGENT_PROFILES.impl, "impl"),
     testAgent: profileAgent(AGENT_PROFILES.test, "test"),
     testHints: typeof record.testHints === "string" ? record.testHints.trim() : "",
+    handoffDir: normalizeHandoffDir(record.handoffDir, cwd),
     maxFixRounds: 0,
   };
 }
@@ -57,15 +88,138 @@ function spec(outputs: Record<string, unknown>): NormalizedInput {
   return value as NormalizedInput;
 }
 
-function trimText(text: string): string {
-  return text.trim();
+function repoRoot(cwd: string): string {
+  try {
+    const root = execFileSync("git", ["-C", cwd, "rev-parse", "--show-toplevel"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    return root || cwd;
+  } catch {
+    return cwd;
+  }
+}
+
+function normalizeHandoffDir(value: unknown, cwd: string): string {
+  if (typeof value === "string" && value.trim()) {
+    const raw = value.trim();
+    return path.isAbsolute(raw) ? raw : path.resolve(cwd, raw);
+  }
+  return path.join(repoRoot(cwd), "tmp", "flow_handoffs");
+}
+
+function handoffRoot(outputs: Record<string, unknown>, state: { runId: string }): string {
+  return path.join(spec(outputs).handoffDir, state.runId);
+}
+
+function expectedHandoffPath(outputs: Record<string, unknown>, state: { runId: string }, node: string): string {
+  return path.join(handoffRoot(outputs, state), `${node.replace(/[^a-z0-9_-]/gi, "_")}.md`);
+}
+
+function compactText(text: string, maxChars = 1800): string {
+  const value = text.trim();
+  if (value.length <= maxChars) return value;
+  return `${value.slice(0, maxChars).trimEnd()}\n... [truncated; read the handoff file for full detail]`;
+}
+
+function nextFocus(text: string): string {
+  const match = text.match(/(?:next focus|next steps?|handoff)\s*:?\s*([\s\S]{1,800})/i);
+  return compactText(match?.[1] || text, 600);
+}
+
+function testVerdictText(text: string): "pass" | "fail" | "unknown" {
+  if (/^\s*TEST_VERDICT:\s*fail\s*$/im.test(text)) return "fail";
+  if (/^\s*TEST_VERDICT:\s*pass\s*$/im.test(text)) return "pass";
+  return "unknown";
+}
+
+function asHandoff(value: unknown): HandoffRef | null {
+  if (value && typeof value === "object" && "handoffPath" in value) {
+    return value as HandoffRef;
+  }
+  return null;
+}
+
+function markerValue(text: string, marker: string): string {
+  const match = text.match(new RegExp(`^\\s*${marker}:\\s*(.+?)\\s*$`, "im"));
+  return match?.[1]?.trim() || "";
+}
+
+function isWithin(parent: string, child: string): boolean {
+  const relative = path.relative(path.resolve(parent), path.resolve(child));
+  return Boolean(relative) && !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
+function parseHandoff(node: string, text: string, context: FlowContext, verdict?: string): HandoffRef {
+  const handoffPath = markerValue(text, "HANDOFF_PATH");
+  const summary = markerValue(text, "HANDOFF_SUMMARY");
+  const root = handoffRoot(context.outputs, context.state);
+  if (!handoffPath) {
+    throw new Error(`${node} response missing HANDOFF_PATH marker.`);
+  }
+  if (!summary) {
+    throw new Error(`${node} response missing HANDOFF_SUMMARY marker.`);
+  }
+  if (!isWithin(root, handoffPath)) {
+    throw new Error(`${node} HANDOFF_PATH must be inside ${root}.`);
+  }
+  if (!existsSync(handoffPath)) {
+    throw new Error(`${node} HANDOFF_PATH does not exist: ${handoffPath}`);
+  }
+  return {
+    node,
+    handoffPath,
+    summary: compactText(summary),
+    nextFocus: nextFocus(summary),
+    rawChars: text.trim().length,
+    verdict,
+  };
+}
+
+function handoffInstructions(outputs: Record<string, unknown>, state: { runId: string }, node: string, focus: string): string {
+  const targetPath = expectedHandoffPath(outputs, state, node);
+  return `Write a handoff document summarizing this node's work so a fresh agent can continue from here.
+Save it to: ${targetPath}
+Create the parent directory if it does not exist.
+
+Include a "suggested skills" section for skills the next agent should invoke.
+Do not duplicate content already captured in other artifacts, such as PRDs, plans, ADRs, issues, commits, diffs, logs, or test outputs. Reference them by path or URL instead.
+Redact sensitive information, such as API keys, passwords, tokens, secrets, or personally identifiable information.
+Tailor the handoff to this next focus: ${focus}
+
+End your response with these marker lines:
+HANDOFF_PATH: ${targetPath}
+HANDOFF_SUMMARY: <compact summary>`;
+}
+
+function handoffBlock(items: Array<[string, unknown]>): string {
+  return items.map(([label, value]) => {
+    const ref = asHandoff(value);
+    if (!ref) return `${label}: (missing)`;
+    const severity = ref.severityCounts
+      ? `\n- severity: P0=${ref.severityCounts.P0} P1=${ref.severityCounts.P1} P2=${ref.severityCounts.P2} P3=${ref.severityCounts.P3}`
+      : "";
+    return `${label}:
+- handoff: ${ref.handoffPath}
+- verdict: ${ref.verdict || "n/a"}${severity}
+- summary:
+${ref.summary || "(empty)"}`;
+  }).join("\n\n");
+}
+
+function handoffIndex(outputs: Record<string, unknown>, keys: string[]): Record<string, HandoffRef> {
+  const index: Record<string, HandoffRef> = {};
+  for (const key of keys) {
+    const ref = asHandoff(outputs[key]);
+    if (ref) index[key] = ref;
+  }
+  return index;
 }
 
 function testVerdict(text: unknown): "pass" | "fail" | "unknown" {
-  const value = String(text || "");
-  if (/^\s*TEST_VERDICT:\s*fail\s*$/im.test(value)) return "fail";
-  if (/^\s*TEST_VERDICT:\s*pass\s*$/im.test(value)) return "pass";
-  return "unknown";
+  const ref = asHandoff(text);
+  if (ref?.verdict === "pass" || ref?.verdict === "fail") return ref.verdict;
+  return testVerdictText(String(text || ""));
 }
 
 export default defineFlow({
@@ -99,7 +253,7 @@ export default defineFlow({
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 60 * 60 * 1000,
       statusDetail: "Applying quick bugfix",
-      prompt: ({ outputs }) => {
+      prompt: ({ outputs, state }) => {
         const input = spec(outputs);
         return `You are the implementation agent in a quick bugfix workflow.
 
@@ -109,9 +263,11 @@ ${input.task}
 Working directory:
 ${input.cwd}
 
-Fix the bug with the smallest safe scoped change. Do not revert unrelated user changes. Run relevant checks when feasible, then summarize exactly what changed and what you verified.`;
+Fix the bug with the smallest safe scoped change. Do not revert unrelated user changes. Run relevant checks when feasible.
+
+${handoffInstructions(outputs, state, "implement", "independent testing of the bugfix")}`;
       },
-      parse: trimText,
+      parse: (text, context) => parseHandoff("implement", text, context),
     }),
     agent_test: acp({
       profile: AGENT_PROFILES.test,
@@ -119,7 +275,7 @@ Fix the bug with the smallest safe scoped change. Do not revert unrelated user c
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 30 * 60 * 1000,
       statusDetail: "Independently testing quick bugfix",
-      prompt: ({ outputs }) => {
+      prompt: ({ outputs, state }) => {
         const input = spec(outputs);
         return `You are the independent testing agent in a quick bugfix workflow.
 
@@ -127,7 +283,7 @@ Task:
 ${input.task}
 
 Implementation summary:
-${String(outputs.implement || "")}
+${handoffBlock([["Implementation", outputs.implement]])}
 
 User-provided test hints:
 ${input.testHints || "(none)"}
@@ -141,12 +297,14 @@ Return:
 - suspected cause if failed
 - residual risk
 
-End with exactly one marker line:
+Include exactly one verdict marker line:
 TEST_VERDICT: pass
 or
-TEST_VERDICT: fail`;
+TEST_VERDICT: fail
+
+${handoffInstructions(outputs, state, "agent_test", "orchestrator review of test evidence and final diff")}`;
       },
-      parse: trimText,
+      parse: (text, context) => parseHandoff("agent_test", text, context, testVerdictText(text)),
     }),
     summarize: compute({
       statusDetail: "Summarizing quick bugfix result",
@@ -162,8 +320,6 @@ TEST_VERDICT: fail`;
             test: input.testAgent,
           },
           maxFixRounds: input.maxFixRounds,
-          implementation: outputs.implement,
-          test: outputs.agent_test,
           testVerdict: verdict,
           testFailed: verdict === "fail",
           recommendation: verdict === "fail"
@@ -173,6 +329,8 @@ TEST_VERDICT: fail`;
               : "Test agent did not emit a parseable TEST_VERDICT marker. The orchestrator should inspect the test output before reporting completion.",
           flowRunId: state.runId,
           artifactHint: `~/.acpx/flows/runs/${state.runId}/`,
+          handoffRoot: handoffRoot(outputs, state),
+          handoffs: handoffIndex(outputs, ["implement", "agent_test"]),
         };
       },
     }),
