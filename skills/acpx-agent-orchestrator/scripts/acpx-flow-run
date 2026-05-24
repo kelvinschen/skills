@@ -181,11 +181,24 @@ function materializeFlow(source, agents) {
   return source.replace(profileBlockPattern, block);
 }
 
-function writeMaterialized(opts, flowName, source, input, agents) {
+function copyFlowSharedFiles(skillRoot, outDir) {
+  const sharedDir = path.join(skillRoot, "flows", "shared");
+  if (!fs.existsSync(sharedDir)) return;
+
+  const targetDir = path.join(outDir, "shared");
+  fs.mkdirSync(targetDir, { recursive: true });
+  for (const entry of fs.readdirSync(sharedDir, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    fs.copyFileSync(path.join(sharedDir, entry.name), path.join(targetDir, entry.name));
+  }
+}
+
+function writeMaterialized(skillRoot, opts, flowName, source, input, agents) {
   const outDir = opts.outputDir
     ? path.resolve(opts.outputDir)
     : fs.mkdtempSync(path.join(os.tmpdir(), `acpx-flow-${flowName}-`));
   fs.mkdirSync(outDir, { recursive: true });
+  copyFlowSharedFiles(skillRoot, outDir);
 
   const generatedFlow = path.join(outDir, `${flowName}.flow.ts`);
   const generatedInput = path.join(outDir, `${flowName}.input.json`);
@@ -241,7 +254,7 @@ function main() {
   const defaultProfiles = readDefaultProfiles(source);
   const input = readInput(opts);
   const { sanitized, agents } = sanitizeInput(input, flowName, defaultProfiles);
-  const materialized = writeMaterialized(opts, flowName, source, sanitized, agents);
+  const materialized = writeMaterialized(skillRoot, opts, flowName, source, sanitized, agents);
 
   if (opts.dryRun) {
     console.log(JSON.stringify({

@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
 import { acp, compute, defineFlow, shell } from "acpx/flows";
+import { handoffPrompt, independentTestingGuidance, testVerdictMarkerPrompt } from "./shared/prompt-templates";
 
 type FlowInput = {
   task?: string;
@@ -178,18 +179,10 @@ function parseHandoff(node: string, text: string, context: FlowContext, verdict?
 
 function handoffInstructions(outputs: Record<string, unknown>, state: { runId: string }, node: string, focus: string): string {
   const targetPath = expectedHandoffPath(outputs, state, node);
-  return `Write a handoff document summarizing this node's work so a fresh agent can continue from here.
-Save it to: ${targetPath}
-Create the parent directory if it does not exist.
-
-Include a "suggested skills" section for skills the next agent should invoke.
-Do not duplicate content already captured in other artifacts, such as PRDs, plans, ADRs, issues, commits, diffs, logs, or test outputs. Reference them by path or URL instead.
-Redact sensitive information, such as API keys, passwords, tokens, secrets, or personally identifiable information.
-Tailor the handoff to this next focus: ${focus}
-
-End your response with these marker lines:
-HANDOFF_PATH: ${targetPath}
-HANDOFF_SUMMARY: <compact summary>`;
+  return handoffPrompt({
+    targetPath,
+    nextFocus: focus,
+  });
 }
 
 function handoffBlock(items: Array<[string, unknown]>): string {
@@ -288,19 +281,9 @@ ${handoffBlock([["Implementation", outputs.implement]])}
 User-provided test hints:
 ${input.testHints || "(none)"}
 
-Do not accept the implementation agent's testing claims as sufficient evidence. Inspect the workspace, run black-box or regression checks, and create temporary test scripts or fixtures if useful. You have permission to run commands and create test artifacts, but do not make unrelated production code changes. If you must modify test files or fixtures, say exactly what you changed.
+${independentTestingGuidance()}
 
-Return:
-- commands/actions run
-- pass/fail verdict
-- observed output
-- suspected cause if failed
-- residual risk
-
-Include exactly one verdict marker line:
-TEST_VERDICT: pass
-or
-TEST_VERDICT: fail
+${testVerdictMarkerPrompt()}
 
 ${handoffInstructions(outputs, state, "agent_test", "orchestrator review of test evidence and final diff")}`;
       },
