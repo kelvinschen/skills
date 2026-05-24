@@ -27,6 +27,15 @@ Use `acpx` as the orchestration boundary. The current agent should coordinate, i
 
 Direct lanes are supplemental and should use named sessions such as `-s plan`, `-s impl`, and `-s review` for continuity.
 
+For stateless fire-and-forget tasks that do not need a reusable session or flow artifacts, use acpx one-shot mode:
+
+```bash
+AGENT=aiden
+acpx --cwd /repo "$AGENT" exec "Summarize the current package structure."
+```
+
+Keep one-shot prompts bounded and disposable. Use named sessions or flows when continuity, monitoring, review, or recovery matters.
+
 ## Non-Blocking Flow-First Orchestration
 
 For normal delegation, prefer bundled flow templates launched through `scripts/acpx-flow-run` so each lane can use its role agent. Choose the lightest template that matches the task risk, then start it non-blockingly. Do not fix main-agent bash timeouts by increasing `--timeout`; long flow work must return control to the orchestrator and be monitored through run artifacts.

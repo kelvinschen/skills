@@ -131,6 +131,15 @@ IMPLEMENT_AGENT=trae
 acpx "$IMPLEMENT_AGENT" -s impl --approve-all --cwd /repo -f task.md
 ```
 
+One-shot fire-and-forget task:
+
+```bash
+AGENT=aiden
+acpx --cwd /repo "$AGENT" exec "Summarize the current package structure."
+```
+
+Use `exec` for bounded stateless tasks that do not need session continuity, flow artifacts, or recovery routing.
+
 Inspect recent output:
 
 ```bash
