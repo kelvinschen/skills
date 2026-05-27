@@ -70,22 +70,25 @@ For per-lane flow orchestration, use `scripts/acpx-flow-run` to materialize stat
 
 ```bash
 FLOW_LOG=/tmp/acpx-flow-simple-feature.log
-scripts/acpx-flow-run simple-feature \
+FLOW_RUN_OUTPUT=$(scripts/acpx-flow-run simple-feature \
   --input-file flows/examples/simple-feature.input.json \
-  --log "$FLOW_LOG"
+  --log "$FLOW_LOG")
+echo "$FLOW_RUN_OUTPUT"
 
-RUN=$(ls -td ~/.acpx/flows/runs/* 2>/dev/null | head -1)
-cat "$RUN/projections/live.json"
+RUN=$(printf '%s\n' "$FLOW_RUN_OUTPUT" | awk -F= '$1=="runDir"{print $2}')
+LIVE=$(printf '%s\n' "$FLOW_RUN_OUTPUT" | awk -F= '$1=="live"{print $2}')
+echo "run=$RUN"
+[ -n "$LIVE" ] && cat "$LIVE"
 ```
 
-The launcher defaults to background execution and `--approve-all`. Flow templates provide default profiles. Input role fields override template defaults, and environment variables override input role fields. A flow input may set `handoffDir`; otherwise the default handoff path is `<repo>/tmp/flow_handoffs/<runId>/<node>.md` and the shared memory index is `<repo>/tmp/flow_handoffs/<runId>/flow-memory.md`.
+The launcher defaults to background execution and `--approve-all`. Background launch output includes `pid`, `log`, `flow`, `input`, `command`, and, when startup lookup succeeds, `runLookup=matched`, `runId`, `runDir`, `manifest`, `live`, `runProjection`, `steps`, `trace`, `sessionsDir`, and `artifactsDir`. Flow templates provide default profiles. Input role fields override template defaults, and environment variables override input role fields. A flow input may set `handoffDir`; otherwise the default handoff path is `<repo>/tmp/flow_handoffs/<runId>/<node>.md` and the shared memory index is `<repo>/tmp/flow_handoffs/<runId>/flow-memory.md`.
 
 ```bash
 PLAN_AGENT=aiden PLAN_REVIEW_AGENT=trae IMPLEMENT_AGENT=trae VALIDATE_AGENT=aiden \
   scripts/acpx-flow-run complex-feature-refactor --input-file flows/examples/complex-feature-refactor.input.json
 ```
 
-If multiple flows may be active, correlate the run bundle with `flowName`, `startedAt`, and the log path before treating the newest directory as the target run.
+If `runLookup=pending`, use the emitted `runSearchRoot`, `runSearchFlow`, and `runSearchFlowName` values to locate the bundle once it appears. Treat the newest run directory only as a fallback debugging aid.
 
 Bundled flow templates instruct each lane agent to write its own handoff file and append a compact index entry to `flow-memory.md`. Downstream prompts receive compact references to the memory file and handoff files, not full upstream agent output. Prefer flow outputs, `flowMemoryPath`, the memory index, and handoff paths for monitoring; use full session reads only when deeper inspection is needed.
 Shared prompt wording for bundled flows lives in `flows/shared/prompt-templates.ts`; update that file before duplicating prompt text in individual flow templates.

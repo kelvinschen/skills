@@ -49,20 +49,24 @@ For normal delegation, prefer bundled flow templates launched through `scripts/a
 ```bash
 FLOW=simple-feature
 FLOW_LOG=/tmp/acpx-flow-$FLOW.log
-scripts/acpx-flow-run "$FLOW" \
+FLOW_RUN_OUTPUT=$(scripts/acpx-flow-run "$FLOW" \
   --input-file "flows/examples/$FLOW.input.json" \
-  --log "$FLOW_LOG"
+  --log "$FLOW_LOG")
+echo "$FLOW_RUN_OUTPUT"
 ```
 
 Flow templates include default profiles. Feature flow defaults are `PLAN_AGENT=aiden`, `PLAN_REVIEW_AGENT=trae`, `IMPLEMENT_AGENT=trae`, and `VALIDATE_AGENT=aiden`; `quick-bugfix` also supports `TEST_AGENT`. Environment variables override input role fields. If the caller confirms a handoff location, pass `handoffDir` in the flow input; otherwise nodes use `<repo>/tmp/flow_handoffs/<runId>/<node>.md` and the shared memory index at `<repo>/tmp/flow_handoffs/<runId>/flow-memory.md`.
 
-After launch, record the PID and log path, then identify the newest run bundle. If other flows may be active, correlate the bundle with `flowName`, `startedAt`, and the log path before treating it as the target run:
+After launch, use the emitted `runId`, `runDir`, and `live` fields to track the exact run bundle:
 
 ```bash
-RUN=$(ls -td ~/.acpx/flows/runs/* 2>/dev/null | head -1)
+RUN=$(printf '%s\n' "$FLOW_RUN_OUTPUT" | awk -F= '$1=="runDir"{print $2}')
+LIVE=$(printf '%s\n' "$FLOW_RUN_OUTPUT" | awk -F= '$1=="live"{print $2}')
 echo "run=$RUN"
-cat "$RUN/projections/live.json"
+[ -n "$LIVE" ] && cat "$LIVE"
 ```
+
+If `runLookup=pending`, use `runSearchRoot`, `runSearchFlow`, and `runSearchFlowName` from the launcher output to locate the bundle once it appears. Treat the newest run directory only as a fallback debugging aid.
 
 The flow runtime persists run state and artifacts under `~/.acpx/flows/runs/<runId>/`. Lane agents write handoff files under the configured handoff directory and append compact entries to `flow-memory.md`. Use flow outputs, `flowMemoryPath`, the memory index, and handoff paths first; read full session output only when deeper inspection is needed.
 The bundled templates create the input `cwd` before starting agent nodes. For self-healing templates, audit validation behavior after completion with `scripts/acpx-visualize`.

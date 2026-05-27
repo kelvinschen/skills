@@ -15,7 +15,7 @@ function usage(exitCode = 0) {
   acpx-visualize --session-json <path> [--output <path>]
   acpx-visualize --agent <name> --cwd <dir> --session <name> [--output <path>]
 
-Generates a self-contained static HTML audit report for an ended acpx flow or captured session.
+Generates a static HTML audit report with CDN-enhanced Markdown rendering for an ended acpx flow or captured session.
 `;
   process.stderr.write(text);
   process.exit(exitCode);
@@ -108,6 +108,19 @@ function stringifyPreview(value) {
     return truncate([value.stdout ? `stdout:\n${value.stdout}` : "", value.stderr ? `stderr:\n${value.stderr}` : ""].filter(Boolean).join("\n\n"));
   }
   return truncate(JSON.stringify(value, null, 2));
+}
+
+function stringifyFull(value) {
+  if (value == null) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (value.Text && typeof value.Text === "string") return value.Text.trim();
+  if (value.output) return stringifyFull(value.output);
+  if (value.Output) return stringifyFull(value.Output);
+  if (value.stdout || value.stderr) {
+    return [value.stdout ? `stdout:\n${value.stdout}` : "", value.stderr ? `stderr:\n${value.stderr}` : ""].filter(Boolean).join("\n\n").trim();
+  }
+  return JSON.stringify(value, null, 2);
 }
 
 function unique(values) {
@@ -325,6 +338,71 @@ function findTimelineSession(step, sessionLookup) {
   return null;
 }
 
+function scopedAssistantText(step, session) {
+  const conversation = step.trace?.conversation;
+  if (!conversation || !session) return "";
+  const start = Number(conversation.messageStart);
+  const end = Number(conversation.messageEnd);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return "";
+
+  return session.conversation
+    .filter((item) => item.type === "assistant" && item.messageIndex > start && item.messageIndex <= end)
+    .map((item) => item.text)
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function resolveStepOutput(step, session) {
+  const candidates = [
+    ["error", step.error],
+    ["rawText", step.rawText],
+    ["output", step.output],
+    ["trace.outputInline", step.trace?.outputInline],
+    ["scopedSessionAssistant", scopedAssistantText(step, session)],
+  ];
+  for (const [source, value] of candidates) {
+    const summary = stringifyFull(value);
+    if (summary.trim()) return { summary, source };
+  }
+  return { summary: "-", source: "none" };
+}
+
+function firstString(...values) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function cwdFromObject(value) {
+  if (!value || typeof value !== "object") return null;
+  return firstString(value.cwd);
+}
+
+function resolveFlowCwd(runProjection, steps, sessions) {
+  const outputs = runProjection.outputs && typeof runProjection.outputs === "object" ? runProjection.outputs : {};
+  const results = runProjection.results && typeof runProjection.results === "object" ? runProjection.results : {};
+  const sessionBindings = runProjection.sessionBindings && typeof runProjection.sessionBindings === "object"
+    ? Object.values(runProjection.sessionBindings)
+    : [];
+
+  return firstString(
+    cwdFromObject(runProjection.input),
+    cwdFromObject(outputs.normalize_input),
+    cwdFromObject(outputs.summarize),
+    cwdFromObject(results.normalize_input?.output),
+    cwdFromObject(results.summarize?.output),
+    ...steps.flatMap((step) => [
+      cwdFromObject(step.output),
+      cwdFromObject(step.trace?.outputInline),
+      cwdFromObject(step.session),
+      cwdFromObject(step.agent),
+    ]),
+    ...sessionBindings.map(cwdFromObject),
+    ...sessions.map((session) => session.summary?.cwd),
+  );
+}
+
 function resolveLatestFlowRun() {
   const runsDir = path.join(os.homedir(), ".acpx", "flows", "runs");
   if (!fs.existsSync(runsDir)) fail(`No flow runs directory found: ${runsDir}`);
@@ -356,9 +434,11 @@ function loadFlowRun(inputPath) {
     sessions.push(parseSessionRecord(record, { binding }));
   }
   const sessionLookup = buildSessionLookup(sessions);
+  const cwd = resolveFlowCwd(runProjection, steps, sessions);
 
   const timeline = steps.map((step) => {
     const session = findTimelineSession(step, sessionLookup);
+    const output = resolveStepOutput(step, session);
     const timelineStep = {
       nodeId: step.nodeId,
       nodeType: step.nodeType,
@@ -369,14 +449,11 @@ function loadFlowRun(inputPath) {
       agentName: step.agent?.agentName || step.session?.agentName || null,
       sessionHandle: step.session?.handle || null,
       sessionName: step.session?.name || null,
-      outputSummary: stringifyPreview(step.output),
+      outputSummary: output.summary,
+      outputSource: output.source,
       error: step.error || null,
       traceKeys: Object.keys(step.trace || {}),
     };
-    const lastAssistantText = session?.summary?.lastAssistantText;
-    if (lastAssistantText) {
-      timelineStep.outputSummary = truncate(lastAssistantText);
-    }
     return timelineStep;
   });
 
@@ -390,6 +467,7 @@ function loadFlowRun(inputPath) {
       flowName: runProjection.flowName || manifest.flowName,
       flowPath: runProjection.flowPath || manifest.flowPath,
       runDir,
+      cwd,
       startedAt: runProjection.startedAt || manifest.startedAt,
       finishedAt: runProjection.finishedAt || manifest.finishedAt,
       durationMs: durationMs(runProjection.startedAt || manifest.startedAt, runProjection.finishedAt || manifest.finishedAt),
@@ -489,9 +567,37 @@ function esc(value) {
     .replace(/"/g, "&quot;");
 }
 
+function jsonScriptValue(value) {
+  return JSON.stringify(String(value ?? ""))
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026");
+}
+
 function badge(value) {
   const normalized = String(value || "unknown").toLowerCase();
   return `<span class="badge badge-${esc(normalized)}">${esc(value || "unknown")}</span>`;
+}
+
+function outcomeIcon(value) {
+  const normalized = String(value || "unknown").toLowerCase();
+  if (normalized === "ok" || normalized === "completed" || normalized === "closed" || normalized === "pass") return "🟢";
+  if (normalized === "failed" || normalized === "error" || normalized === "timed_out" || normalized === "cancelled" || normalized === "fix") return "🔴";
+  if (normalized === "running") return "🔵";
+  return "⚪";
+}
+
+function previewLines(value, maxLines = 5) {
+  const text = String(value ?? "");
+  const lines = text.split(/\r?\n/);
+  if (lines.length <= maxLines) {
+    return { preview: text, full: text, truncated: false };
+  }
+  return {
+    preview: `${lines.slice(0, maxLines).join("\n")}\n... [${lines.length - maxLines} more lines]`,
+    full: text,
+    truncated: true,
+  };
 }
 
 function renderSummary(audit) {
@@ -511,22 +617,52 @@ function renderSummary(audit) {
   return rows.map(([key, value]) => `<div class="kv"><div>${esc(key)}</div><strong>${esc(value)}</strong></div>`).join("");
 }
 
+function renderFlowOverview(timeline) {
+  if (!timeline.length) return `<p class="muted">No timeline steps were recorded.</p>`;
+  return `
+    <div class="flow-overview" aria-label="Flow node order">
+      ${timeline.map((step, index) => `
+        <div class="flow-overview-item">
+          <div class="flow-node" title="${esc(`${step.nodeId || "-"} ${step.outcome || "unknown"}`)}">
+            <strong>${esc(step.nodeId || "-")}</strong>
+            <small>${esc(step.nodeType || "-")}</small>
+            <span class="status-dot" aria-label="${esc(step.outcome || "unknown")}">${outcomeIcon(step.outcome)}</span>
+          </div>
+          ${index < timeline.length - 1 ? `<div class="flow-arrow">→</div>` : ""}
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
 function renderTimeline(audit) {
   if (audit.type !== "flow") return "";
-  const rows = audit.flow.timeline.map((step) => `
-    <tr class="searchable" data-search="${esc([step.nodeId, step.nodeType, step.outcome, step.agentName, step.sessionHandle, step.error].join(" "))}">
+  const rows = audit.flow.timeline.map((step) => {
+    const output = previewLines(step.outputSummary || "-");
+    return `
+    <tr class="searchable" data-search="${esc([step.nodeId, step.nodeType, step.outcome, step.agentName, step.sessionHandle, step.error, step.outputSummary, step.outputSource].join(" "))}">
       <td>${esc(step.nodeId)}</td>
       <td>${esc(step.nodeType)}</td>
-      <td>${badge(step.outcome)}</td>
+      <td class="outcome-cell" title="${esc(step.outcome || "unknown")}">${outcomeIcon(step.outcome)}</td>
       <td>${esc(step.agentName || "-")}</td>
       <td>${esc(step.sessionHandle || "-")}</td>
       <td>${esc(formatDuration(step.durationMs))}</td>
-      <td>${esc(step.error || step.outputSummary || "-")}</td>
+      <td>
+        <div class="output-source">
+          source: ${esc(step.outputSource || "unknown")}
+          ${output.truncated ? `<button type="button" class="output-toggle">Expand</button>` : ""}
+        </div>
+        <pre class="output-preview">${esc(output.preview)}</pre>
+        ${output.truncated ? `<pre class="output-full hidden">${esc(output.full)}</pre>` : ""}
+      </td>
     </tr>
-  `).join("");
+  `;
+  }).join("");
   return `
     <section>
       <h2>Flow Timeline</h2>
+      <h3>Flow Overview</h3>
+      ${renderFlowOverview(audit.flow.timeline)}
       <div class="table-wrap">
         <table>
           <thead><tr><th>Node</th><th>Type</th><th>Outcome</th><th>Agent</th><th>Session</th><th>Duration</th><th>Output / Error</th></tr></thead>
@@ -552,7 +688,10 @@ function renderFlowMemory(audit) {
     ? `<details><summary>Candidate paths</summary><pre>${esc(memory.candidates.join("\n"))}</pre></details>`
     : "";
   const content = memory.exists
-    ? `<pre>${esc(memory.content || "(empty)")}</pre>`
+    ? `
+      <div id="flow-memory-rendered" class="markdown-body"></div>
+      <script type="application/json" id="flow-memory-source">${jsonScriptValue(memory.content || "(empty)")}</script>
+    `
     : `<p class="warning">Shared flow memory file was referenced but not found.</p>`;
   return `
     <section class="searchable" data-search="${esc([memory.path, memory.content].join(" "))}">
@@ -637,6 +776,7 @@ function renderHtml(audit) {
     main { width: min(1180px, calc(100% - 32px)); margin: 22px auto 56px; }
     section, .summary { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin: 16px 0; padding: 18px; box-shadow: 0 10px 28px rgba(0,0,0,.04); }
     h2 { margin: 0 0 14px; font-size: 20px; }
+    h3 { margin: 16px 0 10px; color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
     .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
     .kv { border: 1px solid var(--line); border-radius: 6px; padding: 10px; min-width: 0; }
     .kv div { color: var(--muted); font-size: 12px; }
@@ -645,6 +785,16 @@ function renderHtml(audit) {
     input[type="search"] { width: min(520px, 100%); padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; font: inherit; }
     .warning { background: #fff6dc; border: 1px solid #e0c16c; color: #6b4a00; border-radius: 6px; padding: 10px 12px; margin: 12px 0; }
     .muted { color: var(--muted); margin: 0; }
+    .flow-overview { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; margin-bottom: 16px; overflow-x: auto; padding-bottom: 4px; }
+    .flow-overview-item { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+    .flow-node { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 106px; min-height: 58px; border: 1px solid var(--line); border-radius: 6px; padding: 5px; background: #fbfbf8; text-align: center; }
+    .flow-node strong { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+    .flow-node small { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 10px; }
+    .status-dot { line-height: 1; font-size: 12px; }
+    .flow-arrow { color: var(--muted); font-size: 12px; font-weight: 800; }
+    .outcome-cell { font-size: 14px; text-align: center; white-space: nowrap; }
+    .output-source { color: var(--muted); font-size: 11px; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .04em; }
+    .output-toggle { margin-left: 8px; border: 1px solid var(--line); border-radius: 5px; background: #fff; color: var(--accent); cursor: pointer; font: inherit; font-size: 11px; padding: 1px 6px; text-transform: none; letter-spacing: 0; }
     .table-wrap { overflow: auto; }
     table { width: 100%; border-collapse: collapse; }
     th, td { border-bottom: 1px solid var(--line); padding: 9px; text-align: left; vertical-align: top; }
@@ -664,6 +814,15 @@ function renderHtml(audit) {
     .tool-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
     .tool-grid h3 { margin: 0 0 6px; color: var(--muted); font-size: 12px; text-transform: uppercase; }
     .session-meta { display: flex; flex-wrap: wrap; gap: 12px; color: var(--muted); margin-bottom: 10px; }
+    .markdown-body { border: 1px solid var(--line); border-radius: 7px; padding: 14px; margin: 12px 0; background: #fff; overflow-wrap: anywhere; }
+    .markdown-body h1, .markdown-body h2, .markdown-body h3 { color: var(--text); text-transform: none; letter-spacing: 0; margin: 16px 0 8px; }
+    .markdown-body h1 { font-size: 22px; }
+    .markdown-body h2 { font-size: 18px; }
+    .markdown-body h3 { font-size: 15px; }
+    .markdown-body p, .markdown-body ul, .markdown-body ol, .markdown-body pre, .markdown-body blockquote { margin: 8px 0; }
+    .markdown-body code { background: #f0f0eb; border-radius: 4px; padding: 1px 4px; }
+    .markdown-body pre { background: #f6f6f1; border: 1px solid var(--line); border-radius: 6px; padding: 10px; overflow: auto; }
+    .markdown-body blockquote { border-left: 4px solid var(--line); padding-left: 10px; color: var(--muted); }
     .hidden { display: none !important; }
     footer { color: var(--muted); padding: 20px 0; text-align: center; }
   </style>
@@ -688,7 +847,34 @@ function renderHtml(audit) {
     ${renderSessions(audit)}
   </main>
   <footer>Generated by acpx-visualize</footer>
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
   <script>
+    (function renderFlowMemoryMarkdown() {
+      const source = document.getElementById('flow-memory-source');
+      const rendered = document.getElementById('flow-memory-rendered');
+      if (!source || !rendered || !window.markdownit || !window.DOMPurify) return;
+      try {
+        const markdown = JSON.parse(source.textContent || '""');
+        const md = window.markdownit({ html: false, linkify: true, typographer: true });
+        rendered.innerHTML = window.DOMPurify.sanitize(md.render(markdown));
+      } catch {
+        rendered.textContent = 'Unable to render shared flow memory Markdown.';
+      }
+    })();
+
+    document.querySelectorAll('.output-toggle').forEach((button) => {
+      button.addEventListener('click', () => {
+        const cell = button.closest('td');
+        const preview = cell?.querySelector('.output-preview');
+        const full = cell?.querySelector('.output-full');
+        if (!preview || !full) return;
+        const expanded = full.classList.toggle('hidden') === false;
+        preview.classList.toggle('hidden', expanded);
+        button.textContent = expanded ? 'Collapse' : 'Expand';
+      });
+    });
+
     const input = document.getElementById('filter');
     const count = document.getElementById('match-count');
     const items = Array.from(document.querySelectorAll('.searchable'));

@@ -12,6 +12,9 @@ const ROLE_FIELDS = {
   "complex-feature-refactor": ["planAgent", "planReviewAgent", "implAgent", "validateAgent"],
 };
 
+const FLOW_RUN_LOOKUP_TIMEOUT_MS = 15_000;
+const FLOW_RUN_LOOKUP_INTERVAL_MS = 250;
+
 const ENV_AGENT_NAMES = {
   planAgent: ["PLAN_AGENT", "PLANNING_AGENT"],
   planReviewAgent: ["PLAN_REVIEW_AGENT", "PLAN_REVIEWING_AGENT"],
@@ -214,12 +217,97 @@ function writeMaterialized(skillRoot, opts, flowName, source, input, agents) {
   return { outDir, generatedFlow, generatedInput };
 }
 
+function flowRunsRoot() {
+  return path.join(os.homedir(), ".acpx", "flows", "runs");
+}
+
+function sleepMs(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function readJsonFile(filePath) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function isMatchingRunManifest(manifest, flowName, generatedFlow, earliestStartedAtMs) {
+  if (!manifest || typeof manifest !== "object") return false;
+  if (manifest.flowName !== flowName) return false;
+  if (manifest.flowPath !== generatedFlow) return false;
+
+  if (typeof manifest.startedAt === "string") {
+    const startedAtMs = Date.parse(manifest.startedAt);
+    if (Number.isFinite(startedAtMs) && startedAtMs < earliestStartedAtMs) return false;
+  }
+  return true;
+}
+
+function findFlowRun(flowName, generatedFlow, earliestStartedAtMs) {
+  const runsRoot = flowRunsRoot();
+  let entries;
+  try {
+    entries = fs.readdirSync(runsRoot, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+
+  const matches = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const runDir = path.join(runsRoot, entry.name);
+    const manifestPath = path.join(runDir, "manifest.json");
+    const manifest = readJsonFile(manifestPath);
+    if (!isMatchingRunManifest(manifest, flowName, generatedFlow, earliestStartedAtMs)) continue;
+    matches.push({ runDir, manifestPath, manifest });
+  }
+
+  matches.sort((a, b) => String(b.manifest.startedAt || "").localeCompare(String(a.manifest.startedAt || "")));
+  return matches[0] || null;
+}
+
+function waitForFlowRun(flowName, generatedFlow, earliestStartedAtMs) {
+  const deadline = Date.now() + FLOW_RUN_LOOKUP_TIMEOUT_MS;
+  while (Date.now() <= deadline) {
+    const match = findFlowRun(flowName, generatedFlow, earliestStartedAtMs);
+    if (match) return match;
+    sleepMs(FLOW_RUN_LOOKUP_INTERVAL_MS);
+  }
+  return findFlowRun(flowName, generatedFlow, earliestStartedAtMs);
+}
+
+function printFlowRunLookup(flowName, generatedFlow, lookup) {
+  if (!lookup) {
+    console.log("runLookup=pending");
+    console.log(`runSearchRoot=${flowRunsRoot()}`);
+    console.log(`runSearchFlow=${generatedFlow}`);
+    console.log(`runSearchFlowName=${flowName}`);
+    return;
+  }
+
+  const runDir = lookup.runDir;
+  const runId = lookup.manifest.runId || path.basename(runDir);
+  console.log("runLookup=matched");
+  console.log(`runId=${runId}`);
+  console.log(`runDir=${runDir}`);
+  console.log(`manifest=${lookup.manifestPath}`);
+  console.log(`live=${path.join(runDir, "projections", "live.json")}`);
+  console.log(`runProjection=${path.join(runDir, "projections", "run.json")}`);
+  console.log(`steps=${path.join(runDir, "projections", "steps.json")}`);
+  console.log(`trace=${path.join(runDir, "trace.ndjson")}`);
+  console.log(`sessionsDir=${path.join(runDir, "sessions")}`);
+  console.log(`artifactsDir=${path.join(runDir, "artifacts")}`);
+}
+
 function runAcpx(opts, flowName, generatedFlow, generatedInput) {
   const acpx = process.env.ACPX_BIN || "acpx";
   const acpxArgs = withDefaultApproveAll(opts.acpxArgs);
   const args = [...acpxArgs, "flow", "run", generatedFlow, "--input-file", generatedInput];
 
   if (opts.background) {
+    const earliestStartedAtMs = Date.now() - 1000;
     const logPath = path.resolve(opts.log || path.join(os.tmpdir(), `acpx-flow-${flowName}.log`));
     const fd = fs.openSync(logPath, "a");
     const child = spawn(acpx, args, {
@@ -232,6 +320,7 @@ function runAcpx(opts, flowName, generatedFlow, generatedInput) {
     console.log(`flow=${generatedFlow}`);
     console.log(`input=${generatedInput}`);
     console.log(`command=${acpx} ${args.join(" ")}`);
+    printFlowRunLookup(flowName, generatedFlow, waitForFlowRun(flowName, generatedFlow, earliestStartedAtMs));
     return 0;
   }
 
