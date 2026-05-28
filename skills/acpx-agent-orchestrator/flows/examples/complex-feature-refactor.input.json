@@ -1,5 +1,5 @@
 {
-  "task": "实现一个 complex feature 或 refactor，包含 plan review、independent validation review，最多两轮 automatic fix。",
+  "task": "SMOKE ONLY: 实现一个 complex feature 或 refactor，包含 plan review、independent validation review，最多两轮 automatic fix。",
   "cwd": "/tmp/acpx-complex-feature-smoke",
   "planAgent": "aiden",
   "planReviewAgent": "trae",

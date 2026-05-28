@@ -1,5 +1,5 @@
 {
-  "task": "实现一个小型 local feature，并进行 independent validation review，最多一轮 automatic fix。",
+  "task": "SMOKE ONLY: 实现一个小型 local feature，并进行 independent validation review，最多一轮 automatic fix。",
   "cwd": "/tmp/acpx-simple-feature-smoke",
   "planAgent": "aiden",
   "implAgent": "trae",

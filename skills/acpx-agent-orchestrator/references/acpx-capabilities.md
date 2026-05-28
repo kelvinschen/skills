@@ -33,7 +33,7 @@ acpx --format json "$AGENT" sessions history --limit 5 impl
 
 对于 long-running multi-step orchestration，优先使用 `acpx flow run`，它会把 run state、node outputs、traces 和 artifacts 记录到 `~/.acpx/flows/runs/<runId>/` 下。不要在受限 main-agent shell 中把 `acpx flow run` 当作 foreground long wait 使用。应以非阻塞方式启动长 flows，并监控 run bundle。
 
-添加 shell 机制前先使用 acpx-native capabilities。`--no-wait` 是 agent-session queueing，用于类似 `acpx <agent> --no-wait -s impl ...` 的 prompts。
+One-shot 和 named session prompts 应使用 `nohup` 包裹 acpx-native commands 后台启动，避免阻塞 main agent shell；通过 PID、log、compact session reads 和最终 repo/check state 跟踪。`--no-wait` 是 agent-session queueing，用于类似 `acpx <agent> --no-wait -s impl ...` 的 prompts，但本 skill 的标准启动模式仍是 `nohup ... &`。
 
 ## Token-Effective Tracking
 
@@ -71,7 +71,7 @@ acpx --cwd /repo --format json "$AGENT" sessions read --tail 3 simple-feature-im
 ```bash
 FLOW_LOG=/tmp/acpx-flow-simple-feature.log
 FLOW_RUN_OUTPUT=$(scripts/acpx-flow-run simple-feature \
-  --input-file flows/examples/simple-feature.input.json \
+  --input-json "{\"task\":\"<user request>\",\"cwd\":\"$PWD\"}" \
   --log "$FLOW_LOG")
 echo "$FLOW_RUN_OUTPUT"
 
@@ -81,17 +81,20 @@ echo "run=$RUN"
 [ -n "$LIVE" ] && cat "$LIVE"
 ```
 
-Launcher 默认 background execution 和 `--approve-all`。Background launch output 包含 `pid`、`log`、`flow`、`input`、`command`，并在 startup lookup 成功时包含 `runLookup=matched`、`runId`、`runDir`、`manifest`、`live`、`runProjection`、`steps`、`trace`、`sessionsDir` 和 `artifactsDir`。Flow templates 提供默认 profiles。Input role fields 覆盖 template defaults，环境变量覆盖 input role fields。Flow input 可以设置 `handoffDir`；否则默认 handoff path 为 `<repo>/tmp/flow_handoffs/<runId>/<node>.md`，shared memory index 为 `<repo>/tmp/flow_handoffs/<runId>/flow-memory.md`。
+Launcher 默认 background execution 和 flow-level `--approve-all`。Background launch output 包含 `pid`、`log`、`flow`、`input`、`command`，并在 startup lookup 成功时包含 `runLookup=matched`、`runId`、`runDir`、`manifest`、`live`、`runProjection`、`steps`、`trace`、`sessionsDir` 和 `artifactsDir`。Flow templates 提供默认 profiles。Input role fields 覆盖 template defaults，环境变量覆盖 input role fields。Flow input 可以设置 `handoffDir`；否则默认 handoff path 为 `<repo>/tmp/flow_handoffs/<runId>/<node>.md`，shared memory index 为 `<repo>/tmp/flow_handoffs/<runId>/flow-memory.md`。
+
+`flows/examples/*.input.json` 只用于 smoke/demo，因为其 `task` 和 `cwd` 都是占位值。真实用户任务应使用 `--input-json` 或生成 task-specific input file，并显式传入当前 repo `cwd`。
 
 ```bash
 PLAN_AGENT=aiden PLAN_REVIEW_AGENT=trae IMPLEMENT_AGENT=trae VALIDATE_AGENT=aiden \
-  scripts/acpx-flow-run complex-feature-refactor --input-file flows/examples/complex-feature-refactor.input.json
+  scripts/acpx-flow-run complex-feature-refactor \
+    --input-json "{\"task\":\"<user request>\",\"cwd\":\"$PWD\"}"
 ```
 
 如果 `runLookup=pending`，使用输出的 `runSearchRoot`、`runSearchFlow` 和 `runSearchFlowName` values，待 bundle 出现后定位它。只把 newest run directory 作为 fallback debugging aid。
 
 随附 flow templates 指示每个 lane agent 写入自己的 handoff file，并向 `flow-memory.md` 追加 compact index entry。下游 prompts 接收 memory file 和 handoff files 的 compact references，而不是完整上游 agent output。监控时优先使用 flow outputs、`flowMemoryPath`、memory index 和 handoff paths；只有需要更深检查时才使用完整 session reads。
-随附 flows 的 shared prompt wording 位于 `flows/shared/prompt-templates.ts`；在 individual flow templates 中复制 prompt text 前，先更新该文件。
+随附 flows 的 shared prompt wording 位于 `flows/shared/prompt-templates.ts`，shared handoff/path helpers 位于 `flows/shared/flow-helpers.ts`；在 individual flow templates 中复制通用 prompt 或 helper 逻辑前，先更新 shared files。
 
 Active work 的 recommended polling cadence：
 
@@ -104,11 +107,17 @@ Active work 的 recommended polling cadence：
 
 每次 poll 时，读取 `live.json` 或相关 `sessions read --tail 3` output。默认不要以快于 60s 的频率 poll；只有用户明确需要 near-real-time monitoring 时才缩短。
 
-对于普通 named sessions：
+### Named Session Tracking
+
+对于普通 named sessions，用 `nohup` 后台启动 prompt，然后用 compact reads 跟踪：
 
 ```bash
 REVIEW_AGENT=aiden
 IMPLEMENT_AGENT=trae
+LOG=/tmp/acpx-review.log
+nohup acpx --cwd /repo "$REVIEW_AGENT" -s review --approve-reads --no-terminal \
+  "Review 当前 diff，查找 bugs、regressions 和 missing tests。" >"$LOG" 2>&1 &
+echo "pid=$! log=$LOG"
 acpx --cwd /repo --format json "$REVIEW_AGENT" sessions read --tail 3 review
 acpx --cwd /repo --format json "$IMPLEMENT_AGENT" sessions read --tail 3 impl
 ```
@@ -119,53 +128,54 @@ acpx --cwd /repo --format json "$IMPLEMENT_AGENT" sessions read --tail 3 impl
 
 ## Recommended Patterns
 
-Simple planning 或 review：
+### Simple Planning Or Review
 
 ```bash
 REVIEW_AGENT=aiden
-acpx "$REVIEW_AGENT" -s review --approve-reads --no-terminal --cwd /repo \
-  "Review 当前 diff，查找 bugs、regressions 和 missing tests。"
+LOG=/tmp/acpx-review.log
+nohup acpx "$REVIEW_AGENT" -s review --approve-reads --no-terminal --cwd /repo \
+  "Review 当前 diff，查找 bugs、regressions 和 missing tests。" >"$LOG" 2>&1 &
+echo "pid=$! log=$LOG"
+acpx --cwd /repo --format json "$REVIEW_AGENT" sessions read --tail 3 review
 ```
 
-Bounded implementation：
+### Bounded Implementation
 
 ```bash
 IMPLEMENT_AGENT=trae
-acpx "$IMPLEMENT_AGENT" -s impl --approve-all --cwd /repo -f task.md
+LOG=/tmp/acpx-impl.log
+nohup acpx "$IMPLEMENT_AGENT" -s impl --approve-all --cwd /repo -f task.md >"$LOG" 2>&1 &
+echo "pid=$! log=$LOG"
+acpx --cwd /repo --format json "$IMPLEMENT_AGENT" sessions read --tail 3 impl
 ```
 
-One-shot fire-and-forget task：
+### One-Shot Bounded Stateless Task
 
 ```bash
 AGENT=aiden
-acpx --cwd /repo "$AGENT" exec "总结当前 package structure。"
+LOG=/tmp/acpx-one-shot-$AGENT.log
+nohup acpx --cwd /repo "$AGENT" exec "总结当前 package structure。" >"$LOG" 2>&1 &
+echo "pid=$! log=$LOG"
 ```
 
-对于不需要 session continuity、flow artifacts 或 recovery routing 的 bounded stateless tasks，使用 `exec`。
+对于不需要 session continuity、flow artifacts 或 recovery routing 的 bounded stateless tasks，使用 `exec`，但仍用 `nohup` 后台启动，并通过 PID/log 跟踪 completion。
 
-Inspect recent output：
+### Inspect Recent Output
 
 ```bash
 AGENT=trae
 acpx --format json "$AGENT" sessions read --tail 3 impl
 ```
 
+### Flow Run
+
 当 coding task 应通过 agents 委派时，选择 multi-complexity workflow。长 flow runs 应以非阻塞方式启动。不要依赖 foreground `--timeout` values 让执行时间超过 main agent 的 shell limit：
 
 ```bash
-FLOW_LOG=/tmp/acpx-flow-quick-bugfix.log
-scripts/acpx-flow-run quick-bugfix \
-  --input-file flows/examples/quick-bugfix.input.json \
-  --log "$FLOW_LOG"
-
-FLOW_LOG=/tmp/acpx-flow-simple-feature.log
-scripts/acpx-flow-run simple-feature \
-  --input-file flows/examples/simple-feature.input.json \
-  --log "$FLOW_LOG"
-
-FLOW_LOG=/tmp/acpx-flow-complex-feature-refactor.log
-scripts/acpx-flow-run complex-feature-refactor \
-  --input-file flows/examples/complex-feature-refactor.input.json \
+FLOW=quick-bugfix
+FLOW_LOG=/tmp/acpx-flow-$FLOW.log
+scripts/acpx-flow-run "$FLOW" \
+  --input-json "{\"task\":\"<user request>\",\"cwd\":\"$PWD\"}" \
   --log "$FLOW_LOG"
 ```
 

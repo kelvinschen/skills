@@ -4,10 +4,9 @@
 
 - 预期 `acpx` 已安装在 `PATH` 上。
 - Global config path：`~/.acpx/config.json`。
-- `trae` 是 acpx built-in command，不需要 custom `agents` config entry。
 - `aiden` 可通过 custom command `aiden acp` 使用。
 - `omp` 可通过 custom command `omp acp` 使用。
-- 此技能可使用任何 registered acpx agent。
+- 此技能可使用任何 registered acpx agent (`claude` / `codex` / `pi` 等)。
 
 ## Minimal Config Shape
 
@@ -57,7 +56,7 @@ acpx "$AGENT" status
 当你不想保存 session 时，使用 one-shot prompts：
 
 ```bash
-AGENT=aiden
+AGENT=claude
 acpx --approve-reads --no-terminal "$AGENT" exec "用五个 bullets 总结 repo。"
 ```
 

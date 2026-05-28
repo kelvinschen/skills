@@ -68,8 +68,17 @@ Severity rubric：
 - P3：low-risk nit、style、docs 或 optional cleanup。
 
 返回 validation commands/actions、results 和 findings。先列出 P0/P1 findings。保持 P2/P3 简洁。如果没有 blocking findings，请明确说明并提及 residual risk。
+如果修复某个 P0/P1 必须违反用户明确约束、accepted plan scope、或 out-of-scope boundary，请把它标为 constraint conflict，并说明 automatic fix agent 不应绕过该约束。该情况仍可使用 fix verdict，以便后续 validation 将 unresolved state 升级给 orchestrator。
 仅对真实 P0 findings、失败的 task-relevant checks，或应在此 flow 中修复的 P1 findings 使用 VALIDATION_VERDICT: fix。单独的 P2/P3 不得产生 VALIDATION_VERDICT: fix。${finalRoundGuidance}
 包含 compact handoff，并通过 path 引用 detailed artifacts，不要复制大段 logs 或 diffs。遮盖 secrets 和 sensitive personal data。`;
+}
+
+export function automaticFixGuardrail(): string {
+  return `Automatic fix round guardrail：
+- 原始用户请求、accepted plan scope、out-of-scope items、以及明确的 negative constraints 仍然是硬边界。
+- 不要为了让 tests/checks 变绿而绕过这些边界；尤其不要修改用户明确禁止修改的 files 或行为。
+- 如果 validation finding 的唯一修复方式会违反这些边界，不要应用该修复。改为保留 workspace 不变，记录 constraint conflict、需要 human orchestrator decision 的原因、以及最小可选修复建议。
+- 只在修复同时满足 validation finding 和上述边界时，才编辑文件。`;
 }
 
 export function validationVerdictMarkerPrompt(options: { finalRound?: boolean } = {}): string {
