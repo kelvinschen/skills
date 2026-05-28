@@ -127,13 +127,13 @@ function flowMemoryPath(outputs: Record<string, unknown>, state: { runId: string
 function compactText(text: string, maxChars = 1800): string {
   const value = text.trim();
   if (value.length <= maxChars) return value;
-  return `${value.slice(0, maxChars).trimEnd()}\n... [truncated; inspect the flow run or handoff file for full detail]`;
+  return `${value.slice(0, maxChars).trimEnd()}\n... [已截断；查看 flow run 或 handoff file 获取完整细节]`;
 }
 
 function compactTailText(text: string, maxChars = 1200): string {
   const value = text.trim();
   if (value.length <= maxChars) return value;
-  return `[truncated; inspect the flow memory or handoff file for full detail]\n${value.slice(-maxChars).trimStart()}`;
+  return `[已截断；查看 flow memory 或 handoff file 获取完整细节]\n${value.slice(-maxChars).trimStart()}`;
 }
 
 function nextFocus(text: string): string {
@@ -213,18 +213,18 @@ function handoffInstructions(outputs: Record<string, unknown>, state: { runId: s
 function handoffBlock(items: Array<[string, unknown]>): string {
   const body = items.map(([label, value]) => {
     const ref = asHandoff(value);
-    if (!ref) return `${label}: (missing)`;
+    if (!ref) return `${label}: (缺失)`;
     return `${label}:
 - flow memory: ${ref.memoryFile}
-- handoff: ${ref.handoffPath || "(not specified; read the flow memory entry and session tail if needed)"}
+- handoff: ${ref.handoffPath || "(未指定；需要时读取 flow memory entry 和 session tail)"}
 - verdict: ${ref.verdict || "n/a"}
 - summary preview:
-${ref.summaryPreview || "(empty)"}
+${ref.summaryPreview || "(空)"}
 - next focus:
-${ref.nextFocus || "(not specified)"}
+${ref.nextFocus || "(未指定)"}
 - raw response chars: ${ref.rawChars}`;
   }).join("\n\n");
-  return `Read the shared flow memory first, then open referenced handoff files only when more detail is needed. Do not rely on omitted raw agent responses.\n\n${body}`;
+  return `先读取 shared flow memory；只有需要更多细节时，才打开被引用的 handoff files。不要依赖被省略的 raw agent responses。\n\n${body}`;
 }
 
 function handoffSummary(value: unknown): HandoffSummary | null {
@@ -262,17 +262,17 @@ export default defineFlow({
   run: {
     title: ({ input }) => {
       const task = typeof (input as FlowInput)?.task === "string" ? (input as FlowInput).task?.trim() : "";
-      return task ? `Quick bugfix: ${task.slice(0, 80)}` : "Quick bugfix";
+      return task ? `Quick bugfix：${task.slice(0, 80)}` : "Quick bugfix";
     },
   },
   startAt: "normalize_input",
   nodes: {
     normalize_input: compute({
-      statusDetail: "Normalizing quick bugfix input",
+      statusDetail: "正在规范化 quick bugfix input",
       run: ({ input }) => normalizeInput(input),
     }),
     prepare_workspace: shell({
-      statusDetail: "Ensuring target working directory exists",
+      statusDetail: "正在确保 target working directory 存在",
       exec: ({ outputs }) => ({
         command: "mkdir",
         args: ["-p", spec(outputs).cwd],
@@ -287,20 +287,20 @@ export default defineFlow({
       session: { handle: "impl" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 60 * 60 * 1000,
-      statusDetail: "Applying quick bugfix",
+      statusDetail: "正在应用 quick bugfix",
       prompt: ({ outputs, state }) => {
         const input = spec(outputs);
-        return `You are the implementation agent in a quick bugfix workflow.
+        return `你是 quick bugfix workflow 中的 implementation agent。
 
-Task:
+任务：
 ${input.task}
 
-Working directory:
+Working directory：
 ${input.cwd}
 
-Fix the bug with the smallest safe scoped change. Do not revert unrelated user changes. Run relevant checks when feasible.
+用最小且安全有界的 change 修复 bug。不要 revert unrelated user changes。可行时运行 relevant checks。
 
-${handoffInstructions(outputs, state, "implement", "independent testing of the bugfix")}`;
+${handoffInstructions(outputs, state, "implement", "对 bugfix 进行 independent testing")}`;
       },
       parse: (text, context) => parseHandoff("implement", text, context),
     }),
@@ -309,30 +309,30 @@ ${handoffInstructions(outputs, state, "implement", "independent testing of the b
       session: { handle: "test" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 30 * 60 * 1000,
-      statusDetail: "Independently testing quick bugfix",
+      statusDetail: "正在独立测试 quick bugfix",
       prompt: ({ outputs, state }) => {
         const input = spec(outputs);
-        return `You are the independent testing agent in a quick bugfix workflow.
+        return `你是 quick bugfix workflow 中的 independent testing agent。
 
-Task:
+任务：
 ${input.task}
 
-Implementation summary:
+Implementation summary：
 ${handoffBlock([["Implementation", outputs.implement]])}
 
-User-provided test hints:
-${input.testHints || "(none)"}
+用户提供的 test hints：
+${input.testHints || "(无)"}
 
 ${independentTestingGuidance()}
 
 ${testVerdictMarkerPrompt()}
 
-${handoffInstructions(outputs, state, "agent_test", "orchestrator review of test evidence and final diff")}`;
+${handoffInstructions(outputs, state, "agent_test", "orchestrator review test evidence 和 final diff")}`;
       },
       parse: (text, context) => parseHandoff("agent_test", text, context, testVerdictText(text)),
     }),
     summarize: compute({
-      statusDetail: "Summarizing quick bugfix result",
+      statusDetail: "正在总结 quick bugfix result",
       run: ({ outputs, state }) => {
         const input = spec(outputs);
         const verdict = testVerdict(outputs.agent_test);
@@ -348,10 +348,10 @@ ${handoffInstructions(outputs, state, "agent_test", "orchestrator review of test
           testVerdict: verdict,
           testFailed: verdict === "fail",
           recommendation: verdict === "fail"
-            ? "Test agent reported failure. The orchestrator should inspect artifacts and decide whether to run a higher-complexity self-healing flow or issue a focused follow-up fix."
+            ? "Test agent 报告 failure。Orchestrator 应检查 artifacts，并决定是运行更高复杂度的 self-healing flow，还是发起 focused follow-up fix。"
             : verdict === "pass"
-              ? "Test agent reported pass. The orchestrator should still inspect final diff before reporting completion."
-              : "Test agent did not emit a parseable TEST_VERDICT marker. The orchestrator should inspect the test output before reporting completion.",
+              ? "Test agent 报告 pass。Orchestrator 在报告 completion 前仍应检查 final diff。"
+              : "Test agent 未输出可解析的 TEST_VERDICT marker。Orchestrator 应在报告 completion 前检查 test output。",
           flowRunId: state.runId,
           artifactHint: `~/.acpx/flows/runs/${state.runId}/`,
           handoffRoot: handoffRoot(outputs, state),

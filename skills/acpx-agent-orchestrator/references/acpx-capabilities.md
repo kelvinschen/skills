@@ -1,6 +1,6 @@
 # ACPX Capabilities
 
-This skill should reuse acpx native capabilities instead of rebuilding them in local helper scripts.
+此技能应复用 acpx native capabilities，而不是在 local helper scripts 中重建它们。
 
 ## Native Command Matrix
 
@@ -10,20 +10,20 @@ This skill should reuse acpx native capabilities instead of rebuilding them in l
 | Idempotent session setup | `acpx <agent> sessions ensure -s <name>` |
 | Fresh session | `acpx <agent> sessions new -s <name>` |
 | One-shot task | `acpx <agent> exec "prompt"` |
-| Prompt file or stdin | `-f <path>` or `-f -` |
+| Prompt file or stdin | `-f <path>` 或 `-f -` |
 | Agent-session async queueing | `--no-wait` |
 | Cancel in-flight work | `acpx <agent> cancel -s <name>` |
 | Session metadata | `acpx --format json <agent> sessions show <name>` |
-| Recent/full output | `sessions history --limit <n>` and `sessions read --tail <n>` |
+| Recent/full output | `sessions history --limit <n>` 和 `sessions read --tail <n>` |
 | Cleanup and portability | `sessions close/export/import/prune` |
-| Permissions | `--approve-all`, `--approve-reads`, `--deny-all`, `--allowed-tools`, `--no-terminal` |
-| Multi-agent workflow | `acpx flow run <file>` with `acpx/flows`; use `scripts/acpx-flow-run` for per-lane agent profiles |
+| Permissions | `--approve-all`、`--approve-reads`、`--deny-all`、`--allowed-tools`、`--no-terminal` |
+| Multi-agent workflow | 使用 `acpx/flows` 的 `acpx flow run <file>`；per-lane agent profiles 使用 `scripts/acpx-flow-run` |
 
 ## Status Boundary
 
-`acpx <agent> status -s <name>` reports local queue owner and agent process health. It is useful for diagnosing whether a session owner exists, is alive, or has no active session.
+`acpx <agent> status -s <name>` 报告 local queue owner 和 agent process health。它适合诊断 session owner 是否存在、是否存活，或是否没有 active session。
 
-Do not use `status` alone as proof that a specific prompt turn has completed. For task output and completion evidence, prefer token-effective reads:
+不要单独使用 `status` 作为某个特定 prompt turn 已完成的证明。对于 task output 和 completion evidence，优先使用 token-effective reads：
 
 ```bash
 AGENT=trae
@@ -31,22 +31,22 @@ acpx --format json "$AGENT" sessions read --tail 3 impl
 acpx --format json "$AGENT" sessions history --limit 5 impl
 ```
 
-For long-running multi-step orchestration, prefer `acpx flow run`, which records run state, node outputs, traces, and artifacts under `~/.acpx/flows/runs/<runId>/`. `acpx flow run` should not be used as a foreground long wait from a constrained main-agent shell. Start long flows non-blockingly and monitor the run bundle instead.
+对于 long-running multi-step orchestration，优先使用 `acpx flow run`，它会把 run state、node outputs、traces 和 artifacts 记录到 `~/.acpx/flows/runs/<runId>/` 下。不要在受限 main-agent shell 中把 `acpx flow run` 当作 foreground long wait 使用。应以非阻塞方式启动长 flows，并监控 run bundle。
 
-Use acpx-native capabilities before adding shell mechanics. `--no-wait` is agent-session queueing for prompts such as `acpx <agent> --no-wait -s impl ...`.
+添加 shell 机制前先使用 acpx-native capabilities。`--no-wait` 是 agent-session queueing，用于类似 `acpx <agent> --no-wait -s impl ...` 的 prompts。
 
 ## Token-Effective Tracking
 
-Do not tail `.stream.ndjson` directly. It is the low-level event log and contains a lot of protocol detail. For main-agent tracking, use acpx projections and compact session reads.
+不要直接 tail `.stream.ndjson`。它是 low-level event log，包含大量 protocol detail。Main-agent tracking 应使用 acpx projections 和 compact session reads。
 
-Flow run status:
+Flow run status：
 
 ```bash
 RUN=~/.acpx/flows/runs/<runId>
 cat "$RUN/projections/live.json"
 ```
 
-`live.json` exposes the flow `status`, current node details, and `sessionBindings`. When a binding contains:
+`live.json` 暴露 flow `status`、current node details 和 `sessionBindings`。当 binding 包含：
 
 ```json
 {
@@ -57,16 +57,16 @@ cat "$RUN/projections/live.json"
 }
 ```
 
-read that agent's recent output:
+读取该 agent 的 recent output：
 
 ```bash
 AGENT=trae
 acpx --cwd /repo --format json "$AGENT" sessions read --tail 3 simple-feature-impl-...
 ```
 
-`sessions read --tail` returns a small JSON envelope with `entries[]` containing `role`, `timestamp`, and `textPreview`. That is usually token-effective enough for a main agent to understand progress without a custom formatter.
+`sessions read --tail` 返回一个小 JSON envelope，其中 `entries[]` 包含 `role`、`timestamp` 和 `textPreview`。这通常足够 token-effective，能让 main agent 了解 progress，而无需 custom formatter。
 
-For per-lane flow orchestration, use `scripts/acpx-flow-run` to materialize static node profiles and launch the workflow:
+对于 per-lane flow orchestration，使用 `scripts/acpx-flow-run` materialize static node profiles 并启动 workflow：
 
 ```bash
 FLOW_LOG=/tmp/acpx-flow-simple-feature.log
@@ -81,19 +81,19 @@ echo "run=$RUN"
 [ -n "$LIVE" ] && cat "$LIVE"
 ```
 
-The launcher defaults to background execution and `--approve-all`. Background launch output includes `pid`, `log`, `flow`, `input`, `command`, and, when startup lookup succeeds, `runLookup=matched`, `runId`, `runDir`, `manifest`, `live`, `runProjection`, `steps`, `trace`, `sessionsDir`, and `artifactsDir`. Flow templates provide default profiles. Input role fields override template defaults, and environment variables override input role fields. A flow input may set `handoffDir`; otherwise the default handoff path is `<repo>/tmp/flow_handoffs/<runId>/<node>.md` and the shared memory index is `<repo>/tmp/flow_handoffs/<runId>/flow-memory.md`.
+Launcher 默认 background execution 和 `--approve-all`。Background launch output 包含 `pid`、`log`、`flow`、`input`、`command`，并在 startup lookup 成功时包含 `runLookup=matched`、`runId`、`runDir`、`manifest`、`live`、`runProjection`、`steps`、`trace`、`sessionsDir` 和 `artifactsDir`。Flow templates 提供默认 profiles。Input role fields 覆盖 template defaults，环境变量覆盖 input role fields。Flow input 可以设置 `handoffDir`；否则默认 handoff path 为 `<repo>/tmp/flow_handoffs/<runId>/<node>.md`，shared memory index 为 `<repo>/tmp/flow_handoffs/<runId>/flow-memory.md`。
 
 ```bash
 PLAN_AGENT=aiden PLAN_REVIEW_AGENT=trae IMPLEMENT_AGENT=trae VALIDATE_AGENT=aiden \
   scripts/acpx-flow-run complex-feature-refactor --input-file flows/examples/complex-feature-refactor.input.json
 ```
 
-If `runLookup=pending`, use the emitted `runSearchRoot`, `runSearchFlow`, and `runSearchFlowName` values to locate the bundle once it appears. Treat the newest run directory only as a fallback debugging aid.
+如果 `runLookup=pending`，使用输出的 `runSearchRoot`、`runSearchFlow` 和 `runSearchFlowName` values，待 bundle 出现后定位它。只把 newest run directory 作为 fallback debugging aid。
 
-Bundled flow templates instruct each lane agent to write its own handoff file and append a compact index entry to `flow-memory.md`. Downstream prompts receive compact references to the memory file and handoff files, not full upstream agent output. Prefer flow outputs, `flowMemoryPath`, the memory index, and handoff paths for monitoring; use full session reads only when deeper inspection is needed.
-Shared prompt wording for bundled flows lives in `flows/shared/prompt-templates.ts`; update that file before duplicating prompt text in individual flow templates.
+随附 flow templates 指示每个 lane agent 写入自己的 handoff file，并向 `flow-memory.md` 追加 compact index entry。下游 prompts 接收 memory file 和 handoff files 的 compact references，而不是完整上游 agent output。监控时优先使用 flow outputs、`flowMemoryPath`、memory index 和 handoff paths；只有需要更深检查时才使用完整 session reads。
+随附 flows 的 shared prompt wording 位于 `flows/shared/prompt-templates.ts`；在 individual flow templates 中复制 prompt text 前，先更新该文件。
 
-Recommended polling cadence for active work:
+Active work 的 recommended polling cadence：
 
 | Phase | Interval | Count |
 | --- | ---: | ---: |
@@ -102,9 +102,9 @@ Recommended polling cadence for active work:
 | Steady tracking | 60s | 4 |
 | Extended tracking | 60s | repeat as needed |
 
-At each poll, read `live.json` or the relevant `sessions read --tail 3` output. Do not poll faster than 60s by default; shorten only when the user explicitly needs near-real-time monitoring.
+每次 poll 时，读取 `live.json` 或相关 `sessions read --tail 3` output。默认不要以快于 60s 的频率 poll；只有用户明确需要 near-real-time monitoring 时才缩短。
 
-For ordinary named sessions:
+对于普通 named sessions：
 
 ```bash
 REVIEW_AGENT=aiden
@@ -113,44 +113,44 @@ acpx --cwd /repo --format json "$REVIEW_AGENT" sessions read --tail 3 review
 acpx --cwd /repo --format json "$IMPLEMENT_AGENT" sessions read --tail 3 impl
 ```
 
-Use `sessions history --limit 5` when you need a short history index. Use `sessions show` only when metadata or full messages are specifically needed; it is much heavier than `read --tail`.
+需要 short history index 时使用 `sessions history --limit 5`。只有明确需要 metadata 或 full messages 时才使用 `sessions show`；它比 `read --tail` 重得多。
 
-For low-frequency post-run audit reports, see [audit-visualization.md](audit-visualization.md).
+对于低频 post-run audit reports，见 [audit-visualization.md](audit-visualization.md)。
 
 ## Recommended Patterns
 
-Simple planning or review:
+Simple planning 或 review：
 
 ```bash
 REVIEW_AGENT=aiden
 acpx "$REVIEW_AGENT" -s review --approve-reads --no-terminal --cwd /repo \
-  "Review the current diff for bugs, regressions, and missing tests."
+  "Review 当前 diff，查找 bugs、regressions 和 missing tests。"
 ```
 
-Bounded implementation:
+Bounded implementation：
 
 ```bash
 IMPLEMENT_AGENT=trae
 acpx "$IMPLEMENT_AGENT" -s impl --approve-all --cwd /repo -f task.md
 ```
 
-One-shot fire-and-forget task:
+One-shot fire-and-forget task：
 
 ```bash
 AGENT=aiden
-acpx --cwd /repo "$AGENT" exec "Summarize the current package structure."
+acpx --cwd /repo "$AGENT" exec "总结当前 package structure。"
 ```
 
-Use `exec` for bounded stateless tasks that do not need session continuity, flow artifacts, or recovery routing.
+对于不需要 session continuity、flow artifacts 或 recovery routing 的 bounded stateless tasks，使用 `exec`。
 
-Inspect recent output:
+Inspect recent output：
 
 ```bash
 AGENT=trae
 acpx --format json "$AGENT" sessions read --tail 3 impl
 ```
 
-Choose a multi-complexity workflow when a coding task should be delegated through agents. Start long flow runs non-blockingly. Do not rely on foreground `--timeout` values to outlast the main agent's shell limit:
+当 coding task 应通过 agents 委派时，选择 multi-complexity workflow。长 flow runs 应以非阻塞方式启动。不要依赖 foreground `--timeout` values 让执行时间超过 main agent 的 shell limit：
 
 ```bash
 FLOW_LOG=/tmp/acpx-flow-quick-bugfix.log
@@ -169,8 +169,8 @@ scripts/acpx-flow-run complex-feature-refactor \
   --log "$FLOW_LOG"
 ```
 
-`quick-bugfix` is a short implementation plus independent test lane. `simple-feature` adds planning, independent validation review, and at most one automatic fix round. `complex-feature-refactor` adds plan review, independent validation review, and at most two automatic fix rounds. None of these templates use infinite loops.
+`quick-bugfix` 是短 implementation 加 independent test lane。`simple-feature` 增加 planning、independent validation review，以及最多一轮 automatic fix。`complex-feature-refactor` 增加 plan review、independent validation review，以及最多两轮 automatic fix。这些 templates 都不使用 infinite loops。
 
-Agent validation is a quality signal, not a live tracking mechanism. Feature-flow validation runs in an independent validation lane with the same flow-level permissions as the rest of the run, so its "do not edit production code in validation" rule is enforced by prompt discipline and post-run audit rather than a separate acpx permission boundary. Use `scripts/acpx-visualize` after completion to inspect validation tools, commands, file writes, and outputs.
+Agent validation 是 quality signal，不是 live tracking mechanism。Feature-flow validation 在 independent validation lane 中运行，并具有与 run 其余部分相同的 flow-level permissions，因此其“do not edit production code in validation”规则依靠 prompt discipline 和 post-run audit 执行，而不是单独的 acpx permission boundary。完成后使用 `scripts/acpx-visualize` 检查 validation tools、commands、file writes 和 outputs。
 
-The bundled flows create the target `cwd` before invoking ACP agents, because agent subprocesses cannot spawn with a missing working directory.
+随附 flows 会在调用 ACP agents 前创建 target `cwd`，因为 agent subprocesses 无法以缺失的 working directory 启动。

@@ -1,6 +1,6 @@
 # Audit Visualization
 
-Use `scripts/acpx-visualize` for ended flow/session audit reports. It is intentionally not a state tracker, helper index, poller, or wrapper around live agent work.
+对已结束的 flow/session audit reports 使用 `scripts/acpx-visualize`。它有意不作为 state tracker、helper index、poller 或 live agent work 的 wrapper。
 
 ## Supported Inputs
 
@@ -13,14 +13,14 @@ scripts/acpx-visualize --agent <agent> --cwd /repo --session impl
 
 ## Data Sources
 
-The tool reads acpx-native artifacts: flow `manifest.json`, `projections/run.json`, `projections/steps.json`, session bindings, and session `record.json`; for standalone sessions it reads captured `sessions show` JSON or runs `acpx --format json <agent> sessions show <name>` once. For flow reports, it also reads the referenced shared `flow-memory.md` file when the run output or input identifies one.
+该工具读取 acpx-native artifacts：flow `manifest.json`、`projections/run.json`、`projections/steps.json`、session bindings 和 session `record.json`；对于 standalone sessions，它读取 captured `sessions show` JSON，或运行一次 `acpx --format json <agent> sessions show <name>`。对于 flow reports，当 run output 或 input 标识了 shared `flow-memory.md` file 时，也会读取该文件。
 
-It does not parse `.stream.ndjson`, does not poll, and does not modify or close sessions.
+它不解析 `.stream.ndjson`，不 poll，也不修改或 close sessions。
 
 ## Report Semantics
 
-Flow reports are accepted only when the flow is terminal: `completed`, `failed`, `timed_out`, or `cancelled`. Standalone session reports can be generated before close, but the report includes a warning that the audit represents only the captured state.
+Flow reports 只有在 flow 处于 terminal 状态时才接受：`completed`、`failed`、`timed_out` 或 `cancelled`。Standalone session reports 可以在 close 前生成，但 report 会包含 warning，说明 audit 仅代表 captured state。
 
-The generated HTML is a single local file with embedded CSS and JavaScript. It shows the flow timeline, shared flow memory, session panels, user/assistant output, and inline tool calls with 1,000-character input/result previews, duration, and errors. It intentionally omits raw tool result JSON and a separate tool audit table so long-task reports stay compact.
+生成的 HTML 是一个包含 embedded CSS 和 JavaScript 的单一 local file。它展示 flow timeline、shared flow memory、session panels、user/assistant output，以及带有 1,000 字符 input/result previews、duration 和 errors 的 inline tool calls。它有意省略 raw tool result JSON 和单独的 tool audit table，以保持 long-task reports 紧凑。
 
-Use this for post-run audit, not live progress tracking. Live tracking should still use `projections/live.json` and `sessions read --tail 3`.
+此工具用于 post-run audit，不用于 live progress tracking。Live tracking 仍应使用 `projections/live.json` 和 `sessions read --tail 3`。

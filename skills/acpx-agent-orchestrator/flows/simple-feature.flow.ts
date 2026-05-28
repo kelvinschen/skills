@@ -139,13 +139,13 @@ function flowMemoryPath(outputs: Record<string, unknown>, state: { runId: string
 function compactText(text: string, maxChars = 1800): string {
   const value = text.trim();
   if (value.length <= maxChars) return value;
-  return `${value.slice(0, maxChars).trimEnd()}\n... [truncated; inspect the flow run or handoff file for full detail]`;
+  return `${value.slice(0, maxChars).trimEnd()}\n... [已截断；查看 flow run 或 handoff file 获取完整细节]`;
 }
 
 function compactTailText(text: string, maxChars = 1200): string {
   const value = text.trim();
   if (value.length <= maxChars) return value;
-  return `[truncated; inspect the flow memory or handoff file for full detail]\n${value.slice(-maxChars).trimStart()}`;
+  return `[已截断；查看 flow memory 或 handoff file 获取完整细节]\n${value.slice(-maxChars).trimStart()}`;
 }
 
 function nextFocus(text: string): string {
@@ -254,41 +254,41 @@ function handoffInstructions(outputs: Record<string, unknown>, state: { runId: s
 function handoffBlock(items: Array<[string, unknown]>): string {
   const body = items.map(([label, value]) => {
     const ref = asHandoff(value);
-    if (!ref) return `${label}: (missing)`;
+    if (!ref) return `${label}: (缺失)`;
     const severity = ref.severityCounts
       ? `\n- severity: P0=${ref.severityCounts.P0} P1=${ref.severityCounts.P1} P2=${ref.severityCounts.P2} P3=${ref.severityCounts.P3}`
       : "";
     return `${label}:
 - flow memory: ${ref.memoryFile}
-- handoff: ${ref.handoffPath || "(not specified; read the flow memory entry and session tail if needed)"}
+- handoff: ${ref.handoffPath || "(未指定；需要时读取 flow memory entry 和 session tail)"}
 - verdict: ${ref.verdict || "n/a"}${severity}
 - summary preview:
-${ref.summaryPreview || "(empty)"}
+${ref.summaryPreview || "(空)"}
 - next focus:
-${ref.nextFocus || "(not specified)"}
+${ref.nextFocus || "(未指定)"}
 - raw response chars: ${ref.rawChars}`;
   }).join("\n\n");
-  return `Read the shared flow memory first, then open referenced handoff files only when more detail is needed. Do not rely on omitted raw agent responses.\n\n${body}`;
+  return `先读取 shared flow memory；只有需要更多细节时，才打开被引用的 handoff files。不要依赖被省略的 raw agent responses。\n\n${body}`;
 }
 
 function validationContextBlock(items: Array<[string, unknown]>): string {
   const body = items.map(([label, value]) => {
     const ref = asHandoff(value);
-    if (!ref) return `${label}: (missing)`;
+    if (!ref) return `${label}: (缺失)`;
     const severity = ref.severityCounts
       ? `\n- severity: P0=${ref.severityCounts.P0} P1=${ref.severityCounts.P1} P2=${ref.severityCounts.P2} P3=${ref.severityCounts.P3}`
       : "";
     return `${label}:
 - flow memory: ${ref.memoryFile}
-- handoff: ${ref.handoffPath || "(not specified; read the flow memory entry and session tail if needed)"}
+- handoff: ${ref.handoffPath || "(未指定；需要时读取 flow memory entry 和 session tail)"}
 - verdict: ${ref.verdict || "n/a"}${severity}
 - summary preview:
-${ref.summaryPreview || "(empty)"}
+${ref.summaryPreview || "(空)"}
 - next focus:
-${ref.nextFocus || "(not specified)"}
+${ref.nextFocus || "(未指定)"}
 - raw response chars: ${ref.rawChars}`;
   }).join("\n\n");
-  return `Read the shared flow memory first, then open referenced handoff files only where task-focused validation needs detail. Do not expand scope to omitted raw agent responses.\n\n${body}`;
+  return `先读取 shared flow memory；只有 task-focused validation 需要细节时，才打开被引用的 handoff files。不要把 scope 扩大到被省略的 raw agent responses。\n\n${body}`;
 }
 
 function handoffSummary(value: unknown): HandoffSummary | null {
@@ -343,27 +343,27 @@ function validatePrompt(round: number, implementationKey: "implement_1" | "imple
   return ({ outputs, state }: { outputs: Record<string, unknown>; state: { runId: string } }) => {
     const input = spec(outputs);
     const node = round === 1 ? "validate_1" : "validate_2";
-    return `You are the independent validation agent in a simple feature workflow.
+    return `你是 simple feature workflow 中的 independent validation agent。
 
-Round: ${round}
+Round：${round}
 
-Task:
+任务：
 ${input.task}
 
-Plan reference:
+Plan reference：
 ${validationContextBlock([["Plan", outputs.plan]])}
 
-Implementation summary:
+Implementation summary：
 ${validationContextBlock([["Implementation", outputs[implementationKey]]])}
 
-User-provided test hints:
-${input.testHints || "(none)"}
+用户提供的 test hints：
+${input.testHints || "(无)"}
 
 ${validationReviewGuidance()}
 
 ${validationVerdictMarkerPrompt()}
 
-${handoffInstructions(outputs, state, node, "decision on whether a fix round is needed", "\nVALIDATION_VERDICT: pass|fix\nSEVERITY_COUNTS: P0=0 P1=0 P2=0 P3=0")}`;
+${handoffInstructions(outputs, state, node, "决定是否需要 fix round", "\nVALIDATION_VERDICT: pass|fix\nSEVERITY_COUNTS: P0=0 P1=0 P2=0 P3=0")}`;
   };
 }
 
@@ -372,17 +372,17 @@ export default defineFlow({
   run: {
     title: ({ input }) => {
       const task = typeof (input as FlowInput)?.task === "string" ? (input as FlowInput).task?.trim() : "";
-      return task ? `Simple feature: ${task.slice(0, 80)}` : "Simple feature";
+      return task ? `Simple feature：${task.slice(0, 80)}` : "Simple feature";
     },
   },
   startAt: "normalize_input",
   nodes: {
     normalize_input: compute({
-      statusDetail: "Normalizing simple feature input",
+      statusDetail: "正在规范化 simple feature input",
       run: ({ input }) => normalizeInput(input),
     }),
     prepare_workspace: shell({
-      statusDetail: "Ensuring target working directory exists",
+      statusDetail: "正在确保 target working directory 存在",
       exec: ({ outputs }) => ({
         command: "mkdir",
         args: ["-p", spec(outputs).cwd],
@@ -397,20 +397,20 @@ export default defineFlow({
       session: { handle: "plan" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 30 * 60 * 1000,
-      statusDetail: "Planning simple feature",
+      statusDetail: "正在规划 simple feature",
       prompt: ({ outputs, state }) => {
         const input = spec(outputs);
-        return `You are the planning agent in a simple feature workflow.
+        return `你是 simple feature workflow 中的 planning agent。
 
-Task:
+任务：
 ${input.task}
 
-Working directory:
+Working directory：
 ${input.cwd}
 
-Create a concise implementation plan. Do not edit files. Include intended behavior, likely files, implementation steps, risks, and verification strategy.
+创建一份简洁的 implementation plan。不要编辑 files。包含 intended behavior、likely files、implementation steps、risks 和 verification strategy。
 
-${handoffInstructions(outputs, state, "plan", "implementation using the accepted plan")}`;
+${handoffInstructions(outputs, state, "plan", "使用 accepted plan 进行 implementation")}`;
       },
       parse: (text, context) => parseHandoff("plan", text, context),
     }),
@@ -419,20 +419,20 @@ ${handoffInstructions(outputs, state, "plan", "implementation using the accepted
       session: { handle: "impl" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 60 * 60 * 1000,
-      statusDetail: "Implementing simple feature",
+      statusDetail: "正在实现 simple feature",
       prompt: ({ outputs, state }) => {
         const input = spec(outputs);
-        return `You are the implementation agent in a simple feature workflow.
+        return `你是 simple feature workflow 中的 implementation agent。
 
-Task:
+任务：
 ${input.task}
 
-Accepted plan reference:
+Accepted plan reference：
 ${handoffBlock([["Plan", outputs.plan]])}
 
-Implement the task in the working directory. Do not revert unrelated user changes. Keep the change scoped. Run relevant checks when feasible.
+在 working directory 中实现任务。不要 revert unrelated user changes。保持 change scoped。可行时运行 relevant checks。
 
-${handoffInstructions(outputs, state, "implement_1", "independent validation review of the implementation")}`;
+${handoffInstructions(outputs, state, "implement_1", "对 implementation 进行 independent validation review")}`;
       },
       parse: (text, context) => parseHandoff("implement_1", text, context),
     }),
@@ -441,7 +441,7 @@ ${handoffInstructions(outputs, state, "implement_1", "independent validation rev
       session: { handle: "validate" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 45 * 60 * 1000,
-      statusDetail: "Validating simple feature round 1",
+      statusDetail: "正在验证 simple feature round 1",
       prompt: validatePrompt(1, "implement_1"),
       parse: (text, context) => parseHandoff("validate_1", text, context, {
         verdict: validationVerdictText(text),
@@ -453,50 +453,50 @@ ${handoffInstructions(outputs, state, "implement_1", "independent validation rev
       session: { handle: "validate" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 5 * 60 * 1000,
-      statusDetail: "Deciding whether simple feature needs one fix round",
+      statusDetail: "正在决定 simple feature 是否需要一轮 fix",
       choices: DECISION_CHOICES,
-      question: ({ outputs }) => `Decide whether the simple feature workflow should pass or run one fix round.
+      question: ({ outputs }) => `决定 simple feature workflow 应 pass，还是运行一轮 fix。
 
-Rules:
-- If validation contains a true P0, choose fix unless you explicitly identify it as a false-positive severity label.
-- If validation contains VALIDATION_VERDICT: fix, failed task-relevant checks, or a P1 that should be fixed in this flow, choose fix.
-- P2 and P3 findings are reference material only and must not alone trigger fix.
-- Otherwise choose pass.
+Rules：
+- 如果 validation 包含真实 P0，选择 fix，除非你明确识别它是 false-positive severity label。
+- 如果 validation 包含 VALIDATION_VERDICT: fix、失败的 task-relevant checks，或应在此 flow 中修复的 P1，选择 fix。
+- P2 和 P3 findings 仅作参考材料，不得单独触发 fix。
+- 否则选择 pass。
 
-Parsed validation verdict: ${validationVerdict(outputs.validate_1)}
-Validation reference:
+Parsed validation verdict：${validationVerdict(outputs.validate_1)}
+Validation reference：
 ${handoffBlock([["Validation", outputs.validate_1]])}
 
-Return only JSON with route and reason.`,
+只返回包含 route 和 reason 的 JSON。`,
     }),
     implement_fix_1: acp({
       profile: AGENT_PROFILES.impl,
       session: { handle: "impl" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 60 * 60 * 1000,
-      statusDetail: "Applying simple feature fix round 1",
+      statusDetail: "正在应用 simple feature fix round 1",
       prompt: ({ outputs, state }) => {
         const input = spec(outputs);
-        return `You are the implementation agent applying the only automatic fix round in a simple feature workflow.
+        return `你是 simple feature workflow 中应用唯一 automatic fix round 的 implementation agent。
 
-Task:
+任务：
 ${input.task}
 
-Original plan reference:
+Original plan reference：
 ${handoffBlock([["Plan", outputs.plan]])}
 
-Previous implementation summary:
+Previous implementation summary：
 ${handoffBlock([["Previous implementation", outputs.implement_1]])}
 
-Validation findings:
+Validation findings：
 ${handoffBlock([["Validation", outputs.validate_1]])}
 
-Decision:
+Decision：
 ${JSON.stringify(outputs.decide_1 || {}, null, 2)}
 
-Fix only the issues identified above. Do not do unrelated refactors and do not revert unrelated user changes. Run relevant checks when feasible.
+只修复上面识别的问题。不要进行 unrelated refactors，也不要 revert unrelated user changes。可行时运行 relevant checks。
 
-${handoffInstructions(outputs, state, "implement_fix_1", "independent validation of the fix round")}`;
+${handoffInstructions(outputs, state, "implement_fix_1", "对 fix round 进行 independent validation")}`;
       },
       parse: (text, context) => parseHandoff("implement_fix_1", text, context),
     }),
@@ -505,7 +505,7 @@ ${handoffInstructions(outputs, state, "implement_fix_1", "independent validation
       session: { handle: "validate" },
       cwd: ({ outputs }) => spec(outputs).cwd,
       timeoutMs: 45 * 60 * 1000,
-      statusDetail: "Validating simple feature fix round",
+      statusDetail: "正在验证 simple feature fix round",
       prompt: validatePrompt(2, "implement_fix_1"),
       parse: (text, context) => parseHandoff("validate_2", text, context, {
         verdict: validationVerdictText(text),
@@ -513,7 +513,7 @@ ${handoffInstructions(outputs, state, "implement_fix_1", "independent validation
       }),
     }),
     summarize: compute({
-      statusDetail: "Summarizing simple feature result",
+      statusDetail: "正在总结 simple feature result",
       run: ({ outputs, state }) => {
         const input = spec(outputs);
         const usedFixRound = routeOf(outputs.decide_1) === "fix";

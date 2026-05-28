@@ -1,9 +1,9 @@
 {
-  "task": "Implement a small, local feature with independent validation review and at most one automatic fix round.",
+  "task": "实现一个小型 local feature，并进行 independent validation review，最多一轮 automatic fix。",
   "cwd": "/tmp/acpx-simple-feature-smoke",
   "planAgent": "aiden",
   "implAgent": "trae",
   "validateAgent": "aiden",
-  "testHints": "Create black-box checks that validate the user-visible behavior, not only implementation details.",
+  "testHints": "创建 black-box checks 来验证 user-visible behavior，而不仅是 implementation details。",
   "maxFixRounds": 1
 }
