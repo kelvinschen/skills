@@ -2,13 +2,21 @@
 
 Orchestrator 负责 product judgment、decomposition、status 和 final acceptance。Specialist agents 负责有界 work packets。
 
+## Agent Selection
+
+`claude` / `codex` 适合复杂任务、规划、架构判断和深度 review。
+
+`aiden` / `trae` / `omp` 适合快速实施、局部改动和 scope 明确的 coding work。
+
+`pi` 适合简单、短小、低风险任务。
+
 ## Lanes
 
 Planning lane：
 
 - Purpose：将模糊的 user intent 转换为 implementation plan。
 - Agent：任何适合 planning 的 registered acpx agent。
-- Example：`aiden`。
+- Default：`claude`。
 - Permissions：`--approve-reads --no-terminal`。
 - Required output：target behavior、可能涉及的 files/modules、risks、test plan。
 
@@ -16,7 +24,7 @@ Implementation lane：
 
 - Purpose：应用已接受的 code changes。
 - Agent：任何适合 code edits 的 registered acpx agent。
-- Example：`trae`。
+- Default：`trae`。
 - Permissions：scope accepted 后使用 `--approve-all`。
 - Required output：change summary、tests run、unresolved issues。
 
@@ -24,14 +32,15 @@ Review lane：
 
 - Purpose：发现 regressions、missed requirements、unsafe edits 和 missing tests。
 - Agent：任何适合 review 的 registered acpx agent。
-- Example：`aiden`。
+- Default：`aiden`。
 - Permissions：`--approve-reads --no-terminal`。
 - Required output：findings first，按 severity 排序，并包含 file references。
 
 Verification lane：
 
 - Purpose：运行 tests/builds 并收集 final evidence。
-- Preferred agent：与 implementation lane 相同。
+- Agent：任何适合 verification 的 registered acpx agent。
+- Default：`aiden`。
 - Orchestrator 仍必须直接检查 final git state。
 
 ## Prompt Contracts

@@ -59,7 +59,7 @@ echo "Timeout: ${TIMEOUT_SECONDS}s"
 if [[ "$#" -gt 0 ]]; then
   AGENTS=("$@")
 else
-  read -r -a AGENTS <<<"${ACPX_E2E_AGENTS:-trae aiden}"
+  read -r -a AGENTS <<<"${ACPX_E2E_AGENTS:-claude codex aiden trae omp pi}"
 fi
 
 for agent in "${AGENTS[@]}"; do

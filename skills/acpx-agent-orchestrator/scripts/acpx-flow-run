@@ -44,7 +44,7 @@ Defaults:
 
 Examples:
   scripts/acpx-flow-run simple-feature --input-file flows/examples/simple-feature.input.json
-  PLAN_AGENT=aiden PLAN_REVIEW_AGENT=trae IMPLEMENT_AGENT=trae VALIDATE_AGENT=aiden scripts/acpx-flow-run complex-feature-refactor --input-json '{"task":"..."}' --dry-run`);
+  PLAN_AGENT=claude PLAN_REVIEW_AGENT=aiden IMPLEMENT_AGENT=trae VALIDATE_AGENT=aiden scripts/acpx-flow-run complex-feature-refactor --input-json '{"task":"..."}' --dry-run`);
 }
 
 function fail(message) {

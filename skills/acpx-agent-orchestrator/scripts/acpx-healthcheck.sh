@@ -20,7 +20,7 @@ echo
 if [[ "$#" -gt 0 ]]; then
   AGENTS=("$@")
 else
-  read -r -a AGENTS <<<"${ACPX_HEALTHCHECK_AGENTS:-trae aiden}"
+  read -r -a AGENTS <<<"${ACPX_HEALTHCHECK_AGENTS:-claude codex aiden trae omp pi}"
 fi
 
 echo "== local commands =="

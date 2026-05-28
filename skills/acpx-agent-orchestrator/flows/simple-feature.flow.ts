@@ -34,7 +34,7 @@ type FlowInput = {
 };
 
 const AGENT_PROFILES = {
-  plan: "aiden",
+  plan: "claude",
   impl: "trae",
   validate: "aiden",
 } as const;

@@ -26,7 +26,7 @@
 不要单独使用 `status` 作为某个特定 prompt turn 已完成的证明。对于 task output 和 completion evidence，优先使用 token-effective reads：
 
 ```bash
-AGENT=trae
+AGENT=${AGENT:-trae}
 acpx --format json "$AGENT" sessions read --tail 3 impl
 acpx --format json "$AGENT" sessions history --limit 5 impl
 ```
@@ -60,7 +60,7 @@ cat "$RUN/projections/live.json"
 读取该 agent 的 recent output：
 
 ```bash
-AGENT=trae
+AGENT=${AGENT:-trae}
 acpx --cwd /repo --format json "$AGENT" sessions read --tail 3 simple-feature-impl-...
 ```
 
@@ -86,7 +86,7 @@ Launcher 默认 background execution 和 flow-level `--approve-all`。Background
 `flows/examples/*.input.json` 只用于 smoke/demo，因为其 `task` 和 `cwd` 都是占位值。真实用户任务应使用 `--input-json` 或生成 task-specific input file，并显式传入当前 repo `cwd`。
 
 ```bash
-PLAN_AGENT=aiden PLAN_REVIEW_AGENT=trae IMPLEMENT_AGENT=trae VALIDATE_AGENT=aiden \
+PLAN_AGENT=${PLAN_AGENT:-claude} PLAN_REVIEW_AGENT=${PLAN_REVIEW_AGENT:-aiden} IMPLEMENT_AGENT=${IMPLEMENT_AGENT:-trae} VALIDATE_AGENT=${VALIDATE_AGENT:-aiden} \
   scripts/acpx-flow-run complex-feature-refactor \
     --input-json "{\"task\":\"<user request>\",\"cwd\":\"$PWD\"}"
 ```
@@ -112,8 +112,8 @@ Active work 的 recommended polling cadence：
 对于普通 named sessions，用 `nohup` 后台启动 prompt，然后用 compact reads 跟踪：
 
 ```bash
-REVIEW_AGENT=aiden
-IMPLEMENT_AGENT=trae
+REVIEW_AGENT=${REVIEW_AGENT:-aiden}
+IMPLEMENT_AGENT=${IMPLEMENT_AGENT:-trae}
 LOG=/tmp/acpx-review.log
 nohup acpx --cwd /repo "$REVIEW_AGENT" -s review --approve-reads --no-terminal \
   "Review 当前 diff，查找 bugs、regressions 和 missing tests。" >"$LOG" 2>&1 &
@@ -131,7 +131,7 @@ acpx --cwd /repo --format json "$IMPLEMENT_AGENT" sessions read --tail 3 impl
 ### Simple Planning Or Review
 
 ```bash
-REVIEW_AGENT=aiden
+REVIEW_AGENT=${REVIEW_AGENT:-aiden}
 LOG=/tmp/acpx-review.log
 nohup acpx "$REVIEW_AGENT" -s review --approve-reads --no-terminal --cwd /repo \
   "Review 当前 diff，查找 bugs、regressions 和 missing tests。" >"$LOG" 2>&1 &
@@ -142,7 +142,7 @@ acpx --cwd /repo --format json "$REVIEW_AGENT" sessions read --tail 3 review
 ### Bounded Implementation
 
 ```bash
-IMPLEMENT_AGENT=trae
+IMPLEMENT_AGENT=${IMPLEMENT_AGENT:-trae}
 LOG=/tmp/acpx-impl.log
 nohup acpx "$IMPLEMENT_AGENT" -s impl --approve-all --cwd /repo -f task.md >"$LOG" 2>&1 &
 echo "pid=$! log=$LOG"
@@ -152,7 +152,7 @@ acpx --cwd /repo --format json "$IMPLEMENT_AGENT" sessions read --tail 3 impl
 ### One-Shot Bounded Stateless Task
 
 ```bash
-AGENT=aiden
+AGENT=${AGENT:-pi}
 LOG=/tmp/acpx-one-shot-$AGENT.log
 nohup acpx --cwd /repo "$AGENT" exec "总结当前 package structure。" >"$LOG" 2>&1 &
 echo "pid=$! log=$LOG"
@@ -163,7 +163,7 @@ echo "pid=$! log=$LOG"
 ### Inspect Recent Output
 
 ```bash
-AGENT=trae
+AGENT=${AGENT:-trae}
 acpx --format json "$AGENT" sessions read --tail 3 impl
 ```
 
