@@ -1,6 +1,6 @@
 ---
 name: acpx-agent-orchestrator
-description:  当明确需要使用 acpx 来编排专用 coding agents 时，或新建/管理 coding agents 的会话时，使用该技能。它涵盖 acpx 设置、one-shot、named session、flow 编排，以及在已注册 acpx agents（例如：`claude`、`codex`、`aiden`、`trae`、`omp`、`pi` 等）之间路由工作。
+description:  当明确需要使用 acpx 来编排专用 coding agents 时，或新建/管理 coding agents 的会话时，使用该技能。它涵盖 one-shot、named session、flow 编排，以及在已注册 acpx agents（例如：`claude`、`codex`、`aiden`、`trae`、`omp`、`pi` 等）之间路由工作。
 ---
 
 # ACPX Agent Orchestrator
@@ -11,9 +11,8 @@ description:  当明确需要使用 acpx 来编排专用 coding agents 时，或
 
 - 假设 `acpx` 已就绪且所需 registered agents 可用。常规工作中不要预先运行 validation。
 - 阅读 [references/acpx-capabilities.md](references/acpx-capabilities.md) 了解 command 边界，阅读 [references/agent-routing.md](references/agent-routing.md) 了解 routing 细节。
-- 修改 acpx config 前，先阅读 [references/acpx-config.md](references/acpx-config.md)。只保留 acpx 不提供的 custom agents。
 - `status` 只用于本地 process/session-owner 健康状态，不可作为 prompt 或 flow 已完成的证明。
-- 如果首次 delegation 失败，只检查失败路径：`command -v acpx`、`acpx config show` 以及相关 `<agent> --help`。仅在可用性失败原因不清楚时使用 `scripts/acpx-healthcheck.sh` 或 `scripts/acpx-e2e-validate.sh`。
+- 如果首次 delegation 失败，只检查失败路径：`command -v acpx` 以及相关 `<agent> --help`。仅在可用性失败原因不清楚时使用 `scripts/acpx-healthcheck.sh` 或 `scripts/acpx-e2e-validate.sh`。
 
 ## Agent 选择摘要
 

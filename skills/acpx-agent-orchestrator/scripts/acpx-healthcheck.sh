@@ -13,10 +13,6 @@ echo "== acpx help =="
 acpx --help | sed -n '1,80p'
 echo
 
-echo "== acpx config =="
-acpx config show
-echo
-
 if [[ "$#" -gt 0 ]]; then
   AGENTS=("$@")
 else
