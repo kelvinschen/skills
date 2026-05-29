@@ -11,6 +11,7 @@ description:  当明确需要使用 acpx 来编排专用 coding agents 时，或
 
 - 假设 `acpx` 已就绪且所需 registered agents 可用。常规工作中不要预先运行 validation。
 - 阅读 [references/acpx-capabilities.md](references/acpx-capabilities.md) 了解 command 边界，阅读 [references/agent-routing.md](references/agent-routing.md) 了解 routing 细节。
+- 使用 `scripts/acpx-inspector` 作为 routine session/flow state tracking 的集中入口；迁移计划见 [references/inspector-state-tracking-plan.md](references/inspector-state-tracking-plan.md)。
 - `status` 只用于本地 process/session-owner 健康状态，不可作为 prompt 或 flow 已完成的证明。
 - 如果首次 delegation 失败，只检查失败路径：`command -v acpx` 以及相关 `<agent> --help`。仅在可用性失败原因不清楚时使用 `scripts/acpx-healthcheck.sh` 或 `scripts/acpx-e2e-validate.sh`。
 
@@ -44,7 +45,7 @@ description:  当明确需要使用 acpx 来编排专用 coding agents 时，或
 
 ### One-Shot
 
-适用于 stateless、短小、可丢弃任务；不需要 reusable session 或 flow artifacts。必须用 `nohup` 后台启动，并通过 PID、log 和最终 repo/check state 跟踪。
+适用于 stateless、短小、可丢弃任务；不需要 reusable session 或 flow artifacts。必须用 `nohup` 后台启动；PID/log 只用于 process lifecycle，最终仍检查 command output、repo/check state。若捕获了 JSON/NDJSON events，使用 `scripts/acpx-inspector report oneshot` 做 post-run handoff。
 
 ```bash
 AGENT=${AGENT:-pi}
@@ -58,7 +59,7 @@ echo "pid=$PID log=$LOG"
 
 ### Named Session
 
-适用于需要连续上下文、轻量 lane、人工可跟踪的 plan/impl/review；不需要完整 flow artifacts。必须用 `nohup` 后台启动 prompt，并通过 PID/log 加 `sessions read --tail` 或 `sessions history --limit` 跟踪。
+适用于需要连续上下文、轻量 lane、人工可跟踪的 plan/impl/review；不需要完整 flow artifacts。必须用 `nohup` 后台启动 prompt，并通过 `scripts/acpx-inspector snapshot/read/follow` 跟踪 session state。
 
 ```bash
 IMPLEMENT_AGENT=${IMPLEMENT_AGENT:-trae}
@@ -66,14 +67,15 @@ LOG=/tmp/acpx-impl.log
 nohup acpx --cwd /repo "$IMPLEMENT_AGENT" -s impl --approve-all -f task.md >"$LOG" 2>&1 &
 PID=$!
 echo "pid=$PID log=$LOG"
-acpx --cwd /repo --format json "$IMPLEMENT_AGENT" sessions read --tail 3 impl
+scripts/acpx-inspector snapshot --cwd /repo --agent "$IMPLEMENT_AGENT" --name impl
+scripts/acpx-inspector read --cwd /repo --agent "$IMPLEMENT_AGENT" --name impl --tail 40 --budget 1200
 ```
 
 需要 continuity 但不需要 flow artifacts 时，选择 named sessions。
 
 ### Flow
 
-适用于多阶段、长耗时、需要 handoff、recovery、independent review/validation、self-healing 或 post-run audit 的任务。使用 run bundle、`live.json`、handoff files、`flow-memory.md` 和 audit report 跟踪。
+适用于多阶段、长耗时、需要 handoff、recovery、independent review/validation、self-healing 或 post-run audit 的任务。使用 run bundle 作为 source of truth，但 routine tracking 通过 `scripts/acpx-inspector follow --run-id <runId>` 或 `--run-dir <runDir>` 完成。
 
 需要 monitoring、handoff、review/validation、recovery 或 audit 时，选择 flow。
 
@@ -100,16 +102,19 @@ echo "$FLOW_RUN_OUTPUT"
 
 Flow templates 包含默认 profiles。`quick-bugfix` defaults 为 `IMPLEMENT_AGENT=trae` 和 `TEST_AGENT=aiden`；`simple-feature` defaults 为 `PLAN_AGENT=claude`、`IMPLEMENT_AGENT=trae` 和 `VALIDATE_AGENT=aiden`；`complex-feature-refactor` 额外包含 `PLAN_REVIEW_AGENT=aiden`。环境变量会覆盖 input role fields。如果 caller 确认了 handoff location，在 flow input 中传入 `handoffDir`；否则节点使用 `<repo>/tmp/flow_handoffs/<runId>/<node>.md`，shared memory index 位于 `<repo>/tmp/flow_handoffs/<runId>/flow-memory.md`。
 
-启动后，使用输出的 `runId`、`runDir` 和 `live` fields 跟踪确切 run bundle：
+启动后，使用输出的 `runId` 或 `runDir` 交给 inspector 跟踪确切 run bundle：
 
 ```bash
+RUN_ID=$(printf '%s\n' "$FLOW_RUN_OUTPUT" | awk -F= '$1=="runId"{print $2}')
 RUN=$(printf '%s\n' "$FLOW_RUN_OUTPUT" | awk -F= '$1=="runDir"{print $2}')
-LIVE=$(printf '%s\n' "$FLOW_RUN_OUTPUT" | awk -F= '$1=="live"{print $2}')
-echo "run=$RUN"
-[ -n "$LIVE" ] && cat "$LIVE"
+if [ -n "$RUN_ID" ]; then
+  scripts/acpx-inspector follow --run-id "$RUN_ID" --duration 10m --interval 60s --events 2
+elif [ -n "$RUN" ]; then
+  scripts/acpx-inspector follow --run-dir "$RUN" --duration 10m --interval 60s --events 2
+fi
 ```
 
-Flow runtime 会将 run state 和 artifacts 持久化到 `~/.acpx/flows/runs/<runId>/`。Lane agents 在配置的 handoff directory 下写入 handoff files，并向 `flow-memory.md` 追加 compact entries。优先使用 flow outputs、`flowMemoryPath`、memory index 和 handoff paths；只有需要更深检查时才读取完整 session output。对于 self-healing templates，完成后使用 `scripts/acpx-visualize` 审计 validation behavior。
+Flow runtime 会将 run state 和 artifacts 持久化到 `~/.acpx/flows/runs/<runId>/`。Lane agents 在配置的 handoff directory 下写入 handoff files，并向 `flow-memory.md` 追加 compact entries。Routine progress 使用 inspector 的 compact projection；只有需要更深检查时才读取 flow outputs、`flowMemoryPath`、memory index、handoff paths 或完整 session output。对于 self-healing templates，完成后使用 `scripts/acpx-inspector report flow` 或 `scripts/acpx-visualize` 审计 validation behavior。
 
 ## Permissions
 
@@ -121,41 +126,43 @@ Flow runtime 会将 run state 和 artifacts 持久化到 `~/.acpx/flows/runs/<ru
 
 ## State Tracking
 
-### One-Shot Tracking
+所有 routine acpx session/flow state tracking 优先使用 `scripts/acpx-inspector`。它提供 agent-friendly 的 compact JSON/text 输出，统一处理 session resolution、recent history、health diagnosis、flow progress 和 next action suggestions。不要把 `status`、`sessions read`、`sessions history`、`live.json`、handoff files 或 raw `.stream.ndjson` 当作默认追踪入口。
 
-使用 `nohup` 后台 PID 和 log 跟踪；完成后检查 command output、relevant diff、status 和 tests。
-
-### Named Session Tracking
-
-使用 `nohup` 后台 PID/log 加 compact reads：
+### Discovery And Snapshot
 
 ```bash
-LOG=/tmp/acpx-review.log
-REVIEW_AGENT=${REVIEW_AGENT:-aiden}
 IMPLEMENT_AGENT=${IMPLEMENT_AGENT:-trae}
-nohup acpx --cwd /repo "$REVIEW_AGENT" -s review --approve-reads --no-terminal "Review 当前 diff。" >"$LOG" 2>&1 &
-echo "pid=$! log=$LOG"
-acpx --cwd /repo --format json "$REVIEW_AGENT" sessions read --tail 3 review
-acpx --cwd /repo --format json "$IMPLEMENT_AGENT" sessions read --tail 3 impl
+scripts/acpx-inspector sessions --cwd "$PWD" --limit 20
+scripts/acpx-inspector snapshot --cwd "$PWD" --agent "$IMPLEMENT_AGENT" --name impl
 ```
 
-使用 `sessions history --limit 5` 获取短 history index。常规 tracking 避免使用 `sessions show` 和 raw `.stream.ndjson`。
+先用 `sessions` 或 `snapshot` 确认目标 session。若 inspector 返回 ambiguous candidates，不要猜；补充 `--agent`、`--name`、`--cwd` 或 `--id` 后重试。
 
-### Flow Tracking
-
-通过 `~/.acpx/flows/runs/<runId>/projections/live.json` 检查 progress。对已完成或部分完成的 lanes，先检查 summary output 和 `<handoffRoot>/flow-memory.md`，再打开 node handoff files 或 session tails。
-
-要检查当前 flow node output，读取 `live.json.sessionBindings` 中的 `agentName`、`cwd` 和 `name`，然后 tail 该 session：
+### Recent Output And Diagnosis
 
 ```bash
-acpx --cwd <cwd> --format json <agentName> sessions read --tail 3 <name>
+scripts/acpx-inspector read --cwd "$PWD" --agent "$IMPLEMENT_AGENT" --name impl --tail 40 --budget 1200
+scripts/acpx-inspector diagnose --cwd "$PWD" --agent "$IMPLEMENT_AGENT" --name impl
 ```
+
+使用 `read --budget` 获取 compact history；不要通过盲目增大 tail 或读取 full transcript 解决上下文不足。发生 stale、stuck、queue 或 process 异常时先用 `diagnose`，再决定 cancel、retry、ensure 或 probe。
+
+### Active Follow
+
+```bash
+scripts/acpx-inspector follow --cwd "$PWD" --agent "$IMPLEMENT_AGENT" --name impl --duration 10m --interval 60s --events 2
+scripts/acpx-inspector follow --run-id <runId> --duration 10m --interval 60s --events 2
+```
+
+`follow` 是 active session/flow 的默认轮询机制。对于 flow，优先传 `--run-id`；如果 launcher 只返回 `runDir`，传 `--run-dir`。
 
 ### Polling Cadence
 
-轮询 active flow/session status 时采用由长到短的 cadence，以避免 stale waiting 和 context waste：120s x 4，然后 90s x 5，之后保持 60s，除非用户要求更快 monitoring。
+轮询 active flow/session status 时使用 inspector 的 `--interval` 和 `--duration` 控制 cadence。默认 60s interval；早期长任务可用 90s 或 120s，除非用户要求更快 monitoring。
 
-对于低频 post-run audit reports，阅读 [references/audit-visualization.md](references/audit-visualization.md) 并使用 `scripts/acpx-visualize`。
+### Fallback And Audit
+
+只有 inspector 无法回答、需要 debug source artifacts、或要做 post-run audit 时，才直接读取 `sessions read/history/show`、`projections/live.json`、handoff files 或 raw streams。对于低频 post-run audit reports，优先使用 `scripts/acpx-inspector report flow/session/oneshot`；兼容旧报告时阅读 [references/audit-visualization.md](references/audit-visualization.md) 并使用 `scripts/acpx-visualize`。
 
 ## Failure Handling
 
