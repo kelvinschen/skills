@@ -20,8 +20,9 @@ does not expose an ACP server command comparable to `traecli acp serve` or
   `diagnose --wait`, `report --json --detailed`, `save`, `list`, and `show`
   were covered by source-CLI smoke commands or business run replay.
 - Runtime stages: `fanout`, `reduce`, and `summarize` were covered with real
-  Trae/Aiden runs; `agentTask`, `discover`, `decisionGate`, and `fixLoop` remain
-  covered by fake-runtime/unit tests in this pass.
+  Trae/Aiden runs. Fake-runtime E2E now additionally covers `agentTask`, agent
+  `discover`, program `reduce`, agent `decisionGate` route skipping, and
+  `fixLoop`.
 - Reports: markdown/JSON/detailed report projections and browser report tests
   were exercised by automated tests; detailed report was additionally used on
   business runs.
@@ -119,6 +120,20 @@ Change:
   `run --workflow --yes --wait`, `follow`, `diagnose --wait`, `report --json
   --detailed`, and `resume --wait` against a deterministic no-agent workflow.
 
+### Stage-kind runtime regression coverage
+
+Problem: stage-kind coverage had gaps around agent discovery, program reduce,
+agent decision routing, and fixLoop attempt identity.
+
+Change:
+
+- Added `test/e2e/fake/stage-kinds.test.ts`.
+- Agent decision outputs now call the same downstream route-skip logic as
+  program decisions, so unselected dependents are marked `skipped`.
+- FixLoop validator/fixer turns now use separate attempt ordinals. This avoids
+  overwriting `quality_loop:attempt-1` when round 1 requires both validation and
+  fixing.
+
 ## Verification Commands
 
 From `skills/acpx-agent-orchestrator`:
@@ -127,6 +142,7 @@ From `skills/acpx-agent-orchestrator`:
 npm run typecheck
 npm run test:unit
 npx vitest run test/integration/cli-lifecycle.test.ts
+npx vitest run test/e2e/fake/stage-kinds.test.ts
 npm test
 npm run test:report:browser
 ```

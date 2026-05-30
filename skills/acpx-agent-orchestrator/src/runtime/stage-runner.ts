@@ -212,7 +212,7 @@ async function runFixLoop(input: {
       }),
       contractName: "validation",
       contractOptions: undefined,
-      attemptOrdinal: round
+      attemptOrdinal: round * 2 - 1
     });
     attempts.push(...validator.attempts);
     agentCalls += validator.agentCalls;
@@ -258,7 +258,7 @@ async function runFixLoop(input: {
       }),
       contractName: "implementation",
       contractOptions: undefined,
-      attemptOrdinal: round
+      attemptOrdinal: round * 2
     });
     attempts.push(...fixer.attempts);
     agentCalls += fixer.agentCalls;

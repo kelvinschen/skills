@@ -105,6 +105,10 @@ export async function syncRun(cwd: string, logicalRunId: string, options: SyncRu
   merged = { ...merged, stages: index.stages, attempts: index.attempts, agentUsage: index.agentUsage };
   for (const result of results) {
     merged = mergeAgentResult(merged, result, snapshot.runDir);
+    const stage = snapshot.spec.stages.find((candidate) => candidate.id === result.stageId);
+    if (stage?.kind === "decisionGate" && result.output) {
+      merged = markUnselectedDecisionRoutes(merged, snapshot.spec, stage, String(result.output.route ?? "blocked"));
+    }
     await appendEvent(cwd, logicalRunId, { type: "agent_result_merged", stageId: result.stageId, itemId: result.itemId, status: result.status, errorCode: result.errorCode, outputPath: result.outputPath ? path.relative(snapshot.runDir, result.outputPath) : undefined });
   }
   const afterFanout = await completeReadyFanoutAggregates({ ...snapshot, index: merged });
