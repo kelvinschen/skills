@@ -106,6 +106,19 @@ Change:
 - `updateRunStatus` preserves `diagnosed_blocked` while underlying stages remain
   blocked or failed.
 
+### CLI lifecycle regression coverage
+
+Problem: source review found the public CLI lifecycle commands were mostly
+validated manually, with automated coverage concentrated on report rendering and
+runtime internals.
+
+Change:
+
+- Added `test/integration/cli-lifecycle.test.ts`.
+- The test exercises `validate`, `preview`, `save`, `list`, `show`, `generate`,
+  `run --workflow --yes --wait`, `follow`, `diagnose --wait`, `report --json
+  --detailed`, and `resume --wait` against a deterministic no-agent workflow.
+
 ## Verification Commands
 
 From `skills/acpx-agent-orchestrator`:
@@ -113,6 +126,7 @@ From `skills/acpx-agent-orchestrator`:
 ```bash
 npm run typecheck
 npm run test:unit
+npx vitest run test/integration/cli-lifecycle.test.ts
 npm test
 npm run test:report:browser
 ```
