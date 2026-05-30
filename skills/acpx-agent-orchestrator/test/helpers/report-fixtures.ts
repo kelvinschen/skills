@@ -160,6 +160,25 @@ async function writeLinearFixture(cwd: string, runId: string, dir: string, kind:
           status: "blocked",
           summary: "Implementation blocked",
           blockedReason: "Required file is outside the allowed path scope.",
+          parseDiagnostics: {
+            errorCode: "OUTPUT_SCHEMA_FAILED",
+            summary: "Found JSON candidates, but none satisfied the implementation workflow-output contract.",
+            candidateCount: 1,
+            bestCandidateId: "candidate-1",
+            recoverability: "repairable",
+            rawSnippetHash: "fixture",
+            warnings: [],
+            candidates: [{
+              id: "candidate-1",
+              mode: "jsonFence",
+              syntax: "validJson",
+              rawSnippetHash: "fixture",
+              rawSnippetPreview: "{\"card\":\"67-zhaopin\"}",
+              unwrapped: true,
+              wrapper: "workflow-output",
+              schemaErrors: [{ path: "/status", message: "workflow-output.status must be completed or blocked." }]
+            }]
+          },
           artifacts: [],
           nextFocus: "diagnose"
         }
@@ -168,6 +187,15 @@ async function writeLinearFixture(cwd: string, runId: string, dir: string, kind:
           summary: kind === "long-content" ? long : "Implementation complete",
           artifacts: [{ kind: "file", path: "src/app.ts", label: "Changed app file" }],
           nextFocus: "summarize",
+          metadata: {
+            outputParse: {
+              mode: "workflowOutputFence",
+              repaired: false,
+              unwrapped: false,
+              candidateCount: 1,
+              warnings: []
+            }
+          },
           changedFiles: ["src/app.ts"],
           checks: [{ command: "npm test", status: "pass", summary: "Tests passed" }],
           data: kind === "long-content" ? { body: long } : undefined

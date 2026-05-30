@@ -99,6 +99,7 @@ export type ReportStageDetail = {
   dependsOn: string[];
   status: ReportStageStatus;
   summary?: string;
+  blockedReason?: string;
   roleName?: string;
   roleCategory?: string;
   agent?: string;
@@ -114,6 +115,20 @@ export type ReportStageDetail = {
     findingsCount?: number;
     checksCount?: number;
     artifactsCount?: number;
+  };
+  outputParse?: {
+    mode?: string;
+    repaired?: boolean;
+    unwrapped?: boolean;
+    candidateCount?: number;
+    warnings: string[];
+  };
+  parseDiagnostics?: {
+    errorCode?: string;
+    candidateCount?: number;
+    bestCandidateId?: string;
+    recoverability?: string;
+    schemaErrors: Array<{ path?: string; message?: string }>;
   };
   fanout?: {
     totalItems?: number;
@@ -300,6 +315,7 @@ async function buildStageDetails(
       dependsOn: stage.dependsOn ?? [],
       status: deriveStageStatus(stage, output, index, segments),
       summary: stringField(output, "summary"),
+      blockedReason: stringField(output, "blockedReason"),
       roleName,
       roleCategory: role?.category,
       agent: role?.agent,
@@ -308,6 +324,8 @@ async function buildStageDetails(
       output: outputPreview,
       outputPath: output === undefined ? undefined : outputPath,
       outputShape: outputShape(output),
+      outputParse: outputParseSummary(output),
+      parseDiagnostics: parseDiagnosticsSummary(output),
       fanout: stage.kind === "fanout" ? await buildFanoutDetail(dir, stage, output, segments, limits) : undefined,
       decision: stage.kind === "decisionGate" ? buildDecisionDetail(stage, output) : undefined,
       fixLoop: stage.kind === "fixLoop" ? buildFixLoopDetail(stage, output) : undefined,
@@ -564,6 +582,7 @@ function graphMetrics(detail: ReportStageDetail | undefined): Record<string, str
   return {
     ...(detail.outputShape?.findingsCount !== undefined ? { findings: detail.outputShape.findingsCount } : {}),
     ...(detail.outputShape?.checksCount !== undefined ? { checks: detail.outputShape.checksCount } : {}),
+    ...(detail.outputParse?.candidateCount !== undefined ? { parseCandidates: detail.outputParse.candidateCount } : {}),
     ...(detail.fanout?.totalItems !== undefined ? { items: detail.fanout.totalItems, blockedItems: detail.fanout.blockedItems ?? 0 } : {})
   };
 }
@@ -583,6 +602,55 @@ function objectRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" ? value as Record<string, unknown> : undefined;
 }
 
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function outputParseSummary(output: unknown): ReportStageDetail["outputParse"] | undefined {
+  const value = objectRecord(output);
+  const metadata = objectRecord(value?.metadata);
+  const outputParse = objectRecord(metadata?.outputParse);
+  if (!outputParse) return undefined;
+  return {
+    mode: stringField(outputParse, "mode"),
+    repaired: booleanField(outputParse, "repaired"),
+    unwrapped: booleanField(outputParse, "unwrapped"),
+    candidateCount: numberField(outputParse, "candidateCount"),
+    warnings: stringArray(outputParse.warnings)
+  };
+}
+
+function parseDiagnosticsSummary(output: unknown): ReportStageDetail["parseDiagnostics"] | undefined {
+  const value = objectRecord(output);
+  const diagnostics = objectRecord(value?.parseDiagnostics);
+  if (!diagnostics) return undefined;
+  return {
+    errorCode: stringField(diagnostics, "errorCode"),
+    candidateCount: numberField(diagnostics, "candidateCount"),
+    bestCandidateId: stringField(diagnostics, "bestCandidateId"),
+    recoverability: stringField(diagnostics, "recoverability"),
+    schemaErrors: schemaErrorsFromDiagnostics(diagnostics)
+  };
+}
+
+function schemaErrorsFromDiagnostics(diagnostics: Record<string, unknown>): Array<{ path?: string; message?: string }> {
+  const candidates = Array.isArray(diagnostics.candidates) ? diagnostics.candidates : [];
+  const errors: Array<{ path?: string; message?: string }> = [];
+  for (const candidate of candidates) {
+    const record = objectRecord(candidate);
+    const schemaErrors = Array.isArray(record?.schemaErrors) ? record.schemaErrors : [];
+    for (const error of schemaErrors) {
+      const entry = objectRecord(error);
+      if (!entry) continue;
+      errors.push({
+        path: stringField(entry, "path"),
+        message: stringField(entry, "message")
+      });
+    }
+  }
+  return errors.slice(0, 12);
+}
+
 function safeJson(text: string): Record<string, unknown> {
   try {
     const value = JSON.parse(text) as unknown;
@@ -590,6 +658,18 @@ function safeJson(text: string): Record<string, unknown> {
   } catch {
     return {};
   }
+}
+
+function numberField(value: unknown, key: string): number | undefined {
+  const record = objectRecord(value);
+  const field = record?.[key];
+  return typeof field === "number" ? field : undefined;
+}
+
+function booleanField(value: unknown, key: string): boolean | undefined {
+  const record = objectRecord(value);
+  const field = record?.[key];
+  return typeof field === "boolean" ? field : undefined;
 }
 
 function terminalStatus(status: RunViewStatus): boolean {

@@ -10,7 +10,12 @@ describe("compileWorkflow", () => {
     const compiled = compileWorkflow(spec);
     expect(compiled.flowSource).toContain("defineFlow");
     expect(compiled.flowSource).toContain("extractWorkflowOutput");
+    expect(compiled.flowSource).toContain("collectWorkflowOutputCandidates");
+    expect(compiled.flowSource).toContain("OUTPUT_SCHEMA_FAILED");
+    expect(compiled.flowSource).toContain("OUTPUT_AMBIGUOUS");
     expect(compiled.flowSource).toContain("formatRepairPrompt");
+    expect(compiled.flowSource).toContain("isRepairableOutputFailure(output)");
+    expect(compiled.flowSource).toContain("markRepairResult(repaired)");
     expect(compiled.flowSource).toContain('"plan__repair"');
     expect(compiled.flowSource).toContain('"plan"');
     expect(compiled.flowSource).toContain('"summarize"');

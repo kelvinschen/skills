@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { startAcpxFlow } from "../acpx/run-flow.js";
+import { outputParserHelperSource } from "../compiler/output-parser-helper.js";
 import { runDir } from "../run-index/paths.js";
 import { appendEvent, readRunIndex, writeRunIndex, type RunIndex } from "../run-index/read-write.js";
 import { WorkflowSpecSchema, type Role } from "../schema/workflow-spec.js";
@@ -122,18 +123,10 @@ End the response with one fenced JSON block tagged workflow-output:
 
 function diagnosticFlowSource(workflowName: string, role: Role): string {
   return `import { acp, defineFlow } from "acpx/flows";
+import crypto from "node:crypto";
+import path from "node:path";
 
-function parseWorkflowOutput(text) {
-  const match = String(text || "").match(/\\\`\\\`\\\`workflow-output\\s*([\\s\\S]*?)\\\`\\\`\\\`/);
-  if (!match) return { status: "blocked", summary: "Missing workflow-output JSON block.", artifacts: [], nextFocus: "manual diagnosis", blockedReason: "OUTPUT_PARSE_FAILED" };
-  try {
-    const value = JSON.parse(match[1]);
-    if (value && typeof value === "object" && (value.status === "completed" || value.status === "blocked") && typeof value.summary === "string") return value;
-    return { status: "blocked", summary: "Invalid diagnostic output contract.", artifacts: [], nextFocus: "manual diagnosis", blockedReason: "OUTPUT_PARSE_FAILED" };
-  } catch (error) {
-    return { status: "blocked", summary: "Invalid workflow-output JSON block: " + String(error), artifacts: [], nextFocus: "manual diagnosis", blockedReason: "OUTPUT_PARSE_FAILED" };
-  }
-}
+${outputParserHelperSource()}
 
 export default defineFlow({
   name: ${JSON.stringify(`${workflowName}-diagnostic`)},
@@ -146,7 +139,7 @@ export default defineFlow({
       timeoutMs: 30 * 60 * 1000,
       statusDetail: "Running recovery diagnostic",
       prompt: ({ input }) => input.prompt,
-      parse: (text) => parseWorkflowOutput(text)
+      parse: (text) => extractWorkflowOutput(text, "diagnostic", null)
     })
   },
   edges: []

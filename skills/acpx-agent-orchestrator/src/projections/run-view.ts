@@ -6,6 +6,20 @@ import { runDir } from "../run-index/paths.js";
 import type { RunIndex } from "../run-index/read-write.js";
 
 export type RunViewStatus = "pending" | "running" | "completed" | "blocked" | "diagnosed_blocked" | "failed" | "cancelled";
+export type RunViewOutputParse = {
+  mode?: string;
+  repaired?: boolean;
+  unwrapped?: boolean;
+  candidateCount?: number;
+  warnings: string[];
+};
+export type RunViewParseDiagnostics = {
+  errorCode?: string;
+  candidateCount?: number;
+  bestCandidateId?: string;
+  recoverability?: string;
+  schemaErrors: Array<{ path?: string; message?: string }>;
+};
 
 export type RunView = {
   logicalRunId?: string;
@@ -19,7 +33,16 @@ export type RunView = {
   warnings: OrchestratorIssue[];
   errors: OrchestratorIssue[];
   roles: Array<{ name: string; category: string; agent: string; mode: string }>;
-  stages: Array<{ id: string; kind: string; dependsOn: string[]; status?: string; summary?: string }>;
+  stages: Array<{
+    id: string;
+    kind: string;
+    dependsOn: string[];
+    status?: string;
+    summary?: string;
+    blockedReason?: string;
+    outputParse?: RunViewOutputParse;
+    parseDiagnostics?: RunViewParseDiagnostics;
+  }>;
   agentUsage: { planned: number; actual?: number; repairCalls?: number };
   artifacts: Array<{ kind?: string; path?: string; label?: string }>;
   commands: Record<string, string>;
@@ -78,7 +101,10 @@ export async function runViewFromIndex(cwd: string, spec: WorkflowSpec, index: R
         kind: stage.kind,
         dependsOn: stage.dependsOn ?? [],
         status: typeof output?.status === "string" ? output.status : undefined,
-        summary: typeof output?.summary === "string" ? output.summary : undefined
+        summary: typeof output?.summary === "string" ? output.summary : undefined,
+        blockedReason: typeof output?.blockedReason === "string" ? output.blockedReason : undefined,
+        outputParse: outputParseSummary(output),
+        parseDiagnostics: parseDiagnosticsSummary(output)
       };
     }),
     agentUsage: {
@@ -119,6 +145,49 @@ async function readStageOutputs(cwd: string, logicalRunId: string, spec: Workflo
 
 function objectRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" ? value as Record<string, unknown> : undefined;
+}
+
+function outputParseSummary(output: Record<string, unknown> | undefined): RunViewOutputParse | undefined {
+  const metadata = objectRecord(output?.metadata);
+  const outputParse = objectRecord(metadata?.outputParse);
+  if (!outputParse) return undefined;
+  return {
+    mode: typeof outputParse.mode === "string" ? outputParse.mode : undefined,
+    repaired: typeof outputParse.repaired === "boolean" ? outputParse.repaired : undefined,
+    unwrapped: typeof outputParse.unwrapped === "boolean" ? outputParse.unwrapped : undefined,
+    candidateCount: typeof outputParse.candidateCount === "number" ? outputParse.candidateCount : undefined,
+    warnings: stringArray(outputParse.warnings)
+  };
+}
+
+function parseDiagnosticsSummary(output: Record<string, unknown> | undefined): RunViewParseDiagnostics | undefined {
+  const diagnostics = objectRecord(output?.parseDiagnostics);
+  if (!diagnostics) return undefined;
+  return {
+    errorCode: typeof diagnostics.errorCode === "string" ? diagnostics.errorCode : undefined,
+    candidateCount: typeof diagnostics.candidateCount === "number" ? diagnostics.candidateCount : undefined,
+    bestCandidateId: typeof diagnostics.bestCandidateId === "string" ? diagnostics.bestCandidateId : undefined,
+    recoverability: typeof diagnostics.recoverability === "string" ? diagnostics.recoverability : undefined,
+    schemaErrors: schemaErrorsFromDiagnostics(diagnostics)
+  };
+}
+
+function schemaErrorsFromDiagnostics(diagnostics: Record<string, unknown>): Array<{ path?: string; message?: string }> {
+  const candidates = Array.isArray(diagnostics.candidates) ? diagnostics.candidates : [];
+  const errors: Array<{ path?: string; message?: string }> = [];
+  for (const candidate of candidates) {
+    const record = objectRecord(candidate);
+    const schemaErrors = Array.isArray(record?.schemaErrors) ? record.schemaErrors : [];
+    for (const error of schemaErrors) {
+      const entry = objectRecord(error);
+      if (!entry) continue;
+      errors.push({
+        path: typeof entry.path === "string" ? entry.path : undefined,
+        message: typeof entry.message === "string" ? entry.message : undefined
+      });
+    }
+  }
+  return errors.slice(0, 12);
 }
 
 function stringArray(value: unknown): string[] {

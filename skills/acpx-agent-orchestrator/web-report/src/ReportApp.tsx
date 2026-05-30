@@ -282,10 +282,25 @@ function StageDetail({ stage }: { stage: ReportStageDetail }): React.ReactElemen
       <p>{stage.summary ?? "No stage summary."}</p>
       <dl>
         <dt>Kind</dt><dd>{stage.kind}</dd>
+        <dt>Blocked reason</dt><dd>{stage.blockedReason ?? "-"}</dd>
         <dt>Role</dt><dd>{stage.roleName ?? "-"}</dd>
         <dt>Agent</dt><dd>{stage.agent ?? "-"}</dd>
         <dt>Mode</dt><dd>{stage.mode ?? "-"}</dd>
       </dl>
+      {stage.outputParse && (
+        <p>
+          Output parse: {stage.outputParse.mode ?? "unknown"}
+          {stage.outputParse.candidateCount !== undefined ? `, ${stage.outputParse.candidateCount} candidate(s)` : ""}
+          {stage.outputParse.unwrapped ? ", unwrapped" : ""}
+          {stage.outputParse.repaired ? ", repaired" : ""}
+        </p>
+      )}
+      {stage.parseDiagnostics && (
+        <details className="preview-block">
+          <summary>Parse diagnostics · {stage.parseDiagnostics.errorCode ?? "unknown"}</summary>
+          <JsonBlock value={stage.parseDiagnostics} />
+        </details>
+      )}
       {stage.fanout && <p>Fanout: {stage.fanout.completedItems ?? 0}/{stage.fanout.totalItems ?? 0} completed, {stage.fanout.blockedItems ?? 0} blocked.</p>}
       {stage.prompt && <PreviewBlock title="Prompt" preview={stage.prompt} />}
       {stage.output && <PreviewBlock title="Output" preview={stage.output} />}

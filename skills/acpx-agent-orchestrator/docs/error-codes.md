@@ -39,6 +39,17 @@ Code families are stable and should not be renamed casually:
 New codes may be added within these families. Existing code names should stay
 stable once documented.
 
+Output contract codes currently emitted by compiled workflow parser helpers:
+
+- `OUTPUT_PARSE_FAILED`: no acceptable JSON candidate could be parsed from an
+  agent response.
+- `OUTPUT_SCHEMA_FAILED`: JSON candidates were found, but none satisfied the
+  stage-specific `workflow-output` contract.
+- `OUTPUT_AMBIGUOUS`: multiple different valid `workflow-output` candidates were
+  found, so the parser failed closed.
+- `OUTPUT_REPAIR_FAILED`: the one allowed output-repair pass did not produce a
+  valid `workflow-output`.
+
 Resume policy codes currently emitted by `resume`:
 
 - `RESUME_NO_FAILED_SEGMENT`: no failed non-diagnostic workflow segment can be

@@ -1,5 +1,6 @@
 import type { Role, Stage, Variable, WorkflowSpec } from "../schema/workflow-spec.js";
 import { contractNameForStage, safetyFooter, type OutputContractName } from "./contracts.js";
+import { outputParserHelperSource } from "./output-parser-helper.js";
 
 export type CompiledWorkflow = {
   spec: WorkflowSpec;
@@ -169,148 +170,14 @@ function materializeFlow(spec: WorkflowSpec, stageOrder: string[], options: Comp
   const flowName = `${spec.name}${options.nameSuffix ?? ""}`;
 
   return `import { execFileSync } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { acp, compute, defineFlow } from "acpx/flows";
 
 const PROMPT_CONTEXTS = ${JSON.stringify(promptContexts, null, 2)};
 
-function extractWorkflowOutput(text, contract, maxOutputChars, contractOptions = {}) {
-  if (typeof maxOutputChars === "number" && String(text || "").length > maxOutputChars) {
-    return parseBlocked("Agent output exceeded maxOutputChars (" + maxOutputChars + ").", text);
-  }
-  const parsed = parseWorkflowOutputBlock(text);
-  if (!parsed.ok) return parseBlocked(parsed.summary, text);
-  const validation = validateWorkflowOutput(parsed.value, contract, contractOptions);
-  if (!validation.ok) return parseBlocked(validation.summary, text);
-  return parsed.value;
-}
-
-function parseWorkflowOutputBlock(text) {
-  const match = String(text || "").match(/\\\`\\\`\\\`workflow-output\\s*([\\s\\S]*?)\\\`\\\`\\\`/);
-  if (!match) return { ok: false, summary: "Missing workflow-output JSON block." };
-  try {
-    return { ok: true, value: JSON.parse(match[1]) };
-  } catch (error) {
-    return { ok: false, summary: "Invalid workflow-output JSON block: " + String(error) };
-  }
-}
-
-function validateWorkflowOutput(value, contract, options = {}) {
-  if (!value || typeof value !== "object") return { ok: false, summary: "workflow-output must be a JSON object." };
-  if (value.status !== "completed" && value.status !== "blocked") return { ok: false, summary: "workflow-output.status must be completed or blocked." };
-  if (typeof value.summary !== "string") return { ok: false, summary: "workflow-output.summary must be a string." };
-  if (!Array.isArray(value.artifacts)) return { ok: false, summary: "workflow-output.artifacts must be an array." };
-  if (typeof value.nextFocus !== "string") return { ok: false, summary: "workflow-output.nextFocus must be a string." };
-  const artifactError = validateArtifacts(value.artifacts);
-  if (artifactError) return { ok: false, summary: artifactError };
-  if (contract === "validation") {
-    if (!["pass", "fix", "blocked", "unknown"].includes(value.verdict)) return { ok: false, summary: "validation output requires verdict." };
-    const severityError = validateSeverityCounts(value.severityCounts);
-    if (severityError) return { ok: false, summary: severityError };
-    if (!Array.isArray(value.findings)) return { ok: false, summary: "validation output requires findings array." };
-    const findingError = validateFindings(value.findings);
-    if (findingError) return { ok: false, summary: findingError };
-    if (!Array.isArray(value.checks)) return { ok: false, summary: "validation output requires checks array." };
-    const checkError = validateChecks(value.checks);
-    if (checkError) return { ok: false, summary: checkError };
-  }
-  if (contract === "implementation") {
-    if (!Array.isArray(value.changedFiles) || !value.changedFiles.every((item) => typeof item === "string" && isSafeRelativePath(item))) return { ok: false, summary: "implementation output requires changedFiles safe relative path array." };
-    if (!Array.isArray(value.checks)) return { ok: false, summary: "implementation output requires checks array." };
-    const checkError = validateChecks(value.checks);
-    if (checkError) return { ok: false, summary: checkError };
-  }
-  if (contract === "decision") {
-    if (typeof value.route !== "string") return { ok: false, summary: "decision output requires route string." };
-  }
-  if (contract === "discover") {
-    const outputKey = options.outputKey || "items";
-    const items = value[outputKey];
-    if (!Array.isArray(items)) return { ok: false, summary: "discover output requires " + outputKey + " array." };
-    if (typeof options.maxItems === "number" && items.length > options.maxItems) return { ok: false, summary: "discover output exceeded max item limit (" + options.maxItems + ")." };
-    const itemError = validateDiscoveredItems(items);
-    if (itemError) return { ok: false, summary: itemError };
-  }
-  if (contract === "summarize") {
-    if (!["success", "success_with_warnings", "blocked", "failed", "unknown"].includes(value.finalVerdict)) return { ok: false, summary: "summarize output requires finalVerdict." };
-    for (const field of ["deliverables", "changedFiles", "warnings", "risks", "nextActions"]) {
-      if (!Array.isArray(value[field]) || !value[field].every((item) => typeof item === "string")) return { ok: false, summary: "summarize output requires " + field + " string array." };
-    }
-    if (!Array.isArray(value.checks)) return { ok: false, summary: "summarize output requires checks array." };
-    const checkError = validateChecks(value.checks);
-    if (checkError) return { ok: false, summary: checkError };
-  }
-  return { ok: true };
-}
-
-function validateArtifacts(artifacts) {
-  for (const artifact of artifacts) {
-    if (!artifact || typeof artifact !== "object") return "artifact entries must be objects.";
-    for (const field of ["kind", "path", "url", "label"]) {
-      if (artifact[field] !== undefined && typeof artifact[field] !== "string") return "artifact." + field + " must be a string when present.";
-    }
-    if (artifact.path !== undefined && !isSafeRelativePath(artifact.path)) return "artifact.path must stay inside cwd.";
-  }
-}
-
-function validateSeverityCounts(value) {
-  if (!value || typeof value !== "object") return "validation output requires severityCounts.";
-  for (const field of ["P0", "P1", "P2", "P3"]) {
-    if (!Number.isInteger(value[field]) || value[field] < 0) return "severityCounts." + field + " must be a non-negative integer.";
-  }
-}
-
-function validateFindings(findings) {
-  for (const finding of findings) {
-    if (!finding || typeof finding !== "object") return "finding entries must be objects.";
-    if (!["P0", "P1", "P2", "P3"].includes(finding.severity)) return "finding.severity must be P0, P1, P2, or P3.";
-    if (typeof finding.summary !== "string") return "finding.summary must be a string.";
-    if (finding.path !== undefined && typeof finding.path !== "string") return "finding.path must be a string when present.";
-    if (finding.path !== undefined && !isSafeRelativePath(finding.path)) return "finding.path must stay inside cwd.";
-    if (finding.details !== undefined && typeof finding.details !== "string") return "finding.details must be a string when present.";
-  }
-}
-
-function validateDiscoveredItems(items) {
-  for (const item of items) {
-    if (typeof item === "string" && !isSafeRelativePath(item)) return "discovered string path item must stay inside cwd.";
-    if (item && typeof item === "object" && item.path !== undefined && (typeof item.path !== "string" || !isSafeRelativePath(item.path))) return "discovered item.path must stay inside cwd.";
-  }
-}
-
-function isSafeRelativePath(value) {
-  if (typeof value !== "string" || value.length === 0) return false;
-  if (path.isAbsolute(value)) return false;
-  const normalized = path.normalize(value).replace(/\\\\/g, "/");
-  return normalized !== ".." && !normalized.startsWith("../") && !normalized.includes("/../");
-}
-
-function validateChecks(checks) {
-  for (const check of checks) {
-    if (!check || typeof check !== "object") return "check entries must be objects.";
-    if (check.command !== undefined && typeof check.command !== "string") return "check.command must be a string when present.";
-    if (check.name !== undefined && typeof check.name !== "string") return "check.name must be a string when present.";
-    if (!["pass", "fail", "skipped", "unknown"].includes(check.status)) return "check.status must be pass, fail, skipped, or unknown.";
-    if (check.summary !== undefined && typeof check.summary !== "string") return "check.summary must be a string when present.";
-  }
-}
-
-function parseBlocked(summary, text) {
-  return {
-    status: "blocked",
-    summary,
-    artifacts: [],
-    nextFocus: "format repair or manual correction",
-    blockedReason: "OUTPUT_PARSE_FAILED",
-    rawTextSnippet: String(text || "").slice(0, 4000),
-    metadata: { repairAttempts: 0, agentCallsUsed: 1 }
-  };
-}
-
-function formatRepairPrompt(output, contract) {
-  return "Your previous response could not be parsed as the required workflow-output JSON. Do not redo the task. Emit exactly one fenced JSON block tagged workflow-output that satisfies the " + contract + " contract.\\n\\nParse error: " + (output?.summary ?? "unknown") + "\\n\\nPrevious raw text snippet:\\n" + (output?.rawTextSnippet ?? "");
-}
+${outputParserHelperSource()}
 
 function blockedStop(outputs) {
   const blocked = Object.entries(outputs || {}).filter(([, value]) => value && typeof value === "object" && value.status === "blocked");
@@ -676,7 +543,7 @@ function agentUnit(spec: WorkflowSpec, stage: Stage, options: AgentNodeOptions):
   const finalId = options.nodeId;
   const raw = agentNode(spec, stage, { ...options, nodeId: rawId });
   const route = computeNode(routeId, options.authorStage, `const output = outputs[${JSON.stringify(rawId)}] ?? {};
-const route = output.blockedReason === "OUTPUT_PARSE_FAILED" && (output.metadata?.repairAttempts ?? 0) === 0
+const route = isRepairableOutputFailure(output)
   ? "repair"
   : (output.status === "blocked" ? "blocked" : "completed");
 return { status: "completed", summary: "Agent output route: " + route, route, artifacts: [], nextFocus: route };`);
@@ -687,7 +554,7 @@ return { status: "completed", summary: "Agent output route: " + route, route, ar
     promptExpression: `formatRepairPrompt(outputs[${JSON.stringify(rawId)}], ${JSON.stringify(options.contract)})`
   });
   const final = computeNode(finalId, options.authorStage, `const repaired = outputs[${JSON.stringify(repairId)}];
-if (repaired) return { ...repaired, metadata: { ...(repaired.metadata ?? {}), repairAttempts: 1 } };
+if (repaired) return markRepairResult(repaired);
 return outputs[${JSON.stringify(rawId)}];`);
   return {
     stageId: options.authorStage,

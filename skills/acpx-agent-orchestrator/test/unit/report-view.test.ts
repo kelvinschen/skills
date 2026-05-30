@@ -16,8 +16,13 @@ describe("RunReportView", () => {
       roleName: "worker",
       agent: "trae",
       mode: "edit",
-      status: "completed"
+      status: "completed",
+      outputParse: {
+        mode: "workflowOutputFence",
+        candidateCount: 1
+      }
     });
+    expect(view.graph.nodes.find((node) => node.id === "implement")?.metrics).toMatchObject({ parseCandidates: 1 });
     expect(view.artifacts).toContainEqual(expect.objectContaining({ stageId: "implement", path: "src/app.ts" }));
     expect(JSON.stringify(view.metrics)).not.toMatch(/token|cost/i);
   });
@@ -28,7 +33,15 @@ describe("RunReportView", () => {
 
     expect(view.run.status).toBe("blocked");
     expect(view.summary.summary).toContain("Required file is outside the allowed path scope");
-    expect(view.stages.find((stage) => stage.id === "implement")).toMatchObject({ status: "blocked" });
+    expect(view.stages.find((stage) => stage.id === "implement")).toMatchObject({
+      status: "blocked",
+      blockedReason: "Required file is outside the allowed path scope.",
+      parseDiagnostics: {
+        errorCode: "OUTPUT_SCHEMA_FAILED",
+        candidateCount: 1,
+        schemaErrors: [{ path: "/status", message: "workflow-output.status must be completed or blocked." }]
+      }
+    });
     expect(view.stages.find((stage) => stage.id === "summarize")).toMatchObject({ status: "skipped", output: undefined });
   });
 
