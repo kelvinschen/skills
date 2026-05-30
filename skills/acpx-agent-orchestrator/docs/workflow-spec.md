@@ -29,11 +29,10 @@ Key rules:
 - route branching must be expressed by `decisionGate`
 - file/glob discovery must be an explicit `discover` stage
 - agent discovery requires an explicit role, prompt, and item limit
-- `fanout` can run as outer-runtime batch segments when global/stage
-  concurrency permits; the full acpx snapshot remains a directly runnable
-  serial fallback
-- standalone fanout batch snapshots consume `workflowInput.__fanoutBatchItems`
-  and `runtime.preloadedOutputs`
+- `fanout` schedules one independent runtime item per selected item while
+  respecting global and stage concurrency
+- fanout items use deterministic item session keys and are aggregated by the
+  orchestrator before downstream stages run
 - edit fanout is allowed, but must be followed by a read-only reconcile/reduce
   stage
 - prompt placeholders are `${variableName}` only
@@ -54,3 +53,4 @@ undeclared variables or unsafe graph shapes with JSON Pointer errors.
 
 `limits.maxAgents` is enforced against worst-case planned agent calls, including
 fanout item agents and one possible output-repair call per agent invocation.
+At runtime, actual agent and repair attempts are recorded in `run.json`.

@@ -96,6 +96,30 @@ export async function serveReport(options: ReportServerOptions): Promise<{ url: 
       request.on("close", () => clients.delete(id));
       return;
     }
+    if (url.pathname === "/api/attempt") {
+      const relativePath = url.searchParams.get("path") ?? "";
+      const kind = url.searchParams.get("kind") ?? "";
+      if (!["prompt", "raw", "parse", "output"].includes(kind)) {
+        response.writeHead(400).end("Invalid attempt artifact kind");
+        return;
+      }
+      const activeRunDir = runDir(options.runId, options.cwd);
+      const fileName = kind === "prompt" ? "prompt.md" : kind === "raw" ? "raw.txt" : `${kind}.json`;
+      const target = path.resolve(activeRunDir, relativePath, fileName);
+      const root = path.resolve(activeRunDir);
+      if (!target.startsWith(`${root}${path.sep}`)) {
+        response.writeHead(403).end("Forbidden");
+        return;
+      }
+      try {
+        const text = await fs.readFile(target, "utf8");
+        response.writeHead(200, { "content-type": kind === "prompt" || kind === "raw" ? "text/plain; charset=utf-8" : "application/json; charset=utf-8" });
+        response.end(text);
+      } catch {
+        response.writeHead(404).end("Not found");
+      }
+      return;
+    }
     response.writeHead(404).end("Not found");
   });
 

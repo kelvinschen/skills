@@ -52,12 +52,11 @@ describe("RunReportView", () => {
 
     expect(view.graph.nodes.map((node) => node.id)).toEqual(["discover_files", "review_files", "reconcile", "summarize"]);
     expect(view.graph.nodes.some((node) => node.id.includes("__item_"))).toBe(false);
-    expect(view.metrics.segmentsTotal).toBe(4);
+    expect(view.metrics.attemptsTotal).toBe(5);
     expect(fanout).toMatchObject({
       totalItems: 3,
       completedItems: 2,
       blockedItems: 1,
-      batchCount: 2,
       allowPartial: true,
       displayedItems: 3
     });

@@ -148,7 +148,7 @@ function lintGraph(spec: WorkflowSpec, stages: Map<string, Stage>): Orchestrator
         code: "GRAPH_BRANCH_REQUIRES_DECISION_GATE",
         severity: "error",
         path: "/stages",
-        message: `Stage ${stage.id} has multiple dependents (${next.join(", ")}), but only decisionGate may branch in the compiled acpx flow.`,
+        message: `Stage ${stage.id} has multiple dependents (${next.join(", ")}), but only decisionGate may branch in the execution plan.`,
         suggestions: ["Insert an explicit decisionGate before branching, or restructure the workflow as a linear sequence/reduce."]
       }));
     }

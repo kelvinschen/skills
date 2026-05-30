@@ -41,15 +41,13 @@ describe("live report server", () => {
     expect(syncCalls).toContainEqual({ startPending: false });
   });
 
-  it("does not start pending workflow segments during report sync", async () => {
+  it("does not start pending runtime turns during report sync", async () => {
     const fixture = await createReportFixture("completed-success");
     const pending = {
       ...fixture.index,
       status: "pending" as const,
-      segments: fixture.index.segments.map((segment) => {
-        const { acpxRunDir: _acpxRunDir, acpxRunId: _acpxRunId, ...rest } = segment;
-        return { ...rest, status: "pending" as const };
-      }),
+      stages: Object.fromEntries(Object.entries(fixture.index.stages).map(([stageId, stage]) => [stageId, { ...stage, status: "pending" as const }])),
+      attempts: {},
       agentUsage: { planned: fixture.index.agentUsage.planned, actual: 0, repairCalls: 0, recoveryCalls: 0 },
       finalVerdict: undefined
     };
@@ -58,8 +56,8 @@ describe("live report server", () => {
     const synced = await syncRun(fixture.cwd, fixture.runId, { startPending: false });
 
     expect(synced.status).toBe("running");
-    expect(synced.segments[0]).toMatchObject({ status: "pending" });
-    expect(synced.segments[0].acpxRunDir).toBeUndefined();
+    expect(synced.stages.plan).toMatchObject({ status: "pending" });
+    expect(Object.keys(synced.attempts)).toHaveLength(0);
     await expect(fs.stat(path.join(fixture.dir, "events.ndjson"))).resolves.toBeTruthy();
   });
 });

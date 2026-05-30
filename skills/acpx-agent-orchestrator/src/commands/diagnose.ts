@@ -7,7 +7,7 @@ import { printJson } from "./common.js";
 export function registerDiagnose(program: Command): void {
   program.command("diagnose")
     .argument("<run>", "logical run id or run directory")
-    .option("--wait", "wait until the diagnostic segment finishes")
+    .option("--wait", "wait until diagnostic preparation is reflected in the run index")
     .option("--json", "print JSON")
     .action(async (runArg: string, options: { wait?: boolean; json?: boolean }) => {
       const locator = await resolveRunLocator(runArg);
@@ -17,8 +17,7 @@ export function registerDiagnose(program: Command): void {
         ok: true,
         runId: locator.runId,
         status: index.status,
-        segment: index.segments.at(-1),
-        message: options.wait ? "Diagnostic segment finished." : "Diagnostic segment started."
+        message: options.wait ? "Diagnostic preparation finished." : "Diagnostic preparation started."
       };
       if (options.json) printJson(output);
       else process.stdout.write(`${output.message}\n`);
@@ -26,10 +25,5 @@ export function registerDiagnose(program: Command): void {
 }
 
 async function waitForDiagnostic(cwd: string, runId: string) {
-  while (true) {
-    const index = await syncRun(cwd, runId);
-    const latest = index.segments.at(-1);
-    if (latest?.purpose === "diagnostic" && latest.status !== "pending" && latest.status !== "running") return index;
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-  }
+  return syncRun(cwd, runId, { startPending: false });
 }

@@ -1,24 +1,22 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { readFlowResult } from "../acpx/bundle.js";
 import { runDir } from "../run-index/paths.js";
-import type { RunIndex } from "../run-index/read-write.js";
+import type { AttemptIndexEntry, RunIndex } from "../run-index/read-write.js";
 import type { Stage, WorkflowSpec } from "../schema/workflow-spec.js";
 import { runViewFromIndex, type RunView, type RunViewStatus } from "./run-view.js";
 
 export const REPORT_VIEW_VERSION = "acpx-orchestrator.report/v1";
 
 const DEFAULT_LIMITS = {
-  promptPreviewChars: 4096,
+  promptPreviewChars: 2048,
   outputPreviewChars: 8192,
-  diagnosticPreviewChars: 8192,
-  rawJsonPreviewChars: 8192,
+  rawPreviewChars: 2048,
   eventLimit: 200,
   fanoutItemLimit: 200
 };
 
 export type ReportMode = "snapshot" | "live";
-export type ReportStageStatus = "pending" | "running" | "completed" | "blocked" | "failed" | "skipped" | "unknown";
+export type ReportStageStatus = "pending" | "ready" | "running" | "completed" | "blocked" | "failed" | "skipped" | "unknown";
 
 export type ReportPreview = {
   text: string;
@@ -50,11 +48,11 @@ export type RunReportView = {
     stagesFailed: number;
     stagesRunning: number;
     stagesPending: number;
-    segmentsTotal: number;
-    segmentsRunning: number;
-    segmentsCompleted: number;
-    segmentsBlocked: number;
-    segmentsFailed: number;
+    attemptsTotal: number;
+    attemptsRunning: number;
+    attemptsCompleted: number;
+    attemptsBlocked: number;
+    attemptsFailed: number;
     agentCallsPlanned: number;
     agentCallsActual?: number;
     repairCalls?: number;
@@ -65,7 +63,7 @@ export type RunReportView = {
     edges: ReportGraphEdge[];
   };
   stages: ReportStageDetail[];
-  segments: ReportSegmentDetail[];
+  attempts: ReportAttemptDetail[];
   events: ReportEvent[];
   artifacts: ReportArtifact[];
   diagnostics: ReportDiagnostic[];
@@ -135,7 +133,6 @@ export type ReportStageDetail = {
     completedItems?: number;
     blockedItems?: number;
     displayedItems: number;
-    batchCount?: number;
     allowPartial?: boolean;
     items: Array<{
       id: string;
@@ -155,27 +152,26 @@ export type ReportStageDetail = {
     observedRounds?: number;
     finalValidatorStatus?: string;
   };
-  relatedSegmentIds: string[];
+  relatedAttemptIds: string[];
   relatedEventIds: string[];
 };
 
-export type ReportSegmentDetail = {
-  segmentId: string;
-  purpose: "workflow" | "fanout-batch" | "diagnostic";
-  status: RunViewStatus;
-  materializedFlowPath: string;
-  inputPath: string;
-  acpxRunId?: string;
-  acpxRunDir?: string;
-  fanoutStageId?: string;
-  batchIndex?: number;
-  itemStart?: number;
-  itemCount?: number;
-  outputCount: number;
-  stepCount?: number;
-  agentStepCount?: number;
-  repairStepCount?: number;
-  error?: string;
+export type ReportAttemptDetail = {
+  id: string;
+  stageId: string;
+  itemId?: string;
+  kind: AttemptIndexEntry["kind"];
+  status: AttemptIndexEntry["status"];
+  startedAt?: string;
+  endedAt?: string;
+  durationMs?: number;
+  blockedReason?: string;
+  parseErrorCode?: string;
+  path: string;
+  prompt?: ReportPreview;
+  raw?: ReportPreview;
+  parse?: ReportPreview;
+  output?: ReportPreview;
 };
 
 export type ReportEvent = {
@@ -217,12 +213,11 @@ export async function buildRunReportView(
   const dir = runDir(index.logicalRunId, cwd);
   const summary = await runViewFromIndex(cwd, spec, index);
   const events = await readEvents(dir, limits);
-  const segmentDetails = await buildSegmentDetails(index);
-  const stageDetails = await buildStageDetails(dir, spec, index, events, segmentDetails, limits);
+  const attempts = await buildAttemptDetails(dir, index, limits);
+  const stages = await buildStageDetails(dir, spec, index, events, attempts, limits);
+  const artifacts = await collectArtifacts(stages);
+  const graph = buildGraph(spec, stages);
   const diagnostics = await readDiagnostics(dir, limits);
-  const artifacts = await collectArtifacts(stageDetails);
-  const graph = buildGraph(spec, stageDetails);
-  const durationMs = terminalStatus(index.status) ? positiveDuration(index.createdAt, index.updatedAt) : undefined;
 
   return {
     version: REPORT_VIEW_VERSION,
@@ -236,14 +231,14 @@ export async function buildRunReportView(
       finalVerdict: index.finalVerdict,
       createdAt: index.createdAt,
       updatedAt: index.updatedAt,
-      durationMs,
+      durationMs: terminalStatus(index.status) ? positiveDuration(index.createdAt, index.updatedAt) : undefined,
       runDir: dir,
       source: index.source
     },
-    metrics: buildMetrics(stageDetails, segmentDetails, index),
+    metrics: buildMetrics(stages, attempts, index),
     graph,
-    stages: stageDetails,
-    segments: segmentDetails,
+    stages,
+    attempts,
     events,
     artifacts,
     diagnostics
@@ -261,27 +256,31 @@ export function makePreview(text: string, limit: number, filePath?: string): Rep
   };
 }
 
-async function buildSegmentDetails(index: RunIndex): Promise<ReportSegmentDetail[]> {
-  return Promise.all(index.segments.map(async (segment) => {
-    const projection = segment.acpxRunDir ? await readFlowResult(segment.acpxRunDir) : undefined;
-    const steps = projection?.steps ?? [];
+async function buildAttemptDetails(dir: string, index: RunIndex, limits: typeof DEFAULT_LIMITS): Promise<ReportAttemptDetail[]> {
+  return Promise.all(Object.values(index.attempts).map(async (attempt) => {
+    const absolute = path.join(dir, attempt.path);
+    const [prompt, raw, parse, output] = await Promise.all([
+      readPreviewIfExists(path.join(absolute, "prompt.md"), limits.promptPreviewChars),
+      readPreviewIfExists(path.join(absolute, "raw.txt"), limits.rawPreviewChars),
+      readPreviewIfExists(path.join(absolute, "parse.json"), limits.outputPreviewChars),
+      readPreviewIfExists(path.join(absolute, "output.json"), limits.outputPreviewChars)
+    ]);
     return {
-      segmentId: segment.segmentId,
-      purpose: segment.purpose ?? "workflow",
-      status: segment.status,
-      materializedFlowPath: segment.materializedFlow,
-      inputPath: segment.input,
-      acpxRunId: segment.acpxRunId,
-      acpxRunDir: segment.acpxRunDir,
-      fanoutStageId: segment.fanoutStageId,
-      batchIndex: segment.batchIndex,
-      itemStart: segment.itemStart,
-      itemCount: segment.itemCount,
-      outputCount: Object.keys(projection?.outputs ?? {}).length,
-      stepCount: steps.length,
-      agentStepCount: steps.filter((step) => step.nodeType === "acp").length,
-      repairStepCount: steps.filter((step) => step.nodeType === "acp" && step.nodeId.endsWith("__repair")).length,
-      error: projection?.error
+      id: attempt.id,
+      stageId: attempt.stageId,
+      itemId: attempt.itemId,
+      kind: attempt.kind,
+      status: attempt.status,
+      startedAt: attempt.startedAt,
+      endedAt: attempt.endedAt,
+      durationMs: attempt.startedAt && attempt.endedAt ? positiveDuration(attempt.startedAt, attempt.endedAt) : undefined,
+      blockedReason: attempt.blockedReason,
+      parseErrorCode: attempt.parseErrorCode,
+      path: attempt.path,
+      prompt,
+      raw,
+      parse,
+      output
     };
   }));
 }
@@ -291,45 +290,43 @@ async function buildStageDetails(
   spec: WorkflowSpec,
   index: RunIndex,
   events: ReportEvent[],
-  segments: ReportSegmentDetail[],
+  attempts: ReportAttemptDetail[],
   limits: typeof DEFAULT_LIMITS
 ): Promise<ReportStageDetail[]> {
   return Promise.all(spec.stages.map(async (stage) => {
+    const state = index.stages[stage.id];
     const outputPath = path.join(dir, "outputs", `${stage.id}.json`);
     const output = await readJsonIfExists(outputPath);
     const promptPath = await findPromptPath(dir, stage.id);
     const prompt = promptPath ? makePreview(await fs.readFile(promptPath, "utf8"), limits.promptPreviewChars, promptPath) : undefined;
-    const outputPreview = output === undefined
-      ? undefined
-      : makePreview(JSON.stringify(output, null, 2), limits.outputPreviewChars, outputPath);
-    const roleName = stageRoleName(stage);
-    const role = roleName ? spec.roles[roleName] : undefined;
-    const relatedSegmentIds = relatedSegments(stage, segments);
+    const relatedAttemptIds = attempts.filter((attempt) => attempt.stageId === stage.id).map((attempt) => attempt.id);
     const relatedEventIds = events
       .filter((event) => event.preview.text.includes(stage.id) || event.raw.stageId === stage.id || event.raw.fanoutStageId === stage.id)
       .map((event) => event.id);
+    const roleName = stageRoleName(stage);
+    const role = roleName ? spec.roles[roleName] : undefined;
 
     return {
       id: stage.id,
       kind: stage.kind,
       dependsOn: stage.dependsOn ?? [],
-      status: deriveStageStatus(stage, output, index, segments),
+      status: state?.status ?? statusFromOutput(output),
       summary: stringField(output, "summary"),
-      blockedReason: stringField(output, "blockedReason"),
+      blockedReason: stringField(output, "blockedReason") ?? state?.blockedReason,
       roleName,
       roleCategory: role?.category,
       agent: role?.agent,
       mode: role?.mode,
       prompt,
-      output: outputPreview,
+      output: output === undefined ? undefined : makePreview(JSON.stringify(output, null, 2), limits.outputPreviewChars, outputPath),
       outputPath: output === undefined ? undefined : outputPath,
       outputShape: outputShape(output),
       outputParse: outputParseSummary(output),
       parseDiagnostics: parseDiagnosticsSummary(output),
-      fanout: stage.kind === "fanout" ? await buildFanoutDetail(dir, stage, output, segments, limits) : undefined,
+      fanout: stage.kind === "fanout" ? await buildFanoutDetail(dir, state, limits) : undefined,
       decision: stage.kind === "decisionGate" ? buildDecisionDetail(stage, output) : undefined,
-      fixLoop: stage.kind === "fixLoop" ? buildFixLoopDetail(stage, output) : undefined,
-      relatedSegmentIds,
+      fixLoop: stage.kind === "fixLoop" ? buildFixLoopDetail(stage, relatedAttemptIds.length) : undefined,
+      relatedAttemptIds,
       relatedEventIds
     };
   }));
@@ -363,44 +360,36 @@ function buildGraph(spec: WorkflowSpec, stages: ReportStageDetail[]): RunReportV
       relation: "dependency" as const
     }))
   );
-  const decisionEdges = spec.stages.flatMap((stage) => {
-    if (stage.kind !== "decisionGate") return [];
-    const decision = stageById.get(stage.id)?.decision;
-    return [
-      ...stage.rules.map((rule, index) => ({
-        id: `${stage.id}:route:${index}->${rule.to}`,
+  const decisionEdges = spec.stages
+    .filter((stage): stage is Extract<Stage, { kind: "decisionGate" }> => stage.kind === "decisionGate")
+    .flatMap((stage) => {
+      const routes = new Set([...(stage.routes ?? []), ...stage.rules.map((rule) => rule.to), stage.default]);
+      const output = stageById.get(stage.id);
+      return [...routes].map((route) => ({
+        id: `${stage.id}=>${route}`,
         source: stage.id,
-        target: rule.to,
+        target: route,
         relation: "decision-route" as const,
-        label: `rule ${index + 1}`,
-        active: decision?.matchedRoute === rule.to
-      })),
-      ...(stage.default !== "blocked" ? [{
-        id: `${stage.id}:default->${stage.default}`,
-        source: stage.id,
-        target: stage.default,
-        relation: "decision-route" as const,
-        label: "default",
-        active: decision?.matchedRoute === stage.default
-      }] : [])
-    ].filter((edge) => spec.stages.some((candidate) => candidate.id === edge.target));
-  });
+        label: route,
+        active: output?.decision?.matchedRoute === route
+      }));
+    });
   return { nodes, edges: [...dependencyEdges, ...decisionEdges] };
 }
 
-function buildMetrics(stages: ReportStageDetail[], segments: ReportSegmentDetail[], index: RunIndex): RunReportView["metrics"] {
+function buildMetrics(stages: ReportStageDetail[], attempts: ReportAttemptDetail[], index: RunIndex): RunReportView["metrics"] {
   return {
     stagesTotal: stages.length,
     stagesCompleted: stages.filter((stage) => stage.status === "completed").length,
     stagesBlocked: stages.filter((stage) => stage.status === "blocked").length,
     stagesFailed: stages.filter((stage) => stage.status === "failed").length,
     stagesRunning: stages.filter((stage) => stage.status === "running").length,
-    stagesPending: stages.filter((stage) => stage.status === "pending").length,
-    segmentsTotal: segments.length,
-    segmentsRunning: segments.filter((segment) => segment.status === "running").length,
-    segmentsCompleted: segments.filter((segment) => segment.status === "completed").length,
-    segmentsBlocked: segments.filter((segment) => segment.status === "blocked").length,
-    segmentsFailed: segments.filter((segment) => segment.status === "failed").length,
+    stagesPending: stages.filter((stage) => stage.status === "pending" || stage.status === "ready").length,
+    attemptsTotal: attempts.length,
+    attemptsRunning: attempts.filter((attempt) => attempt.status === "running" || attempt.status === "repairing").length,
+    attemptsCompleted: attempts.filter((attempt) => attempt.status === "completed").length,
+    attemptsBlocked: attempts.filter((attempt) => attempt.status === "blocked").length,
+    attemptsFailed: attempts.filter((attempt) => attempt.status === "failed").length,
     agentCallsPlanned: index.agentUsage.planned,
     agentCallsActual: index.agentUsage.actual,
     repairCalls: index.agentUsage.repairCalls,
@@ -408,193 +397,202 @@ function buildMetrics(stages: ReportStageDetail[], segments: ReportSegmentDetail
   };
 }
 
-async function buildFanoutDetail(
-  dir: string,
-  stage: Extract<Stage, { kind: "fanout" }>,
-  output: unknown,
-  segments: ReportSegmentDetail[],
-  limits: typeof DEFAULT_LIMITS
-): Promise<ReportStageDetail["fanout"]> {
-  const itemDir = path.join(dir, "outputs", stage.id);
-  const itemFiles = await listJsonFiles(itemDir);
-  const displayed = itemFiles.slice(0, limits.fanoutItemLimit);
-  const items = await Promise.all(displayed.map(async (file) => {
-    const value = await readJsonIfExists(file);
+async function buildFanoutDetail(dir: string, state: RunIndex["stages"][string] | undefined, limits: typeof DEFAULT_LIMITS): Promise<ReportStageDetail["fanout"]> {
+  if (!state?.fanout) return undefined;
+  const items = await Promise.all(state.fanout.items.slice(0, limits.fanoutItemLimit).map(async (item) => {
+    const outputPath = item.outputPath ? path.join(dir, item.outputPath) : undefined;
+    const output = outputPath ? await readJsonIfExists(outputPath) : undefined;
     return {
-      id: path.basename(file, ".json"),
-      status: stringField(value, "status"),
-      summary: stringField(value, "summary"),
-      outputPath: file,
-      output: value === undefined ? undefined : makePreview(JSON.stringify(value, null, 2), limits.outputPreviewChars, file)
+      id: item.id,
+      status: item.status,
+      summary: stringField(output, "summary"),
+      outputPath,
+      output: output === undefined || !outputPath ? undefined : makePreview(JSON.stringify(output, null, 2), limits.outputPreviewChars, outputPath)
     };
   }));
-  const aggregate = objectRecord(output);
-  const aggregateItems = Array.isArray(aggregate?.items) ? aggregate.items : undefined;
-  const blockedItems = Array.isArray(aggregate?.blockedItems) ? aggregate.blockedItems.length : items.filter((item) => item.status === "blocked").length;
   return {
-    totalItems: aggregateItems?.length ?? itemFiles.length,
-    completedItems: aggregateItems?.filter((item) => objectRecord(item)?.status === "completed").length ?? items.filter((item) => item.status === "completed").length,
-    blockedItems,
+    totalItems: state.fanout.totalItems,
+    completedItems: state.fanout.completedItems,
+    blockedItems: state.fanout.blockedItems,
     displayedItems: items.length,
-    batchCount: segments.filter((segment) => segment.purpose === "fanout-batch" && segment.fanoutStageId === stage.id).length,
-    allowPartial: stage.fanoutPolicy?.allowPartial,
+    allowPartial: state.fanout.allowPartial,
     items
   };
 }
 
-function buildDecisionDetail(stage: Extract<Stage, { kind: "decisionGate" }>, output: unknown): ReportStageDetail["decision"] {
-  return {
-    matchedRoute: stringField(output, "route"),
-    defaultRoute: stage.default,
-    routes: [...stage.rules.map((rule) => rule.to), stage.default]
-  };
-}
-
-function buildFixLoopDetail(stage: Extract<Stage, { kind: "fixLoop" }>, output: unknown): ReportStageDetail["fixLoop"] {
-  return {
-    maxRounds: stage.maxRounds,
-    finalValidatorStatus: stringField(output, "verdict") ?? stringField(output, "status")
-  };
-}
-
-function deriveStageStatus(stage: Stage, output: unknown, index: RunIndex, segments: ReportSegmentDetail[]): ReportStageStatus {
-  const outputStatus = stringField(output, "status");
-  if (isReportStageStatus(outputStatus)) return outputStatus;
-  if (relatedSegments(stage, segments).some((segmentId) => segments.find((segment) => segment.segmentId === segmentId)?.status === "running")) return "running";
-  if (index.status === "pending" || index.status === "running") return "pending";
-  return "skipped";
-}
-
-function relatedSegments(stage: Stage, segments: ReportSegmentDetail[]): string[] {
-  const direct = segments.filter((segment) => {
-    if (segment.purpose === "fanout-batch") return segment.fanoutStageId === stage.id;
-    return segment.purpose === "workflow" || segment.purpose === undefined;
-  });
-  return direct.map((segment) => segment.segmentId);
+async function collectArtifacts(stages: ReportStageDetail[]): Promise<ReportArtifact[]> {
+  const result: ReportArtifact[] = [];
+  for (const stage of stages) {
+    if (!stage.outputPath) continue;
+    const output = await readJsonIfExists(stage.outputPath);
+    const artifacts = Array.isArray(output?.artifacts) ? output.artifacts as ReportArtifact[] : [];
+    result.push(...artifacts.map((artifact) => ({ ...artifact, stageId: stage.id })));
+  }
+  return result;
 }
 
 async function readEvents(dir: string, limits: typeof DEFAULT_LIMITS): Promise<ReportEvent[]> {
   try {
     const text = await fs.readFile(path.join(dir, "events.ndjson"), "utf8");
-    const rows = text.split(/\r?\n/).filter(Boolean).map((line, index) => {
-      const raw = safeJson(line);
+    return text.trim().split("\n").filter(Boolean).slice(-limits.eventLimit).map((line, index) => {
+      const raw = safeJson(line) as Record<string, unknown>;
       return {
         id: `event-${index + 1}`,
         at: typeof raw.at === "string" ? raw.at : undefined,
         type: typeof raw.type === "string" ? raw.type : undefined,
-        preview: makePreview(JSON.stringify(raw, null, 2), limits.rawJsonPreviewChars),
+        preview: makePreview(JSON.stringify(raw, null, 2), limits.outputPreviewChars),
         raw
       };
     });
-    return rows.slice(-limits.eventLimit);
   } catch {
     return [];
   }
 }
 
 async function readDiagnostics(dir: string, limits: typeof DEFAULT_LIMITS): Promise<ReportDiagnostic[]> {
-  const files = await listJsonFiles(path.join(dir, "diagnostics"));
-  return Promise.all(files.map(async (file) => {
-    const value = await readJsonIfExists(file);
-    return {
-      id: path.basename(file, ".json"),
-      path: file,
-      status: stringField(value, "status"),
-      summary: stringField(value, "summary"),
-      preview: makePreview(JSON.stringify(value ?? {}, null, 2), limits.diagnosticPreviewChars, file)
-    };
-  }));
-}
-
-async function collectArtifacts(stages: ReportStageDetail[]): Promise<ReportArtifact[]> {
-  const nested = await Promise.all(stages.map(async (stage) => {
-    const output = stage.outputPath ? objectRecord(await readJsonIfExists(stage.outputPath)) ?? {} : {};
-    const artifacts = Array.isArray(output.artifacts) ? output.artifacts : [];
-    return artifacts
-      .filter((artifact): artifact is Record<string, unknown> => Boolean(artifact && typeof artifact === "object"))
-      .map((artifact) => ({
-        stageId: stage.id,
-        kind: stringField(artifact, "kind"),
-        path: stringField(artifact, "path"),
-        url: stringField(artifact, "url"),
-        label: stringField(artifact, "label")
-      }));
-  }));
-  return nested.flat();
-}
-
-async function findPromptPath(dir: string, promptId: string): Promise<string | undefined> {
-  const root = path.join(dir, "resolved-prompts");
   try {
-    const entries = await fs.readdir(root, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const file = path.join(root, entry.name, `${promptId}.md`);
-      try {
-        await fs.access(file);
-        return file;
-      } catch {
-        // Continue.
-      }
-    }
-  } catch {
-    // No prompt directory.
-  }
-  return undefined;
-}
-
-async function listJsonFiles(dir: string): Promise<string[]> {
-  try {
-    const entries = await fs.readdir(dir, { withFileTypes: true });
-    return entries
-      .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
-      .map((entry) => path.join(dir, entry.name))
-      .sort();
+    const diagnosticDir = path.join(dir, "diagnostics");
+    const entries = await fs.readdir(diagnosticDir);
+    return Promise.all(entries.filter((entry) => entry.endsWith(".json")).map(async (entry) => {
+      const filePath = path.join(diagnosticDir, entry);
+      const text = await fs.readFile(filePath, "utf8");
+      const parsed = safeJson(text) as Record<string, unknown>;
+      return {
+        id: path.basename(entry, ".json"),
+        path: filePath,
+        status: stringField(parsed, "status"),
+        summary: stringField(parsed, "summary"),
+        preview: makePreview(text, limits.outputPreviewChars, filePath)
+      };
+    }));
   } catch {
     return [];
   }
 }
 
-async function readJsonIfExists(file: string): Promise<unknown> {
+async function readPreviewIfExists(filePath: string, limit: number): Promise<ReportPreview | undefined> {
   try {
-    return JSON.parse(await fs.readFile(file, "utf8")) as unknown;
+    return makePreview(await fs.readFile(filePath, "utf8"), limit, filePath);
   } catch {
     return undefined;
   }
 }
 
-function outputShape(output: unknown): ReportStageDetail["outputShape"] | undefined {
-  const value = objectRecord(output);
-  if (!value) return undefined;
+async function findPromptPath(dir: string, stageId: string): Promise<string | undefined> {
+  const direct = path.join(dir, "prompts", `${stageId}.md`);
+  try {
+    await fs.access(direct);
+    return direct;
+  } catch {
+    return undefined;
+  }
+}
+
+async function readJsonIfExists(filePath: string): Promise<Record<string, unknown> | undefined> {
+  try {
+    const value = JSON.parse(await fs.readFile(filePath, "utf8")) as unknown;
+    return value && typeof value === "object" ? value as Record<string, unknown> : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function stageRoleName(stage: Stage): string | undefined {
+  if (stage.kind === "agentTask" || stage.kind === "fanout" || stage.kind === "summarize") return stage.role;
+  if (stage.kind === "discover" || stage.kind === "reduce" || stage.kind === "decisionGate") return stage.role;
+  if (stage.kind === "fixLoop") return stage.validator.role;
+  return undefined;
+}
+
+function statusFromOutput(output: Record<string, unknown> | undefined): ReportStageStatus {
+  const status = output?.status;
+  if (status === "completed" || status === "blocked" || status === "failed" || status === "running" || status === "pending" || status === "skipped") return status;
+  return "pending";
+}
+
+function outputShape(output: Record<string, unknown> | undefined): ReportStageDetail["outputShape"] {
+  if (!output) return undefined;
   return {
-    keys: Object.keys(value),
-    status: stringField(value, "status"),
-    verdict: stringField(value, "verdict"),
-    finalVerdict: stringField(value, "finalVerdict"),
-    findingsCount: Array.isArray(value.findings) ? value.findings.length : undefined,
-    checksCount: Array.isArray(value.checks) ? value.checks.length : undefined,
-    artifactsCount: Array.isArray(value.artifacts) ? value.artifacts.length : undefined
+    keys: Object.keys(output),
+    status: stringField(output, "status"),
+    verdict: stringField(output, "verdict"),
+    finalVerdict: stringField(output, "finalVerdict"),
+    findingsCount: Array.isArray(output.findings) ? output.findings.length : undefined,
+    checksCount: Array.isArray(output.checks) ? output.checks.length : undefined,
+    artifactsCount: Array.isArray(output.artifacts) ? output.artifacts.length : undefined
+  };
+}
+
+function outputParseSummary(output: Record<string, unknown> | undefined): ReportStageDetail["outputParse"] {
+  const outputParse = objectRecord(objectRecord(output?.metadata)?.outputParse);
+  if (!outputParse) return undefined;
+  return {
+    mode: stringField(outputParse, "mode"),
+    repaired: typeof outputParse.repaired === "boolean" ? outputParse.repaired : undefined,
+    unwrapped: typeof outputParse.unwrapped === "boolean" ? outputParse.unwrapped : undefined,
+    candidateCount: typeof outputParse.candidateCount === "number" ? outputParse.candidateCount : undefined,
+    warnings: stringArray(outputParse.warnings)
+  };
+}
+
+function parseDiagnosticsSummary(output: Record<string, unknown> | undefined): ReportStageDetail["parseDiagnostics"] {
+  const diagnostics = objectRecord(output?.parseDiagnostics);
+  if (!diagnostics) return undefined;
+  return {
+    errorCode: stringField(diagnostics, "errorCode"),
+    candidateCount: typeof diagnostics.candidateCount === "number" ? diagnostics.candidateCount : undefined,
+    bestCandidateId: stringField(diagnostics, "bestCandidateId"),
+    recoverability: stringField(diagnostics, "recoverability"),
+    schemaErrors: schemaErrorsFromDiagnostics(diagnostics)
+  };
+}
+
+function schemaErrorsFromDiagnostics(diagnostics: Record<string, unknown>): Array<{ path?: string; message?: string }> {
+  const candidates = Array.isArray(diagnostics.candidates) ? diagnostics.candidates : [];
+  return candidates.flatMap((candidate) => {
+    const schemaErrors = Array.isArray(objectRecord(candidate)?.schemaErrors) ? objectRecord(candidate)?.schemaErrors as unknown[] : [];
+    return schemaErrors.map((error) => ({
+      path: stringField(objectRecord(error), "path"),
+      message: stringField(objectRecord(error), "message")
+    }));
+  }).slice(0, 12);
+}
+
+function buildDecisionDetail(stage: Extract<Stage, { kind: "decisionGate" }>, output: Record<string, unknown> | undefined): ReportStageDetail["decision"] {
+  const routes = [...new Set([...(stage.routes ?? []), ...stage.rules.map((rule) => rule.to), stage.default])];
+  return {
+    matchedRoute: stringField(output, "route"),
+    defaultRoute: stage.default,
+    routes
+  };
+}
+
+function buildFixLoopDetail(stage: Extract<Stage, { kind: "fixLoop" }>, attemptCount: number): ReportStageDetail["fixLoop"] {
+  return {
+    maxRounds: stage.maxRounds,
+    observedRounds: attemptCount
   };
 }
 
 function graphMetrics(detail: ReportStageDetail | undefined): Record<string, string | number | boolean> {
-  if (!detail) return {};
-  return {
-    ...(detail.outputShape?.findingsCount !== undefined ? { findings: detail.outputShape.findingsCount } : {}),
-    ...(detail.outputShape?.checksCount !== undefined ? { checks: detail.outputShape.checksCount } : {}),
-    ...(detail.outputParse?.candidateCount !== undefined ? { parseCandidates: detail.outputParse.candidateCount } : {}),
-    ...(detail.fanout?.totalItems !== undefined ? { items: detail.fanout.totalItems, blockedItems: detail.fanout.blockedItems ?? 0 } : {})
-  };
+  const metrics: Record<string, string | number | boolean> = {};
+  if (detail?.outputParse?.candidateCount !== undefined) metrics.parseCandidates = detail.outputParse.candidateCount;
+  if (detail?.fanout?.totalItems !== undefined) metrics.totalItems = detail.fanout.totalItems;
+  if (detail?.relatedAttemptIds.length) metrics.attempts = detail.relatedAttemptIds.length;
+  return metrics;
 }
 
-function stageRoleName(stage: Stage): string | undefined {
-  if ("role" in stage && typeof stage.role === "string") return stage.role;
-  return undefined;
+function terminalStatus(status: RunViewStatus): boolean {
+  return status === "completed" || status === "blocked" || status === "diagnosed_blocked" || status === "failed" || status === "cancelled";
 }
 
-function stringField(value: unknown, key: string): string | undefined {
-  const record = objectRecord(value);
-  const field = record?.[key];
+function positiveDuration(start: string, end: string): number | undefined {
+  const duration = Date.parse(end) - Date.parse(start);
+  return Number.isFinite(duration) && duration >= 0 ? duration : undefined;
+}
+
+function stringField(value: Record<string, unknown> | undefined, key: string): string | undefined {
+  const field = value?.[key];
   return typeof field === "string" ? field : undefined;
 }
 
@@ -606,83 +604,10 @@ function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
-function outputParseSummary(output: unknown): ReportStageDetail["outputParse"] | undefined {
-  const value = objectRecord(output);
-  const metadata = objectRecord(value?.metadata);
-  const outputParse = objectRecord(metadata?.outputParse);
-  if (!outputParse) return undefined;
-  return {
-    mode: stringField(outputParse, "mode"),
-    repaired: booleanField(outputParse, "repaired"),
-    unwrapped: booleanField(outputParse, "unwrapped"),
-    candidateCount: numberField(outputParse, "candidateCount"),
-    warnings: stringArray(outputParse.warnings)
-  };
-}
-
-function parseDiagnosticsSummary(output: unknown): ReportStageDetail["parseDiagnostics"] | undefined {
-  const value = objectRecord(output);
-  const diagnostics = objectRecord(value?.parseDiagnostics);
-  if (!diagnostics) return undefined;
-  return {
-    errorCode: stringField(diagnostics, "errorCode"),
-    candidateCount: numberField(diagnostics, "candidateCount"),
-    bestCandidateId: stringField(diagnostics, "bestCandidateId"),
-    recoverability: stringField(diagnostics, "recoverability"),
-    schemaErrors: schemaErrorsFromDiagnostics(diagnostics)
-  };
-}
-
-function schemaErrorsFromDiagnostics(diagnostics: Record<string, unknown>): Array<{ path?: string; message?: string }> {
-  const candidates = Array.isArray(diagnostics.candidates) ? diagnostics.candidates : [];
-  const errors: Array<{ path?: string; message?: string }> = [];
-  for (const candidate of candidates) {
-    const record = objectRecord(candidate);
-    const schemaErrors = Array.isArray(record?.schemaErrors) ? record.schemaErrors : [];
-    for (const error of schemaErrors) {
-      const entry = objectRecord(error);
-      if (!entry) continue;
-      errors.push({
-        path: stringField(entry, "path"),
-        message: stringField(entry, "message")
-      });
-    }
-  }
-  return errors.slice(0, 12);
-}
-
-function safeJson(text: string): Record<string, unknown> {
+function safeJson(value: string): unknown {
   try {
-    const value = JSON.parse(text) as unknown;
-    return objectRecord(value) ?? {};
+    return JSON.parse(value) as unknown;
   } catch {
     return {};
   }
-}
-
-function numberField(value: unknown, key: string): number | undefined {
-  const record = objectRecord(value);
-  const field = record?.[key];
-  return typeof field === "number" ? field : undefined;
-}
-
-function booleanField(value: unknown, key: string): boolean | undefined {
-  const record = objectRecord(value);
-  const field = record?.[key];
-  return typeof field === "boolean" ? field : undefined;
-}
-
-function terminalStatus(status: RunViewStatus): boolean {
-  return status !== "pending" && status !== "running";
-}
-
-function positiveDuration(start: string, end: string): number | undefined {
-  const started = Date.parse(start);
-  const ended = Date.parse(end);
-  if (!Number.isFinite(started) || !Number.isFinite(ended) || ended < started) return undefined;
-  return ended - started;
-}
-
-function isReportStageStatus(value: string | undefined): value is ReportStageStatus {
-  return value === "pending" || value === "running" || value === "completed" || value === "blocked" || value === "failed" || value === "skipped" || value === "unknown";
 }

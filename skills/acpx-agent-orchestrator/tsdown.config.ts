@@ -9,9 +9,9 @@ export default defineConfig({
   dts: true,
   clean: true,
   platform: "node",
-  target: "node20",
+  target: "node22",
   deps: {
-    alwaysBundle: [/^(commander|proper-lockfile|zod)(\/.*)?$/],
+    alwaysBundle: [/^(commander|proper-lockfile|zod|jsonrepair)(\/.*)?$/],
     onlyBundle: false,
     dts: {
       neverBundle: [/^zod(\/.*)?$/]

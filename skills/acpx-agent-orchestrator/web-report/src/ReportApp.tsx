@@ -15,7 +15,6 @@ import {
 import {
   Activity,
   AlertTriangle,
-  Boxes,
   CircleDot,
   FileText,
   GitBranch,
@@ -29,7 +28,7 @@ import type { ReportEvent, ReportStageDetail, RunReportView } from "./types.js";
 
 type Selection =
   | { kind: "stage"; id: string }
-  | { kind: "segment"; id: string }
+  | { kind: "attempt"; id: string }
   | { kind: "event"; id: string }
   | { kind: "diagnostic"; id: string }
   | { kind: "artifact"; id: string };
@@ -80,7 +79,7 @@ export function ReportApp(): React.ReactElement {
   }
 
   const selectedStage = selection?.kind === "stage" ? view.stages.find((stage) => stage.id === selection.id) : undefined;
-  const selectedSegment = selection?.kind === "segment" ? view.segments.find((segment) => segment.segmentId === selection.id) : undefined;
+  const selectedAttempt = selection?.kind === "attempt" ? view.attempts.find((attempt) => attempt.id === selection.id) : undefined;
   const selectedEvent = selection?.kind === "event" ? view.events.find((event) => event.id === selection.id) : undefined;
   const selectedDiagnostic = selection?.kind === "diagnostic" ? view.diagnostics.find((diagnostic) => diagnostic.id === selection.id) : undefined;
   const selectedArtifact = selection?.kind === "artifact" ? view.artifacts[Number(selection.id)] : undefined;
@@ -90,7 +89,7 @@ export function ReportApp(): React.ReactElement {
       <div className="app-shell">
         <aside className="sidebar">
           <div className="brand"><Sparkles size={20} /> ACPX</div>
-          {["Overview", "Graph", "Stages", "Segments", "Events", "Artifacts", "Diagnostics"].map((item) => (
+          {["Overview", "Graph", "Stages", "Attempts", "Events", "Artifacts", "Diagnostics"].map((item) => (
             <button key={item} className={section === item ? "nav active" : "nav"} onClick={() => setSection(item)}>
               {navIcon(item)}
               {item}
@@ -110,7 +109,7 @@ export function ReportApp(): React.ReactElement {
 
           <section className="metrics" aria-label="Run metrics">
             <Metric label="Stages" value={`${view.metrics.stagesCompleted}/${view.metrics.stagesTotal}`} hint={`${view.metrics.stagesBlocked} blocked`} />
-            <Metric label="Segments" value={`${view.metrics.segmentsCompleted}/${view.metrics.segmentsTotal}`} hint={`${view.metrics.segmentsRunning} running`} />
+            <Metric label="Attempts" value={`${view.metrics.attemptsCompleted}/${view.metrics.attemptsTotal}`} hint={`${view.metrics.attemptsBlocked} blocked`} />
             <Metric label="Agent Calls" value={`${view.metrics.agentCallsActual ?? 0}/${view.metrics.agentCallsPlanned}`} hint={`${view.metrics.repairCalls ?? 0} repairs`} />
             <Metric label="Verdict" value={view.run.finalVerdict ?? "n/a"} hint={view.run.status} />
           </section>
@@ -120,14 +119,14 @@ export function ReportApp(): React.ReactElement {
               {section === "Overview" && <Overview view={view} />}
               {section === "Graph" && <GraphView view={view} onSelect={(id) => setSelection({ kind: "stage", id })} />}
               {section === "Stages" && <StageTable view={view} onSelect={(id) => setSelection({ kind: "stage", id })} />}
-              {section === "Segments" && <SegmentList view={view} onSelect={(id) => setSelection({ kind: "segment", id })} />}
+              {section === "Attempts" && <AttemptList view={view} onSelect={(id) => setSelection({ kind: "attempt", id })} />}
               {section === "Events" && <EventList events={view.events} onSelect={(id) => setSelection({ kind: "event", id })} />}
               {section === "Artifacts" && <ArtifactList view={view} onSelect={(id) => setSelection({ kind: "artifact", id })} />}
               {section === "Diagnostics" && <DiagnosticList view={view} onSelect={(id) => setSelection({ kind: "diagnostic", id })} />}
             </div>
             <DetailPanel
               stage={selectedStage}
-              segment={selectedSegment}
+              attempt={selectedAttempt}
               event={selectedEvent}
               diagnostic={selectedDiagnostic}
               artifact={selectedArtifact}
@@ -238,8 +237,8 @@ function StageTable({ view, onSelect }: { view: RunReportView; onSelect: (id: st
   );
 }
 
-function SegmentList({ view, onSelect }: { view: RunReportView; onSelect: (id: string) => void }): React.ReactElement {
-  return <ListRows rows={view.segments.map((segment) => ({ id: segment.segmentId, title: segment.segmentId, subtitle: `${segment.purpose} · ${segment.status}`, onClick: () => onSelect(segment.segmentId) }))} />;
+function AttemptList({ view, onSelect }: { view: RunReportView; onSelect: (id: string) => void }): React.ReactElement {
+  return <ListRows rows={view.attempts.map((attempt) => ({ id: attempt.id, title: attempt.id, subtitle: `${attempt.kind} · ${attempt.status}`, onClick: () => onSelect(attempt.id) }))} empty="No attempts." />;
 }
 
 function EventList({ events, onSelect }: { events: ReportEvent[]; onSelect: (id: string) => void }): React.ReactElement {
@@ -254,23 +253,23 @@ function DiagnosticList({ view, onSelect }: { view: RunReportView; onSelect: (id
   return <ListRows rows={view.diagnostics.map((diagnostic) => ({ id: diagnostic.id, title: diagnostic.id, subtitle: diagnostic.summary ?? diagnostic.status ?? "", onClick: () => onSelect(diagnostic.id) }))} empty="No diagnostics." />;
 }
 
-function DetailPanel({ stage, segment, event, diagnostic, artifact }: {
+function DetailPanel({ stage, attempt, event, diagnostic, artifact }: {
   stage?: ReportStageDetail;
-  segment?: RunReportView["segments"][number];
+  attempt?: RunReportView["attempts"][number];
   event?: ReportEvent;
   diagnostic?: RunReportView["diagnostics"][number];
   artifact?: RunReportView["artifacts"][number];
 }): React.ReactElement {
-  const title = stage?.id ?? segment?.segmentId ?? event?.type ?? diagnostic?.id ?? artifact?.label ?? "Details";
+  const title = stage?.id ?? attempt?.id ?? event?.type ?? diagnostic?.id ?? artifact?.label ?? "Details";
   return (
     <aside className="detail-panel">
       <h2>{title}</h2>
       {stage && <StageDetail stage={stage} />}
-      {segment && <JsonBlock value={segment} />}
+      {attempt && <AttemptDetail attempt={attempt} />}
       {event && <PreviewBlock title="Event" preview={event.preview} />}
       {diagnostic && <PreviewBlock title="Diagnostic" preview={diagnostic.preview} />}
       {artifact && <JsonBlock value={artifact} />}
-      {!stage && !segment && !event && !diagnostic && !artifact && <p>Select a node or row to inspect details.</p>}
+      {!stage && !attempt && !event && !diagnostic && !artifact && <p>Select a node or row to inspect details.</p>}
     </aside>
   );
 }
@@ -302,8 +301,28 @@ function StageDetail({ stage }: { stage: ReportStageDetail }): React.ReactElemen
         </details>
       )}
       {stage.fanout && <p>Fanout: {stage.fanout.completedItems ?? 0}/{stage.fanout.totalItems ?? 0} completed, {stage.fanout.blockedItems ?? 0} blocked.</p>}
+      {stage.relatedAttemptIds.length > 0 && <p>Attempts: {stage.relatedAttemptIds.join(", ")}</p>}
       {stage.prompt && <PreviewBlock title="Prompt" preview={stage.prompt} />}
       {stage.output && <PreviewBlock title="Output" preview={stage.output} />}
+    </div>
+  );
+}
+
+function AttemptDetail({ attempt }: { attempt: RunReportView["attempts"][number] }): React.ReactElement {
+  return (
+    <div className="stack">
+      <div className={`status-pill status-${attempt.status}`}>{attempt.status}</div>
+      <dl>
+        <dt>Stage</dt><dd>{attempt.stageId}</dd>
+        <dt>Kind</dt><dd>{attempt.kind}</dd>
+        <dt>Item</dt><dd>{attempt.itemId ?? "-"}</dd>
+        <dt>Blocked reason</dt><dd>{attempt.blockedReason ?? "-"}</dd>
+        <dt>Parse code</dt><dd>{attempt.parseErrorCode ?? "-"}</dd>
+      </dl>
+      {attempt.prompt && <PreviewBlock title="Prompt" preview={attempt.prompt} />}
+      {attempt.raw && <PreviewBlock title="Raw" preview={attempt.raw} />}
+      {attempt.parse && <PreviewBlock title="Parse" preview={attempt.parse} />}
+      {attempt.output && <PreviewBlock title="Output" preview={attempt.output} />}
     </div>
   );
 }
@@ -360,7 +379,7 @@ function navIcon(item: string): React.ReactElement {
   if (item === "Overview") return <Activity {...props} />;
   if (item === "Graph") return <GitBranch {...props} />;
   if (item === "Stages") return <ListChecks {...props} />;
-  if (item === "Segments") return <Boxes {...props} />;
+  if (item === "Attempts") return <ListChecks {...props} />;
   if (item === "Events") return <CircleDot {...props} />;
   if (item === "Artifacts") return <FileText {...props} />;
   return <AlertTriangle {...props} />;

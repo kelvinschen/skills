@@ -1,9 +1,9 @@
-import type { RunReportView, ReportStageDetail, ReportSegmentDetail, ReportEvent, ReportDiagnostic, ReportArtifact } from "../../src/projections/run-report.js";
+import type { RunReportView, ReportStageDetail, ReportAttemptDetail, ReportEvent, ReportDiagnostic, ReportArtifact } from "../../src/projections/run-report.js";
 
 export type {
   RunReportView,
   ReportStageDetail,
-  ReportSegmentDetail,
+  ReportAttemptDetail,
   ReportEvent,
   ReportDiagnostic,
   ReportArtifact

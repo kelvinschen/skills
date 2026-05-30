@@ -1,15 +1,16 @@
 ---
 name: acpx-agent-orchestrator
-description: Use when the user explicitly wants dynamic acpx workflow orchestration, reusable agent workflows, or multi-agent coding workflows backed by acpx flow. The Main Agent generates structured workflow specs; the skill CLI validates, previews, saves, runs, follows, resumes, diagnoses, and reports logical workflow runs.
+description: Use when the user explicitly wants dynamic acpx workflow orchestration, reusable agent workflows, or multi-agent coding workflows backed by the acpx runtime. The Main Agent generates structured workflow specs; the skill CLI validates, previews, saves, runs, follows, resumes, diagnoses, and reports logical workflow runs.
 ---
 
 # ACPX Agent Orchestrator
 
-This skill implements dynamic workflow orchestration over `acpx flow`.
+This skill implements runtime-driven dynamic workflow orchestration over
+`acpx/runtime`.
 
-Do not use legacy one-shot, named-session, fixed-template flow, `acpx-flow-run`,
-or `acpx-inspector` workflows. They were intentionally removed. The public
-surface is `scripts/acpx-orchestrator`.
+Do not generate or execute `workflow.flow.ts`, `materialized.flow.ts`, or
+`acpx flow run` artifacts. The public surface is
+`skills/acpx-agent-orchestrator/scripts/acpx-orchestrator`.
 
 ## Core Workflow
 
@@ -39,12 +40,12 @@ skills/acpx-agent-orchestrator/scripts/acpx-orchestrator report --run <logical-r
 skills/acpx-agent-orchestrator/scripts/acpx-orchestrator report serve --run <logical-run-id> --port 0
 ```
 
-Use `--wait` when the user wants the command to block until the logical run
-finishes. Use `diagnose <logical-run-id> --wait` for blocked runs; it appends a
-read-only recovery segment and keeps edit work from being rerun.
-HTML reports are observation-only. Snapshot HTML is a single self-contained
-file, while `report serve` streams run state over SSE and never starts pending
-workflow segments.
+Use `--wait` when the user wants the command to advance until terminal status.
+Use `diagnose <logical-run-id> --wait` for blocked runs; it prepares a
+read-only recovery diagnostic without rerunning edit work.
+
+HTML reports are observation-only. Snapshot HTML is self-contained, while
+`report serve` streams run state over SSE and syncs with `startPending: false`.
 
 ## Spec Authoring
 
@@ -60,8 +61,10 @@ stage id, and authoring stage kinds:
 - `summarize`
 
 Prompt text is freeform, but variables are explicit and interpolated as
-`${variableName}`. Agent outputs must end with a fenced `workflow-output` JSON
-block.
+`${variableName}`. Agent outputs must end with one fenced `workflow-output` JSON
+block. Zod-backed contracts validate outputs, deterministic
+`checks[].result -> checks[].status` normalization is allowed, and one
+schema-aware repair turn may run in the same session.
 
 Preview must be treated as the approval artifact: check roles, edit modes,
 fanout, partial-result policy, limits, and audit paths before using `--yes`.
@@ -70,7 +73,7 @@ separate explicit action.
 
 Read:
 
-- [docs/dynamic-workflow-design.md](docs/dynamic-workflow-design.md)
+- [docs/runtime-orchestrator-refactor-implementation.md](docs/runtime-orchestrator-refactor-implementation.md)
 - [docs/workflow-spec.md](docs/workflow-spec.md)
 - [docs/cli.md](docs/cli.md)
 - [docs/html-report-design.md](docs/html-report-design.md)

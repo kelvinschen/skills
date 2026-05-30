@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Command } from "commander";
-import { compileWorkflow } from "../compiler/compile.js";
+import { compileExecutionPlan } from "../compiler/compile.js";
 import { globalWorkflowsDir, projectWorkflowsDir } from "../run-index/paths.js";
 import { ensureEmptyOrOverwrite, loadAndLint, printIssues, printJson } from "./common.js";
 
@@ -25,11 +25,11 @@ export function registerSave(program: Command): void {
       const target = path.join(root, name);
       await ensureEmptyOrOverwrite(target, options.overwrite);
       await fs.mkdir(target, { recursive: true });
-      const compiled = compileWorkflow(spec);
+      const plan = compileExecutionPlan(spec);
       await fs.writeFile(path.join(target, "workflow.spec.json"), `${JSON.stringify(spec, null, 2)}\n`, "utf8");
-      await fs.writeFile(path.join(target, "workflow.flow.ts"), compiled.flowSource, "utf8");
+      await fs.writeFile(path.join(target, "execution-plan.json"), `${JSON.stringify(plan, null, 2)}\n`, "utf8");
       await writeHelperSnapshot(target);
-      await fs.writeFile(path.join(target, "README.md"), `# ${name}\n\n${spec.description || "Saved acpx-orchestrator workflow."}\n\nThis directory is a self-contained saved workflow snapshot. The stable authoring interface is workflow.spec.json; workflow.flow.ts and helper/ are derived artifacts and should normally be regenerated from the spec.\n\nRun with acpx-orchestrator using workflow.spec.json. Direct acpx execution of workflow.flow.ts requires compiled segment input.\n`, "utf8");
+      await fs.writeFile(path.join(target, "README.md"), `# ${name}\n\n${spec.description || "Saved acpx-orchestrator workflow."}\n\nThis directory is a saved runtime-driven workflow snapshot. The stable authoring interface is workflow.spec.json; execution-plan.json is the derived runtime plan and should normally be regenerated from the spec.\n\nRun with acpx-orchestrator using workflow.spec.json.\n`, "utf8");
       const output = { ok: true, workflow: name, path: target };
       if (options.json) printJson(output);
       else process.stdout.write(`saved ${name} -> ${target}\n`);

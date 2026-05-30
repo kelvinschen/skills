@@ -2,12 +2,81 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { lock } from "proper-lockfile";
 import { runDir } from "./paths.js";
-import type { RunViewStatus } from "../projections/run-view.js";
+
+export type AttemptStatus =
+  | "pending"
+  | "running"
+  | "raw_received"
+  | "parsing"
+  | "repairing"
+  | "completed"
+  | "blocked"
+  | "failed"
+  | "cancelled"
+  | "timed_out";
+
+export type StageStatus =
+  | "pending"
+  | "ready"
+  | "running"
+  | "completed"
+  | "blocked"
+  | "failed"
+  | "skipped";
+
+export type RunStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "blocked"
+  | "diagnosed_blocked"
+  | "failed"
+  | "cancelled";
+
+export type AttemptIndexEntry = {
+  id: string;
+  stageId: string;
+  itemId?: string;
+  kind: "attempt" | "repair" | "diagnostic";
+  status: AttemptStatus;
+  path: string;
+  startedAt?: string;
+  endedAt?: string;
+  blockedReason?: string;
+  parseErrorCode?: string;
+  rawPreview?: string;
+  promptPreview?: string;
+};
+
+export type StageIndexEntry = {
+  stageId: string;
+  status: StageStatus;
+  attempts: string[];
+  outputPath?: string;
+  blockedReason?: string;
+  startedAt?: string;
+  completedAt?: string;
+  skippedReason?: string;
+  fanout?: {
+    totalItems: number;
+    completedItems: number;
+    blockedItems: number;
+    allowPartial: boolean;
+    items: Array<{
+      id: string;
+      index: number;
+      status: StageStatus;
+      outputPath?: string;
+      blockedReason?: string;
+    }>;
+  };
+};
 
 export type RunIndex = {
+  schemaVersion: "acpx-orchestrator.run/v2";
   logicalRunId: string;
   workflowName: string;
-  status: RunViewStatus;
+  status: RunStatus;
   createdAt: string;
   updatedAt: string;
   source?: {
@@ -15,19 +84,8 @@ export type RunIndex = {
     path?: string;
     sha256?: string;
   };
-  segments: Array<{
-    segmentId: string;
-    purpose?: "workflow" | "fanout-batch" | "diagnostic";
-    status: RunViewStatus;
-    materializedFlow: string;
-    input: string;
-    acpxRunId?: string;
-    acpxRunDir?: string;
-    fanoutStageId?: string;
-    batchIndex?: number;
-    itemStart?: number;
-    itemCount?: number;
-  }>;
+  stages: Record<string, StageIndexEntry>;
+  attempts: Record<string, AttemptIndexEntry>;
   agentUsage: {
     planned: number;
     actual: number;
@@ -55,7 +113,13 @@ export async function writeRunIndex(cwd: string, index: RunIndex): Promise<void>
 
 export async function readRunIndex(cwd: string, logicalRunId: string): Promise<RunIndex> {
   const filePath = path.join(runDir(logicalRunId, cwd), "run.json");
-  return JSON.parse(await fs.readFile(filePath, "utf8")) as RunIndex;
+  const parsed = JSON.parse(await fs.readFile(filePath, "utf8")) as RunIndex;
+  return {
+    ...parsed,
+    schemaVersion: parsed.schemaVersion ?? "acpx-orchestrator.run/v2",
+    stages: parsed.stages ?? {},
+    attempts: parsed.attempts ?? {}
+  };
 }
 
 export async function appendEvent(cwd: string, logicalRunId: string, event: Record<string, unknown>): Promise<void> {

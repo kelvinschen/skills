@@ -30,39 +30,23 @@ Code families are stable and should not be renamed casually:
 - `DECISION_*`: invalid decision target/default routing.
 - `DISCOVER_*`: invalid agent discover declaration.
 - `FANOUT_*`: edit fanout risk or missing reconcile stage.
-- `OUTPUT_*`: reserved for output contract/runtime parse errors.
-- `RUNTIME_*`: logical run index or segment execution errors.
+- `OUTPUT_*`: runtime output parse, schema, ambiguity, or repair errors.
+- `RUNTIME_*`: logical run index, scheduler, session, or command errors.
 - `RESUME_*`: resume policy errors.
-- `ACPX_*`: acpx startup, lookup, or bundle-read errors.
+- `ACPX_*`: `acpx/runtime` startup, session, or turn errors.
 - `INTERNAL_*`: unexpected compiler/runtime invariant failure.
 
-New codes may be added within these families. Existing code names should stay
-stable once documented.
-
-Output contract codes currently emitted by compiled workflow parser helpers:
+Output contract codes emitted by the runtime parser:
 
 - `OUTPUT_PARSE_FAILED`: no acceptable JSON candidate could be parsed from an
   agent response.
 - `OUTPUT_SCHEMA_FAILED`: JSON candidates were found, but none satisfied the
-  stage-specific `workflow-output` contract.
+  stage-specific Zod-backed `workflow-output` contract.
 - `OUTPUT_AMBIGUOUS`: multiple different valid `workflow-output` candidates were
   found, so the parser failed closed.
-- `OUTPUT_REPAIR_FAILED`: the one allowed output-repair pass did not produce a
-  valid `workflow-output`.
+- `OUTPUT_REPAIR_FAILED`: the one allowed schema-aware repair turn did not
+  produce a valid `workflow-output`.
 
-Resume policy codes currently emitted by `resume`:
-
-- `RESUME_NO_FAILED_SEGMENT`: no failed non-diagnostic workflow segment can be
-  retried.
-- `RESUME_EDIT_WORKFLOW_REFUSED`: the run snapshot contains edit-capable roles;
-  use `diagnose` and start a new run for edit recovery.
-- `RESUME_POLICY_INVALID_MAX_ITEMS`: CLI value is not `stage=count`.
-- `RESUME_POLICY_INVALID_SKIP_ITEM`: CLI value is not `stage=index`.
-- `RESUME_POLICY_STAGE_UNKNOWN`: the policy references an unknown stage id.
-- `RESUME_POLICY_STAGE_NOT_FANOUT`: the policy target is not a fanout stage.
-- `RESUME_POLICY_PARTIAL_REQUIRES_READONLY`: resume attempted to enable partial
-  results for an edit fanout.
-- `RESUME_POLICY_MAX_ITEMS_NOT_TIGHTENING`: `maxItems` exceeds the compiled
-  fanout cap from the run snapshot.
-- `RESUME_POLICY_SKIP_ITEM_OUT_OF_RANGE`: skipped item index is outside the
-  compiled fanout cap.
+Output contract failures map to blocked attempt/stage/run state, not failed.
+`failed` is reserved for compiler, scheduler, ACPX runtime, or other
+unrecoverable runtime errors.

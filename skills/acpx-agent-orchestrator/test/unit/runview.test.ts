@@ -11,6 +11,6 @@ describe("RunView", () => {
     expect(view.workflowName).toBe("simple-feature");
     expect(view.status).toBe("pending");
     expect(view.stages.map((stage) => stage.id)).toContain("summarize");
-    expect(view.agentUsage.planned).toBe(8);
+    expect(view.agentUsage.planned).toBe(4);
   });
 });

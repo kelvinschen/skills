@@ -43,6 +43,16 @@ export type RunView = {
     outputParse?: RunViewOutputParse;
     parseDiagnostics?: RunViewParseDiagnostics;
   }>;
+  attempts: Array<{
+    id: string;
+    stageId: string;
+    itemId?: string;
+    kind: string;
+    status: string;
+    blockedReason?: string;
+    parseErrorCode?: string;
+    path: string;
+  }>;
   agentUsage: { planned: number; actual?: number; repairCalls?: number };
   artifacts: Array<{ kind?: string; path?: string; label?: string }>;
   commands: Record<string, string>;
@@ -65,6 +75,7 @@ export function previewRunView(spec: WorkflowSpec, issues: OrchestratorIssue[] =
       kind: stage.kind,
       dependsOn: stage.dependsOn ?? []
     })),
+    attempts: [],
     agentUsage: {
       planned: estimateAgentCalls(spec)
     },
@@ -96,17 +107,28 @@ export async function runViewFromIndex(cwd: string, spec: WorkflowSpec, index: R
     risks: [...preview.risks, ...outputRisks],
     stages: spec.stages.map((stage) => {
       const output = objectRecord(stageOutputs[stage.id]);
+      const indexed = index.stages[stage.id];
       return {
         id: stage.id,
         kind: stage.kind,
         dependsOn: stage.dependsOn ?? [],
-        status: typeof output?.status === "string" ? output.status : undefined,
+        status: typeof output?.status === "string" ? output.status : indexed?.status,
         summary: typeof output?.summary === "string" ? output.summary : undefined,
-        blockedReason: typeof output?.blockedReason === "string" ? output.blockedReason : undefined,
+        blockedReason: typeof output?.blockedReason === "string" ? output.blockedReason : indexed?.blockedReason,
         outputParse: outputParseSummary(output),
         parseDiagnostics: parseDiagnosticsSummary(output)
       };
     }),
+    attempts: Object.values(index.attempts).map((attempt) => ({
+      id: attempt.id,
+      stageId: attempt.stageId,
+      itemId: attempt.itemId,
+      kind: attempt.kind,
+      status: attempt.status,
+      blockedReason: attempt.blockedReason,
+      parseErrorCode: attempt.parseErrorCode,
+      path: attempt.path
+    })),
     agentUsage: {
       planned: index.agentUsage.planned,
       actual: index.agentUsage.actual,
@@ -126,8 +148,7 @@ export function estimateAgentCalls(spec: WorkflowSpec): number {
     if (stage.kind === "fanout") baseCalls += stage.limits?.maxFanoutItems ?? spec.limits.maxFanoutItems ?? 1;
     if (stage.kind === "fixLoop") baseCalls += stage.maxRounds + Math.max(0, stage.maxRounds - 1);
   }
-  // Each agent call can consume one format-repair call in the generated flow.
-  return baseCalls * 2;
+  return baseCalls;
 }
 
 async function readStageOutputs(cwd: string, logicalRunId: string, spec: WorkflowSpec): Promise<Record<string, unknown>> {
@@ -203,13 +224,13 @@ function finalVerdict(output?: Record<string, unknown>): RunView["finalVerdict"]
 function previewRisks(spec: WorkflowSpec): string[] {
   const risks: string[] = [
     "Approval permits this run only; saving for reuse requires an explicit save command.",
-    "Audit artifacts are written under .acpx-orchestrator/runs/<logicalRunId>/ with spec, flow, prompts, outputs, and events.",
-    "Role modes are enforced by injected prompts and audit metadata when acpx does not expose per-stage permission controls."
+    "Audit artifacts are written under .acpx-orchestrator/runs/<logicalRunId>/ with spec, execution plan, prompts, outputs, attempts, sessions, and events.",
+    "Agent turns run through run-local ACPX runtime sessions; repair turns count toward actual usage."
   ];
   const editRoles = Object.entries(spec.roles).filter(([, role]) => role.mode === "edit").map(([name]) => name);
   if (editRoles.length > 0) risks.push(`Edit-capable roles may modify files: ${editRoles.join(", ")}.`);
   const editFanout = spec.stages.filter((stage) => stage.kind === "fanout" && spec.roles[stage.role]?.mode === "edit").map((stage) => stage.id);
-  if (editFanout.length > 0) risks.push(`Edit fanout is high risk; batch segments may run under the global concurrency pool: ${editFanout.join(", ")}.`);
+  if (editFanout.length > 0) risks.push(`Edit fanout is high risk; independent item sessions run under the global concurrency pool: ${editFanout.join(", ")}.`);
   const allowPartial = spec.stages.filter((stage) => stage.kind === "fanout" && stage.fanoutPolicy?.allowPartial).map((stage) => stage.id);
   if (allowPartial.length > 0) risks.push(`Partial fanout results are explicitly allowed for: ${allowPartial.join(", ")}.`);
   if ((spec.limits.maxConcurrency ?? 1) > 1) risks.push(`Global maxConcurrency is ${spec.limits.maxConcurrency}; stage limits may only reduce it.`);

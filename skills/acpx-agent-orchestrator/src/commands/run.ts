@@ -13,8 +13,8 @@ export function registerRun(program: Command): void {
     .option("--global", "resolve saved workflow from global directory")
     .option("--input-json <path>", "raw workflow input JSON file")
     .option("--yes", "skip approval after preview")
-    .option("--wait", "wait for workflow completion when execution driver is implemented")
-    .option("--prepare-only", "prepare the logical run without starting acpx")
+    .option("--wait", "advance scheduler until the workflow reaches a terminal state")
+    .option("--prepare-only", "prepare the logical run without starting runtime turns")
     .option("--json", "print JSON")
     .action(async (options: { spec?: string; workflow?: string; global?: boolean; inputJson?: string; yes?: boolean; wait?: boolean; prepareOnly?: boolean; json?: boolean }) => {
       const specPath = resolveSpecPath(options);
@@ -60,13 +60,12 @@ export function registerRun(program: Command): void {
         logicalRunId: prepared.logicalRunId,
         runDir: prepared.dir,
         status: index.status,
-        segment: index.segments[0],
         runView,
-        note: options.prepareOnly ? "Run prepared without starting acpx." : "Run started."
+        note: options.prepareOnly ? "Run prepared without starting runtime turns." : "Run advanced."
       };
       if (options.json) printJson(output);
       else {
-        process.stdout.write(`${options.prepareOnly ? "run prepared" : "run started"}: ${prepared.logicalRunId}\n`);
+        process.stdout.write(`${options.prepareOnly ? "run prepared" : "run advanced"}: ${prepared.logicalRunId}\n`);
         process.stdout.write(`status: ${runView.status}${runView.finalVerdict ? ` verdict=${runView.finalVerdict}` : ""}\n`);
         process.stdout.write(`${prepared.dir}\n`);
       }

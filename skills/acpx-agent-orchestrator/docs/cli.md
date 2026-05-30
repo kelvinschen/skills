@@ -31,34 +31,30 @@ scripts/acpx-orchestrator report serve --run <logical-run-id> --port 0
 All commands support `--json` where structured output is useful.
 
 `run` validates automatically. Without `--yes`, it prints a preview and exits
-with approval required.
+with approval required. With `--yes`, it prepares a logical run, writes
+`execution-plan.json`, advances one scheduler tick, and returns. Use `--wait` to
+advance until terminal status.
 
-`run` starts a logical run and returns after the first acpx segment is started.
-Use `--wait` to poll the logical run index until it reaches a terminal status.
+`follow` observes and syncs the selected logical run. It does not create a new
+workflow.
 
-`diagnose` appends a read-only `recovery_reviewer` diagnostic segment. It does
-not rerun edit work and does not change the saved workflow spec. A finished
-diagnostic maps a blocked logical run to `diagnosed_blocked`.
+`diagnose` prepares a read-only recovery diagnostic prompt/artifact. It does not
+rerun edit work and does not change the saved workflow spec.
 
-`resume` only retries failed workflow segments from the original run snapshot.
-It refuses workflows with edit-capable roles; use `diagnose` and then start a
-new run for edit recovery. Resume may tighten runtime policy through the
-segment input without changing the saved spec, graph, prompts, roles, or agents:
+`resume` advances an existing run from its persisted run snapshot and
+`execution-plan.json`. Resume policy flags may only tighten fanout handling:
 
-- `--timeout-seconds <seconds>` sets the outer acpx process timeout for the retry.
-- `--max-fanout-items <stage=count>` lowers the effective fanout item cap within
-  the compiled snapshot.
+- `--max-fanout-items <stage=count>` lowers the effective fanout item cap.
 - `--skip-fanout-item <stage=index>` skips a zero-based item index.
 - `--allow-partial-fanout <stage>` allows partial read-only fanout results.
 
-`save` writes a self-contained snapshot directory with `workflow.spec.json`,
-derived `workflow.flow.ts`, README, schema/docs, wrapper, and built helper files
-from the current package build. It fails if the helper CLI has not been built,
-instead of writing a partial snapshot. Approval to run is not save approval;
-saving is always explicit.
+`save` writes a saved workflow directory with `workflow.spec.json`,
+`execution-plan.json`, README, schema/docs, wrapper, and built helper files from
+the current package build. Approval to run is not save approval; saving is
+always explicit.
 
-`report --html --output <file>` writes a single self-contained HTML snapshot
-based only on the run index and artifacts. `report serve` starts an
-observation-only local server that streams RunReportView snapshots over SSE
-after syncing existing artifacts with `startPending: false`; it does not expose
-workflow control endpoints.
+`report --html --output <file>` writes a self-contained HTML snapshot based on
+the run index, final outputs, attempts, events, and diagnostics. `report serve`
+starts an observation-only local server that streams RunReportView snapshots
+over SSE after syncing existing artifacts with `startPending: false`; it does
+not expose workflow control endpoints.

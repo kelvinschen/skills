@@ -6,7 +6,15 @@ import { describe, expect, it } from "vitest";
 
 const runReal = process.env.RUN_REAL_ACPX_E2E === "1";
 
-function findAcpxOrSkip(): string {
+function realReadAgent(): string {
+  return process.env.ACPX_REAL_READONLY_AGENT ?? process.env.ACPX_REAL_AGENT ?? "aiden";
+}
+
+function realEditAgent(): string {
+  return process.env.ACPX_REAL_EDIT_AGENT ?? process.env.ACPX_REAL_AGENT ?? "trae";
+}
+
+function findAcpxOrThrow(): string {
   try {
     return execFileSync("zsh", ["-lc", "command -v acpx"], { encoding: "utf8" }).trim();
   } catch {
@@ -15,9 +23,8 @@ function findAcpxOrSkip(): string {
 }
 
 describe.skipIf(!runReal)("real acpx agents e2e", () => {
-  it("runs a deterministic blocked contract through the CLI and real acpx", async () => {
-    const acpx = findAcpxOrSkip();
-    expect(acpx).toBeTruthy();
+  it("reaches a blocked terminal state through the CLI without invoking an agent", async () => {
+    const acpx = findAcpxOrThrow();
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-orchestrator-real-contract-"));
     await fs.writeFile(path.join(cwd, "sample.txt"), "hello\n", "utf8");
     const specPath = path.join(cwd, "workflow.spec.json");
@@ -29,7 +36,7 @@ describe.skipIf(!runReal)("real acpx agents e2e", () => {
         cwd: { type: "path", default: cwd }
       },
       roles: {
-        summarizer: { category: "summarization", agent: "aiden", mode: "readOnly" }
+        summarizer: { category: "summarization", agent: realReadAgent(), mode: "readOnly" }
       },
       limits: { maxAgents: 2, maxConcurrency: 1, maxFanoutItems: 1, maxFixRounds: 0, stageTimeoutMinutes: 1 },
       stages: [
@@ -53,21 +60,16 @@ describe.skipIf(!runReal)("real acpx agents e2e", () => {
       ]
     }, null, 2), "utf8");
 
-    const raw = execFileSync(tsxPath(), [cliPath(), "run", "--spec", specPath, "--yes", "--wait", "--json"], {
-      cwd,
-      encoding: "utf8",
-      timeout: 2 * 60 * 1000,
-      env: { ...process.env, PATH: `${path.dirname(acpx)}:${process.env.PATH ?? ""}` }
-    });
+    const raw = runCli(cwd, acpx, ["run", "--spec", specPath, "--yes", "--wait", "--json"], 2 * 60 * 1000);
     const result = JSON.parse(raw);
     expect(result.status).toBe("blocked");
     expect(result.runView.status).toBe("blocked");
     await expect(fs.stat(path.join(result.runDir, "outputs", "discover.json"))).resolves.toBeTruthy();
+    await expect(fs.stat(path.join(result.runDir, "attempts"))).resolves.toBeTruthy();
   }, 3 * 60 * 1000);
 
-  it("runs a small code task through real configured agents", async () => {
-    const acpx = findAcpxOrSkip();
-    expect(acpx).toBeTruthy();
+  it("runs a small code task through a configured real ACP agent", async () => {
+    const acpx = findAcpxOrThrow();
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-orchestrator-real-"));
     await fs.mkdir(path.join(cwd, "src"));
     await fs.writeFile(path.join(cwd, "src", "status.txt"), "initial\n", "utf8");
@@ -76,68 +78,61 @@ describe.skipIf(!runReal)("real acpx agents e2e", () => {
     await fs.writeFile(specPath, JSON.stringify({
       schemaVersion: "acpx-orchestrator.workflow/v1",
       name: "real-small-code-task",
-      root: "plan",
+      root: "implement",
       inputs: {
         task: { type: "string", default: "" },
         cwd: { type: "path", default: cwd }
       },
       roles: {
-        planner: { category: "planning", agent: "aiden", mode: "readOnly" },
-        implementer: { category: "implementation", agent: "trae", mode: "edit" },
-        validator: { category: "validation", agent: "aiden", mode: "readOnly" },
-        summarizer: { category: "summarization", agent: "aiden", mode: "readOnly" }
+        implementer: { category: "implementation", agent: realEditAgent(), mode: "edit" },
+        summarizer: { category: "summarization", agent: realReadAgent(), mode: "readOnly" }
       },
-      limits: { maxAgents: 8, maxConcurrency: 1, maxFanoutItems: 1, maxFixRounds: 0, stageTimeoutMinutes: 20 },
+      limits: { maxAgents: 4, maxConcurrency: 1, maxFanoutItems: 1, maxFixRounds: 0, stageTimeoutMinutes: 10 },
       stages: [
-        {
-          id: "plan",
-          kind: "agentTask",
-          role: "planner",
-          variables: [{ name: "task", source: "input.task" }],
-          prompt: "Plan the smallest safe change for this task in the current repo. Task: ${task}"
-        },
         {
           id: "implement",
           kind: "agentTask",
           role: "implementer",
-          dependsOn: ["plan"],
-          variables: [{ name: "task", source: "input.task" }, { name: "plan", source: "outputs.plan.summary" }],
-          prompt: "Implement only this small task. Task: ${task}\n\nPlan:\n${plan}"
-        },
-        {
-          id: "validate",
-          kind: "agentTask",
-          role: "validator",
-          dependsOn: ["implement"],
-          variables: [{ name: "task", source: "input.task" }, { name: "implementation", source: "outputs.implement.summary" }],
-          prompt: "Validate the implementation. Task: ${task}\n\nImplementation:\n${implementation}"
+          variables: [{ name: "task", source: "input.task" }],
+          prompt: [
+            "In the current working directory, complete this task:",
+            "${task}",
+            "",
+            "Do the file edit directly. Keep the final response brief and finish with the required workflow-output block."
+          ].join("\n")
         },
         {
           id: "summarize",
           kind: "summarize",
           role: "summarizer",
-          dependsOn: ["validate"],
-          variables: [{ name: "validation", source: "outputs.validate.summary" }],
-          prompt: "Summarize the run outcome.\n\nValidation:\n${validation}"
+          dependsOn: ["implement"],
+          variables: [{ name: "implementation", source: "outputs.implement.summary" }],
+          prompt: "Summarize the run outcome.\n\nImplementation:\n${implementation}"
         }
       ]
     }, null, 2), "utf8");
     await fs.writeFile(inputPath, JSON.stringify({
       cwd,
-      task: "Edit src/status.txt so it contains exactly the line: done"
+      task: "Edit src/status.txt so it contains exactly one line: done"
     }, null, 2), "utf8");
 
-    const raw = execFileSync(tsxPath(), [cliPath(), "run", "--spec", specPath, "--input-json", inputPath, "--yes", "--wait", "--json"], {
-      cwd,
-      encoding: "utf8",
-      timeout: 30 * 60 * 1000,
-      env: { ...process.env, PATH: `${path.dirname(acpx)}:${process.env.PATH ?? ""}` }
-    });
+    const raw = runCli(cwd, acpx, ["run", "--spec", specPath, "--input-json", inputPath, "--yes", "--wait", "--json"], 20 * 60 * 1000);
     const result = JSON.parse(raw);
-    expect(["completed", "blocked", "diagnosed_blocked"]).toContain(result.status);
-    expect(await fs.readFile(path.join(cwd, "src", "status.txt"), "utf8")).toContain("done");
-  }, 35 * 60 * 1000);
+    expect(result.status).toBe("completed");
+    expect((await fs.readFile(path.join(cwd, "src", "status.txt"), "utf8")).trim()).toBe("done");
+    await expect(fs.stat(path.join(result.runDir, "attempts", "implement", "attempt-1", "raw.txt"))).resolves.toBeTruthy();
+    await expect(fs.stat(path.join(result.runDir, "outputs", "summarize.json"))).resolves.toBeTruthy();
+  }, 25 * 60 * 1000);
 });
+
+function runCli(cwd: string, acpx: string, args: string[], timeout: number): string {
+  return execFileSync(tsxPath(), [cliPath(), ...args], {
+    cwd,
+    encoding: "utf8",
+    timeout,
+    env: { ...process.env, PATH: `${path.dirname(acpx)}:${process.env.PATH ?? ""}` }
+  });
+}
 
 function cliPath(): string {
   return path.resolve(__dirname, "..", "..", "..", "src", "cli.ts");

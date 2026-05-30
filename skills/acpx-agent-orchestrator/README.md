@@ -1,13 +1,11 @@
 # ACPX Agent Orchestrator
 
-Dynamic workflow orchestration for ACP agents through `acpx flow`.
+Runtime-driven workflow orchestration for ACP agents.
 
 The Main Agent creates a structured workflow spec. `scripts/acpx-orchestrator`
-validates, previews, compiles, saves, and runs it while maintaining a logical run
-index under `.acpx-orchestrator/runs/`.
-
-This rewrite intentionally removes the old fixed-template public surface. Use
-the new CLI and spec examples under `workflows/examples/`.
+validates, previews, compiles it to `execution-plan.json`, and runs a
+step-driven scheduler that talks directly to `acpx/runtime` with run-local
+persistent sessions.
 
 Core commands:
 
@@ -22,9 +20,9 @@ scripts/acpx-orchestrator report --run <logical-run-id> --html --output report.h
 scripts/acpx-orchestrator report serve --run <logical-run-id> --port 0
 ```
 
-The saved workflow interface is `workflow.spec.json`. Generated flow snapshots,
-resolved prompts, stage outputs, events, and acpx bundle references are run
-artifacts for audit and replay.
+Run directories contain `workflow.spec.json`, `execution-plan.json`, `input.json`,
+final `outputs/`, raw `attempts/`, run-local `acpx-state/`, `sessions/`, and
+`events.ndjson`. The orchestrator does not generate or execute ACPX flow files.
 
 Docs:
 
@@ -32,4 +30,4 @@ Docs:
 - [docs/cli.md](docs/cli.md)
 - [docs/html-report-design.md](docs/html-report-design.md)
 - [docs/error-codes.md](docs/error-codes.md)
-- [docs/dynamic-workflow-design.md](docs/dynamic-workflow-design.md)
+- [docs/runtime-orchestrator-refactor-implementation.md](docs/runtime-orchestrator-refactor-implementation.md)
