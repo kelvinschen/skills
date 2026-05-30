@@ -4,7 +4,7 @@ import type { Command } from "commander";
 import { issue, resultFromIssues, type OrchestratorIssue } from "../errors.js";
 import { resolveRunLocator } from "../run-index/locator.js";
 import { runDir } from "../run-index/paths.js";
-import { readRunIndex, writeRunIndex } from "../run-index/read-write.js";
+import { appendEvent, readRunIndex, writeRunIndex } from "../run-index/read-write.js";
 import { parseResumePolicyOptions, validateResumePolicy } from "../runtime/resume-policy.js";
 import { syncRun } from "../runtime/sync.js";
 import { WorkflowSpecSchema, type WorkflowSpec } from "../schema/workflow-spec.js";
@@ -32,7 +32,13 @@ export function registerResume(program: Command): void {
       const index = await readRunIndex(locator.cwd, locator.runId);
       const reset = resetRecoverableFailedStages(index);
       await writeRunIndex(locator.cwd, reset);
-      const finalIndex = options.wait ? await waitForResume(locator.cwd, locator.runId) : await syncRun(locator.cwd, locator.runId);
+      let finalIndex;
+      try {
+        finalIndex = options.wait ? await waitForResume(locator.cwd, locator.runId) : await syncRun(locator.cwd, locator.runId);
+      } catch (error) {
+        await markKnownRunFatal(locator.cwd, locator.runId, error);
+        throw error;
+      }
       const output = {
         ok: true,
         runId: locator.runId,
@@ -67,5 +73,26 @@ async function waitForResume(cwd: string, runId: string) {
     const index = await syncRun(cwd, runId);
     if (index.status !== "pending" && index.status !== "running") return index;
     await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+}
+
+async function markKnownRunFatal(cwd: string, runId: string, error: unknown): Promise<void> {
+  const message = error instanceof Error ? error.message : String(error);
+  try {
+    const index = await readRunIndex(cwd, runId);
+    await writeRunIndex(cwd, {
+      ...index,
+      status: "failed",
+      blockedReason: `RUNTIME_COMMAND_ERROR: ${message}`
+    });
+    await appendEvent(cwd, runId, {
+      type: "runtime_fatal",
+      code: "RUNTIME_COMMAND_ERROR",
+      status: "failed",
+      errorMessage: message,
+      errorMetadata: error instanceof Error && "metadata" in error ? (error as { metadata?: unknown }).metadata : undefined
+    });
+  } catch {
+    // Preserve the original CLI failure; best-effort terminal status only.
   }
 }

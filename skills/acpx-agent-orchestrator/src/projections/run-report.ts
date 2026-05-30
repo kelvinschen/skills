@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { runDir } from "../run-index/paths.js";
-import type { AttemptIndexEntry, RunIndex } from "../run-index/read-write.js";
+import { RuntimeErrorCodes, type AttemptIndexEntry, type RunIndex } from "../run-index/read-write.js";
 import type { Stage, WorkflowSpec } from "../schema/workflow-spec.js";
 import { runViewFromIndex, type RunView, type RunViewStatus } from "./run-view.js";
 
@@ -132,6 +132,7 @@ export type ReportStageDetail = {
     totalItems?: number;
     completedItems?: number;
     blockedItems?: number;
+    failedItems?: number;
     displayedItems: number;
     allowPartial?: boolean;
     items: Array<{
@@ -140,6 +141,9 @@ export type ReportStageDetail = {
       summary?: string;
       outputPath?: string;
       output?: ReportPreview;
+      blockedReason?: string;
+      errorCode?: string;
+      errorMessage?: string;
     }>;
   };
   decision?: {
@@ -193,6 +197,9 @@ export type ReportArtifact = {
 export type ReportDiagnostic = {
   id: string;
   path: string;
+  code?: string;
+  stageId?: string;
+  itemId?: string;
   status?: string;
   summary?: string;
   preview: ReportPreview;
@@ -217,7 +224,7 @@ export async function buildRunReportView(
   const stages = await buildStageDetails(dir, spec, index, events, attempts, limits);
   const artifacts = await collectArtifacts(stages);
   const graph = buildGraph(spec, stages);
-  const diagnostics = await readDiagnostics(dir, limits);
+  const diagnostics = [...await readDiagnostics(dir, limits), ...await buildRuntimeDiagnostics(dir, index, events, limits)];
 
   return {
     version: REPORT_VIEW_VERSION,
@@ -407,13 +414,17 @@ async function buildFanoutDetail(dir: string, state: RunIndex["stages"][string] 
       status: item.status,
       summary: stringField(output, "summary"),
       outputPath,
-      output: output === undefined || !outputPath ? undefined : makePreview(JSON.stringify(output, null, 2), limits.outputPreviewChars, outputPath)
+      output: output === undefined || !outputPath ? undefined : makePreview(JSON.stringify(output, null, 2), limits.outputPreviewChars, outputPath),
+      blockedReason: item.blockedReason ?? stringField(output, "blockedReason"),
+      errorCode: item.errorCode,
+      errorMessage: item.errorMessage
     };
   }));
   return {
     totalItems: state.fanout.totalItems,
     completedItems: state.fanout.completedItems,
     blockedItems: state.fanout.blockedItems,
+    failedItems: state.fanout.failedItems,
     displayedItems: items.length,
     allowPartial: state.fanout.allowPartial,
     items
@@ -467,6 +478,96 @@ async function readDiagnostics(dir: string, limits: typeof DEFAULT_LIMITS): Prom
     }));
   } catch {
     return [];
+  }
+}
+
+async function buildRuntimeDiagnostics(dir: string, index: RunIndex, events: ReportEvent[], limits: typeof DEFAULT_LIMITS): Promise<ReportDiagnostic[]> {
+  const diagnostics: ReportDiagnostic[] = [];
+  for (const stage of Object.values(index.stages)) {
+    if (!stage.fanout) continue;
+    for (const item of stage.fanout.items) {
+      const outputPath = item.outputPath ? path.join(dir, item.outputPath) : path.join(dir, "outputs", stage.stageId, `${safeFileName(item.id)}.json`);
+      const outputExists = await fileExists(outputPath);
+      if (item.status === "running" && outputExists) {
+        diagnostics.push(runtimeDiagnostic({
+          code: RuntimeErrorCodes.RUN_INDEX_OUTPUT_MISMATCH,
+          stageId: stage.stageId,
+          itemId: item.id,
+          path: outputPath,
+          summary: `Fanout item ${stage.stageId}/${item.id} is running in run.json but has an output file.`,
+          limits
+        }));
+      }
+      if (item.errorCode) {
+        diagnostics.push(runtimeDiagnostic({
+          code: item.errorCode,
+          stageId: stage.stageId,
+          itemId: item.id,
+          path: outputPath,
+          summary: item.errorMessage ?? item.blockedReason ?? item.errorCode,
+          limits
+        }));
+      }
+    }
+  }
+
+  for (const event of events) {
+    const text = event.preview.text;
+    const rawCode = typeof event.raw.code === "string" ? event.raw.code : undefined;
+    const rawErrorCode = typeof event.raw.errorCode === "string" ? event.raw.errorCode : undefined;
+    const lockContention = text.includes("Lock file is already being held")
+      || rawCode === RuntimeErrorCodes.RUN_INDEX_LOCK_TIMEOUT
+      || rawCode === RuntimeErrorCodes.EVENT_APPEND_LOCK_TIMEOUT
+      || rawErrorCode === RuntimeErrorCodes.RUN_INDEX_LOCK_TIMEOUT
+      || rawErrorCode === RuntimeErrorCodes.EVENT_APPEND_LOCK_TIMEOUT;
+    if (!lockContention) continue;
+    diagnostics.push(runtimeDiagnostic({
+      code: rawCode ?? rawErrorCode ?? "LOCK_CONTENTION",
+      stageId: typeof event.raw.stageId === "string" ? event.raw.stageId : undefined,
+      itemId: typeof event.raw.itemId === "string" ? event.raw.itemId : undefined,
+      path: path.join(dir, "events.ndjson"),
+      summary: "Runtime lock contention was observed in events.",
+      limits,
+      raw: event.raw
+    }));
+  }
+  return diagnostics;
+}
+
+function runtimeDiagnostic(input: {
+  code: string;
+  path: string;
+  summary: string;
+  limits: typeof DEFAULT_LIMITS;
+  stageId?: string;
+  itemId?: string;
+  raw?: Record<string, unknown>;
+}): ReportDiagnostic {
+  const body = input.raw ?? {
+    code: input.code,
+    stageId: input.stageId,
+    itemId: input.itemId,
+    summary: input.summary,
+    path: input.path
+  };
+  return {
+    id: `runtime-${input.code}-${input.stageId ?? "run"}-${input.itemId ?? "all"}`,
+    path: input.path,
+    code: input.code,
+    stageId: input.stageId,
+    itemId: input.itemId,
+    status: "blocked",
+    summary: input.summary,
+    preview: makePreview(JSON.stringify(body, null, 2), input.limits.outputPreviewChars, input.path)
+  };
+}
+
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -610,4 +711,8 @@ function safeJson(value: string): unknown {
   } catch {
     return {};
   }
+}
+
+function safeFileName(value: string): string {
+  return String(value || "item").replace(/[^A-Za-z0-9_.-]/g, "_");
 }

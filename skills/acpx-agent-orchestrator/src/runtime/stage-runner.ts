@@ -12,7 +12,7 @@ import { applyTransforms } from "../transformers/builtins.js";
 import { renderPrompt } from "../variables/interpolate.js";
 import { appendEvent, type AttemptIndexEntry } from "../run-index/read-write.js";
 import { attemptDir, attemptId, previewText, safeFileName, writeAttemptFile } from "./attempts.js";
-import type { OrchestratorAgentRuntime } from "./agent-runtime.js";
+import type { AgentTurnResult, OrchestratorAgentRuntime } from "./agent-runtime.js";
 import { formatRepairPrompt, isRepairableOutputFailure, repairFailedEnvelope } from "./repair.js";
 import { parseWorkflowOutput } from "./output-parser.js";
 import { recordSessionBinding } from "./session-bindings.js";
@@ -46,6 +46,8 @@ export type AgentWorkResult = {
   repairCalls: number;
   blockedReason?: string;
   error?: string;
+  errorCode?: string;
+  errorMessage?: string;
 };
 
 export async function runProgramStage(input: {
@@ -303,18 +305,32 @@ async function executeAttemptWithRepair(input: {
     status: "running" as const,
     path: path.relative(input.runDir, dir),
     startedAt,
-    promptPreview: previewText(input.prompt)
-  };
-  await appendEvent(input.cwd, input.runId, { type: "attempt_started", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id });
-  const turn = await input.runtime.runTurn({
+    promptPreview: previewText(input.prompt),
     sessionKey: input.unit.sessionKey,
-    roleName: input.unit.roleName,
-    role: input.unit.role,
-    cwd: input.unit.cwd,
-    prompt: input.prompt,
     requestId: id,
-    timeoutMs: input.unit.timeoutMs
-  }, async (event) => appendTurnEvent(input.cwd, input.runId, input.unit.stageId, input.unit.itemId, id, event));
+    agent: input.unit.role.agent,
+    roleMode: input.unit.role.mode,
+    runtimeDisposeInvoked: false
+  };
+  await appendEvent(input.cwd, input.runId, { type: "attempt_created", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id });
+  await appendEvent(input.cwd, input.runId, { type: "attempt_started", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id });
+  await appendEvent(input.cwd, input.runId, { type: "turn_started", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, sessionKey: input.unit.sessionKey, agent: input.unit.role.agent, roleMode: input.unit.role.mode });
+  let turn: AgentTurnResult;
+  try {
+    turn = await input.runtime.runTurn({
+      sessionKey: input.unit.sessionKey,
+      roleName: input.unit.roleName,
+      role: input.unit.role,
+      cwd: input.unit.cwd,
+      prompt: input.prompt,
+      requestId: id,
+      timeoutMs: input.unit.timeoutMs
+    }, async (event) => appendTurnEvent(input.cwd, input.runId, input.unit.stageId, input.unit.itemId, id, event));
+    await appendEvent(input.cwd, input.runId, { type: "turn_finished", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, status: turn.status, stopReason: turn.stopReason, errorCode: turn.errorDetailCode ?? turn.errorCode });
+  } catch (error) {
+    await appendEvent(input.cwd, input.runId, { type: "turn_finished", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, status: "failed", error: errorMessage(error) });
+    throw error;
+  }
   await recordSessionBinding(input.runDir, {
     sessionKey: input.unit.sessionKey,
     roleName: input.unit.roleName,
@@ -325,23 +341,32 @@ async function executeAttemptWithRepair(input: {
   await writeAttemptFile(dir, "raw.txt", turn.rawText);
 
   if (turn.status !== "completed") {
+    const diagnostics = runtimeDiagnostics(input, id, turn);
     const output = {
       status: "blocked",
       summary: turn.error ?? `Agent turn ${turn.status}.`,
       artifacts: [],
       nextFocus: "diagnose",
-      blockedReason: turn.status === "cancelled" ? "AGENT_TURN_CANCELLED" : "AGENT_TURN_FAILED"
+      blockedReason: turn.status === "cancelled" ? "AGENT_TURN_CANCELLED" : "AGENT_TURN_FAILED",
+      runtimeDiagnostics: diagnostics
     };
     await writeAttemptFile(dir, "output.json", output);
-    await fs.mkdir(path.dirname(input.unit.outputPath), { recursive: true });
-    await fs.writeFile(input.unit.outputPath, `${JSON.stringify(output, null, 2)}\n`, "utf8");
+    await writeUnitOutput(input, output, id);
     return {
       stageId: input.unit.stageId,
       itemId: input.unit.itemId,
       status: "blocked",
       output,
       outputPath: input.unit.outputPath,
-      attempts: [{ ...attemptEntryBase, status: "blocked", endedAt: new Date().toISOString(), blockedReason: String(output.blockedReason), rawPreview: previewText(turn.rawText) }],
+      attempts: [{
+        ...attemptEntryBase,
+        status: "blocked",
+        endedAt: new Date().toISOString(),
+        blockedReason: String(output.blockedReason),
+        rawPreview: previewText(turn.rawText),
+        stopReason: turn.stopReason,
+        runtimeErrorCode: turn.errorDetailCode ?? turn.errorCode ?? String(output.blockedReason)
+      }],
       agentCalls: 1,
       repairCalls: 0,
       blockedReason: String(output.blockedReason)
@@ -356,8 +381,7 @@ async function executeAttemptWithRepair(input: {
   if (parsed.ok) {
     const output = withOutputParseMetadata(parsed.value, parsed.outputParse);
     await writeAttemptFile(dir, "output.json", output);
-    await fs.mkdir(path.dirname(input.unit.outputPath), { recursive: true });
-    await fs.writeFile(input.unit.outputPath, `${JSON.stringify(output, null, 2)}\n`, "utf8");
+    await writeUnitOutput(input, output, id);
     return {
       stageId: input.unit.stageId,
       itemId: input.unit.itemId,
@@ -381,8 +405,7 @@ async function executeAttemptWithRepair(input: {
   };
   await writeAttemptFile(dir, "output.json", blocked);
   if (!isRepairableOutputFailure(parsed.errorCode)) {
-    await fs.mkdir(path.dirname(input.unit.outputPath), { recursive: true });
-    await fs.writeFile(input.unit.outputPath, `${JSON.stringify(blocked, null, 2)}\n`, "utf8");
+    await writeUnitOutput(input, blocked, id);
     return {
       stageId: input.unit.stageId,
       itemId: input.unit.itemId,
@@ -443,19 +466,33 @@ async function executeRepairAttempt(input: {
     status: "running" as const,
     path: path.relative(input.runDir, dir),
     startedAt: new Date().toISOString(),
-    promptPreview: previewText(input.prompt)
-  };
-  await appendEvent(input.cwd, input.runId, { type: "repair_started", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, originalReason: input.originalReason });
-  const turn = await input.runtime.runTurn({
+    promptPreview: previewText(input.prompt),
     sessionKey: input.unit.sessionKey,
-    roleName: input.unit.roleName,
-    role: input.unit.role,
-    cwd: input.unit.cwd,
-    prompt: input.prompt,
     requestId: id,
-    timeoutMs: input.unit.timeoutMs,
-    repair: true
-  }, async (event) => appendTurnEvent(input.cwd, input.runId, input.unit.stageId, input.unit.itemId, id, event));
+    agent: input.unit.role.agent,
+    roleMode: input.unit.role.mode,
+    runtimeDisposeInvoked: false
+  };
+  await appendEvent(input.cwd, input.runId, { type: "attempt_created", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, repair: true });
+  await appendEvent(input.cwd, input.runId, { type: "repair_started", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, originalReason: input.originalReason });
+  await appendEvent(input.cwd, input.runId, { type: "turn_started", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, sessionKey: input.unit.sessionKey, agent: input.unit.role.agent, roleMode: input.unit.role.mode, repair: true });
+  let turn: AgentTurnResult;
+  try {
+    turn = await input.runtime.runTurn({
+      sessionKey: input.unit.sessionKey,
+      roleName: input.unit.roleName,
+      role: input.unit.role,
+      cwd: input.unit.cwd,
+      prompt: input.prompt,
+      requestId: id,
+      timeoutMs: input.unit.timeoutMs,
+      repair: true
+    }, async (event) => appendTurnEvent(input.cwd, input.runId, input.unit.stageId, input.unit.itemId, id, event));
+    await appendEvent(input.cwd, input.runId, { type: "turn_finished", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, status: turn.status, stopReason: turn.stopReason, errorCode: turn.errorDetailCode ?? turn.errorCode, repair: true });
+  } catch (error) {
+    await appendEvent(input.cwd, input.runId, { type: "turn_finished", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, status: "failed", error: errorMessage(error), repair: true });
+    throw error;
+  }
   await writeAttemptFile(dir, "raw.txt", turn.rawText);
   const parsed = turn.status === "completed"
     ? parseWorkflowOutput(turn.rawText, input.contractName, {
@@ -470,8 +507,7 @@ async function executeRepairAttempt(input: {
       repairedFromStageAttempt: input.originalAttempt.id
     });
     await writeAttemptFile(dir, "output.json", output);
-    await fs.mkdir(path.dirname(input.unit.outputPath), { recursive: true });
-    await fs.writeFile(input.unit.outputPath, `${JSON.stringify(output, null, 2)}\n`, "utf8");
+    await writeUnitOutput(input, output, id);
     return {
       stageId: input.unit.stageId,
       itemId: input.unit.itemId,
@@ -490,8 +526,7 @@ async function executeRepairAttempt(input: {
     repairDiagnostics: parsed?.diagnostics ?? { errorCode: "AGENT_TURN_FAILED", summary: turn.error ?? turn.status }
   });
   await writeAttemptFile(dir, "output.json", output);
-  await fs.mkdir(path.dirname(input.unit.outputPath), { recursive: true });
-  await fs.writeFile(input.unit.outputPath, `${JSON.stringify(output, null, 2)}\n`, "utf8");
+  await writeUnitOutput(input, output, id);
   return {
     stageId: input.unit.stageId,
     itemId: input.unit.itemId,
@@ -525,6 +560,39 @@ function withOutputParseMetadata(output: Record<string, unknown>, outputParse: R
   };
 }
 
+async function writeUnitOutput(input: {
+  cwd: string;
+  runDir: string;
+  runId: string;
+  unit: AgentWorkUnit;
+}, output: Record<string, unknown>, attemptId?: string): Promise<void> {
+  await fs.mkdir(path.dirname(input.unit.outputPath), { recursive: true });
+  await fs.writeFile(input.unit.outputPath, `${JSON.stringify(output, null, 2)}\n`, "utf8");
+  await appendEvent(input.cwd, input.runId, {
+    type: "output_written",
+    stageId: input.unit.stageId,
+    itemId: input.unit.itemId,
+    attemptId,
+    outputPath: path.relative(input.runDir, input.unit.outputPath),
+    status: output.status
+  });
+}
+
+function runtimeDiagnostics(input: {
+  unit: AgentWorkUnit;
+}, requestId: string, turn: AgentTurnResult): Record<string, unknown> {
+  return {
+    stopReason: turn.stopReason,
+    requestId,
+    sessionKey: input.unit.sessionKey,
+    agent: input.unit.role.agent,
+    roleMode: input.unit.role.mode,
+    runtimeDisposeInvoked: false,
+    errorCode: turn.errorDetailCode ?? turn.errorCode,
+    rawTextPreview: previewText(turn.rawText)
+  };
+}
+
 async function appendTurnEvent(cwd: string, runId: string, stageId: string, itemId: string | undefined, attemptId: string, event: AcpRuntimeEvent): Promise<void> {
   await appendEvent(cwd, runId, {
     type: "agent_event",
@@ -533,6 +601,10 @@ async function appendTurnEvent(cwd: string, runId: string, stageId: string, item
     attemptId,
     event
   });
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 async function writePromptAudit(runDir: string, id: string, prompt: string): Promise<void> {

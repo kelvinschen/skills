@@ -20,6 +20,9 @@ export type AgentTurnResult = {
   events: AcpRuntimeEvent[];
   status: "completed" | "cancelled" | "failed";
   error?: string;
+  errorCode?: string;
+  errorDetailCode?: string;
+  stopReason?: string;
 };
 
 export interface OrchestratorAgentRuntime {
@@ -78,14 +81,17 @@ class AcpxRuntimeAdapter implements OrchestratorAgentRuntime {
         rawText,
         events,
         status: "failed",
-        error: result.error.message
+        error: result.error.message,
+        errorCode: result.error.code,
+        errorDetailCode: result.error.detailCode
       };
     }
     return {
       handle,
       rawText,
       events,
-      status: result.status
+      status: result.status,
+      stopReason: result.stopReason
     };
   }
 

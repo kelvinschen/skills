@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import { previewRunView, runViewFromIndex } from "../projections/run-view.js";
+import { appendEvent, readRunIndex, writeRunIndex } from "../run-index/read-write.js";
 import { prepareRun, startPreparedRun } from "../runtime/run-workflow.js";
 import { syncRun } from "../runtime/sync.js";
 import { resultFromIssues } from "../errors.js";
@@ -50,9 +51,15 @@ export function registerRun(program: Command): void {
         input,
         sourcePath: specPath
       });
-      let index = options.prepareOnly ? prepared.index : await startPreparedRun(process.cwd(), prepared);
-      if (!options.prepareOnly && options.wait) {
-        index = await waitForLogicalRun(process.cwd(), prepared.logicalRunId);
+      let index;
+      try {
+        index = options.prepareOnly ? prepared.index : await startPreparedRun(process.cwd(), prepared);
+        if (!options.prepareOnly && options.wait) {
+          index = await waitForLogicalRun(process.cwd(), prepared.logicalRunId);
+        }
+      } catch (error) {
+        await markKnownRunFatal(process.cwd(), prepared.logicalRunId, error);
+        throw error;
       }
       const runView = await runViewFromIndex(process.cwd(), spec, index);
       const output = {
@@ -77,5 +84,26 @@ async function waitForLogicalRun(cwd: string, runId: string) {
     const index = await syncRun(cwd, runId);
     if (index.status !== "pending" && index.status !== "running") return index;
     await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+}
+
+async function markKnownRunFatal(cwd: string, runId: string, error: unknown): Promise<void> {
+  const message = error instanceof Error ? error.message : String(error);
+  try {
+    const index = await readRunIndex(cwd, runId);
+    await writeRunIndex(cwd, {
+      ...index,
+      status: "failed",
+      blockedReason: `RUNTIME_COMMAND_ERROR: ${message}`
+    });
+    await appendEvent(cwd, runId, {
+      type: "runtime_fatal",
+      code: "RUNTIME_COMMAND_ERROR",
+      status: "failed",
+      errorMessage: message,
+      errorMetadata: error instanceof Error && "metadata" in error ? (error as { metadata?: unknown }).metadata : undefined
+    });
+  } catch {
+    // Preserve the original CLI failure; best-effort terminal status only.
   }
 }

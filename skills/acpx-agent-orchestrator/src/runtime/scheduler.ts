@@ -3,11 +3,13 @@ import path from "node:path";
 import type { ExecutionPlan, ExecutionPlanStage } from "../compiler/execution-plan.js";
 import { stageRoleName } from "../compiler/compile-execution-plan.js";
 import { runDir as resolveRunDir } from "../run-index/paths.js";
-import { appendEvent, readRunIndex, writeRunIndex, type RunIndex, type StageIndexEntry, type StageStatus } from "../run-index/read-write.js";
+import { appendEvent, readRunIndex, RuntimeErrorCodes, writeRunIndex, type AttemptIndexEntry, type RunIndex, type StageIndexEntry, type StageStatus } from "../run-index/read-write.js";
 import { WorkflowSpecSchema, type Stage, type WorkflowSpec } from "../schema/workflow-spec.js";
 import { createOrchestratorAgentRuntime } from "./agent-runtime.js";
-import { safeFileName, upsertAttemptIndex } from "./attempts.js";
+import { attemptDir, attemptId, safeFileName, upsertAttemptIndex, writeAttemptFile } from "./attempts.js";
 import { resolveSource, runAgentWork, runProgramStage, stableItemId, type AgentWorkResult, type AgentWorkUnit } from "./stage-runner.js";
+
+const STALE_FANOUT_ITEM_RECOVERY_MS = 30_000;
 
 export type SyncRunOptions = {
   startPending?: boolean;
@@ -27,6 +29,9 @@ export async function syncRun(cwd: string, logicalRunId: string, options: SyncRu
   const snapshot = await loadSnapshot(cwd, logicalRunId);
   let index = ensureStageEntries(snapshot.index, snapshot.spec);
   let changed = index !== snapshot.index;
+  const reconciled = await reconcileFanoutRuntimeState({ ...snapshot, index });
+  index = reconciled.index;
+  changed ||= reconciled.changed;
   const deterministic = await advanceDeterministicStages({ ...snapshot, index });
   index = deterministic.index;
   changed ||= deterministic.changed;
@@ -52,7 +57,7 @@ export async function syncRun(cwd: string, logicalRunId: string, options: SyncRu
     return index;
   }
 
-  index = markUnitsRunning(index, selected);
+  index = markUnitsRunning(index, selected, snapshot.runDir);
   index = { ...index, status: "running" };
   await writeRunIndex(cwd, index);
   await appendEvent(cwd, logicalRunId, { type: "scheduler_batch_started", count: selected.length, stages: selected.map((unit) => unit.itemId ? `${unit.stageId}/${unit.itemId}` : unit.stageId) });
@@ -61,7 +66,7 @@ export async function syncRun(cwd: string, logicalRunId: string, options: SyncRu
   const batchOutputs = await readAuthorOutputs(snapshot.runDir);
   let results: AgentWorkResult[];
   try {
-    results = await Promise.all(selected.map((unit) => runAgentWork({
+    const settled = await Promise.allSettled(selected.map((unit) => runAgentWork({
       cwd,
       runDir: snapshot.runDir,
       runId: logicalRunId,
@@ -70,7 +75,26 @@ export async function syncRun(cwd: string, logicalRunId: string, options: SyncRu
       plan: snapshot.plan,
       unit,
       runtime
+    }).catch(async (error: unknown) => {
+      if (unit.type !== "fanoutItem") throw error;
+      await appendEvent(cwd, logicalRunId, {
+        type: "fanout_item_runtime_error",
+        stageId: unit.stageId,
+        itemId: unit.itemId,
+        errorCode: RuntimeErrorCodes.FANOUT_ITEM_RUNTIME_ERROR,
+        errorMessage: errorMessage(error)
+      });
+      return fanoutItemRuntimeErrorResult({
+        cwd,
+        runDir: snapshot.runDir,
+        runId: logicalRunId,
+        unit,
+        error
+      });
     })));
+    const fatal = settled.find((result): result is PromiseRejectedResult => result.status === "rejected");
+    if (fatal) throw fatal.reason;
+    results = settled.map((result) => (result as PromiseFulfilledResult<AgentWorkResult>).value);
   } finally {
     await runtime.dispose?.();
   }
@@ -80,6 +104,7 @@ export async function syncRun(cwd: string, logicalRunId: string, options: SyncRu
   merged = { ...merged, stages: index.stages, attempts: index.attempts, agentUsage: index.agentUsage };
   for (const result of results) {
     merged = mergeAgentResult(merged, result, snapshot.runDir);
+    await appendEvent(cwd, logicalRunId, { type: "agent_result_merged", stageId: result.stageId, itemId: result.itemId, status: result.status, errorCode: result.errorCode, outputPath: result.outputPath ? path.relative(snapshot.runDir, result.outputPath) : undefined });
   }
   const afterFanout = await completeReadyFanoutAggregates({ ...snapshot, index: merged });
   merged = afterFanout.index;
@@ -108,6 +133,105 @@ async function loadSnapshot(cwd: string, runId: string): Promise<RuntimeSnapshot
     input: JSON.parse(inputRaw) as Record<string, unknown>,
     index
   };
+}
+
+async function reconcileFanoutRuntimeState(snapshot: RuntimeSnapshot): Promise<{ index: RunIndex; changed: boolean }> {
+  let index = snapshot.index;
+  let changed = false;
+  for (const stage of snapshot.spec.stages.filter((candidate): candidate is Extract<Stage, { kind: "fanout" }> => candidate.kind === "fanout")) {
+    const state = index.stages[stage.id];
+    if (!state?.fanout || state.status === "completed" || state.status === "blocked" || state.status === "failed") continue;
+    let stageChanged = false;
+    const items = [...state.fanout.items];
+    const attempts: AttemptIndexEntry[] = [];
+    for (const [itemPosition, item] of items.entries()) {
+      const outputPath = fanoutItemOutputPath(snapshot.runDir, stage.id, item);
+      const output = await readJsonIfExists(outputPath);
+      if (output) {
+        const status = statusFromItemOutput(output);
+        const relativeOutputPath = path.relative(snapshot.runDir, outputPath);
+        if (item.status !== status || item.outputPath !== relativeOutputPath || item.completedAt === undefined) {
+          if (item.status === "running") {
+            await appendEvent(snapshot.cwd, snapshot.runId, {
+              type: "run_index_output_mismatch",
+              code: RuntimeErrorCodes.RUN_INDEX_OUTPUT_MISMATCH,
+              stageId: stage.id,
+              itemId: item.id,
+              outputPath: relativeOutputPath,
+              previousStatus: item.status,
+              recoveredStatus: status
+            });
+          }
+          items[itemPosition] = {
+            ...item,
+            status,
+            outputPath: relativeOutputPath,
+            blockedReason: stringField(output, "blockedReason") ?? item.blockedReason,
+            completedAt: item.completedAt ?? new Date().toISOString(),
+            errorCode: stringField(output, "blockedReason") ?? item.errorCode
+          };
+          stageChanged = true;
+        }
+        continue;
+      }
+
+      if (item.status === "running" && isStaleFanoutItem(item.startedAt ?? state.startedAt)) {
+        const code = item.attemptId ? RuntimeErrorCodes.FANOUT_ITEM_RUNTIME_ERROR : RuntimeErrorCodes.FANOUT_ITEM_UNSTARTED_TIMEOUT;
+        const message = item.attemptId
+          ? "Fanout item attempt did not produce a terminal output before scheduler recovery."
+          : "Fanout item was selected but no attempt was started before scheduler recovery.";
+        const result = await writeRecoveredFanoutItemFailure({
+          cwd: snapshot.cwd,
+          runDir: snapshot.runDir,
+          runId: snapshot.runId,
+          stageId: stage.id,
+          itemId: item.id,
+          attemptId: item.attemptId ?? attemptId({ stageId: stage.id, itemId: item.id, kind: "attempt", ordinal: 1 }),
+          startedAt: item.startedAt ?? state.startedAt,
+          code,
+          message,
+          outputPath
+        });
+        items[itemPosition] = {
+          ...item,
+          status: "blocked",
+          outputPath: path.relative(snapshot.runDir, result.outputPath),
+          blockedReason: code,
+          completedAt: new Date().toISOString(),
+          errorCode: code,
+          errorMessage: message,
+          attemptId: result.attempt.id
+        };
+        attempts.push(result.attempt);
+        stageChanged = true;
+        await appendEvent(snapshot.cwd, snapshot.runId, {
+          type: "fanout_item_recovered",
+          stageId: stage.id,
+          itemId: item.id,
+          attemptId: result.attempt.id,
+          errorCode: code,
+          outputPath: path.relative(snapshot.runDir, result.outputPath)
+        });
+      }
+    }
+    if (!stageChanged) continue;
+    const completedItems = items.filter((item) => item.status === "completed").length;
+    const blockedItems = items.filter((item) => item.status === "blocked").length;
+    const failedItems = items.filter((item) => item.status === "failed").length;
+    index = updateStage(index, stage.id, {
+      ...state,
+      fanout: {
+        ...state.fanout,
+        items,
+        completedItems,
+        blockedItems,
+        failedItems
+      }
+    });
+    for (const attempt of attempts) index = upsertAttemptIndex(index, attempt);
+    changed = true;
+  }
+  return { index, changed };
 }
 
 function ensureStageEntries(index: RunIndex, spec: WorkflowSpec): RunIndex {
@@ -297,23 +421,46 @@ function selectRunnableUnits(index: RunIndex, plan: ExecutionPlan, units: AgentW
   return selected;
 }
 
-function markUnitsRunning(index: RunIndex, units: AgentWorkUnit[]): RunIndex {
+function markUnitsRunning(index: RunIndex, units: AgentWorkUnit[], runDir: string): RunIndex {
   let next = index;
   for (const unit of units) {
     const stage = next.stages[unit.stageId];
     if (!stage) continue;
+    const startedAt = new Date().toISOString();
     if (unit.itemId && stage.fanout) {
-      const items = stage.fanout.items.map((item) => item.id === unit.itemId ? { ...item, status: "running" as StageStatus } : item);
+      const selectedAttemptId = attemptId({ stageId: unit.stageId, itemId: unit.itemId, kind: "attempt", ordinal: 1 });
+      const items = stage.fanout.items.map((item) => item.id === unit.itemId ? {
+        ...item,
+        status: "running" as StageStatus,
+        attemptId: item.attemptId ?? selectedAttemptId,
+        startedAt: item.startedAt ?? startedAt,
+        errorCode: undefined,
+        errorMessage: undefined
+      } : item);
       next = updateStage(next, unit.stageId, {
         ...stage,
         status: "running",
-        startedAt: stage.startedAt ?? new Date().toISOString(),
+        startedAt: stage.startedAt ?? startedAt,
         fanout: { ...stage.fanout, items }
+      });
+      next = upsertAttemptIndex(next, {
+        id: selectedAttemptId,
+        stageId: unit.stageId,
+        itemId: unit.itemId,
+        kind: "attempt",
+        status: "running",
+        path: path.relative(runDir, attemptDir(runDir, { stageId: unit.stageId, itemId: unit.itemId, kind: "attempt", ordinal: 1 })),
+        startedAt,
+        sessionKey: unit.sessionKey,
+        requestId: selectedAttemptId,
+        agent: unit.role.agent,
+        roleMode: unit.role.mode,
+        runtimeDisposeInvoked: false
       });
     } else {
       next = updateStage(next, unit.stageId, {
         status: "running",
-        startedAt: stage.startedAt ?? new Date().toISOString()
+        startedAt: stage.startedAt ?? startedAt
       });
     }
   }
@@ -332,11 +479,15 @@ function mergeAgentResult(index: RunIndex, result: AgentWorkResult, runDir: stri
         ...item,
         status: result.status === "failed" ? "failed" as StageStatus : result.status,
         outputPath: result.outputPath ? path.relative(runDir, result.outputPath) : item.outputPath,
-        blockedReason: result.blockedReason
+        blockedReason: result.blockedReason,
+        completedAt: new Date().toISOString(),
+        errorCode: result.errorCode ?? result.blockedReason ?? item.errorCode,
+        errorMessage: result.errorMessage ?? result.error ?? item.errorMessage
       };
     });
     const completedItems = items.filter((item) => item.status === "completed").length;
     const blockedItems = items.filter((item) => item.status === "blocked").length;
+    const failedItems = items.filter((item) => item.status === "failed").length;
     next = updateStage(next, result.stageId, {
       ...stage,
       status: items.some((item) => item.status === "pending" || item.status === "ready" || item.status === "running") ? "running" : stage.status,
@@ -344,7 +495,8 @@ function mergeAgentResult(index: RunIndex, result: AgentWorkResult, runDir: stri
         ...stage.fanout,
         items,
         completedItems,
-        blockedItems
+        blockedItems,
+        failedItems
       }
     });
   } else {
@@ -394,6 +546,7 @@ async function completeReadyFanoutAggregates(snapshot: RuntimeSnapshot): Promise
     }));
     const blockedItems = outputs.filter((output) => output.status === "blocked");
     const completed = outputs.filter((output) => output.status === "completed").length;
+    const failed = items.filter((item) => item.status === "failed").length;
     const ratio = outputs.length === 0 ? 1 : completed / outputs.length;
     const policy = stage.fanoutPolicy;
     const partialAllowed = (policy?.allowPartial ?? false)
@@ -421,13 +574,192 @@ async function completeReadyFanoutAggregates(snapshot: RuntimeSnapshot): Promise
       fanout: {
         ...state.fanout,
         completedItems: completed,
-        blockedItems: blockedItems.length
+        blockedItems: blockedItems.length,
+        failedItems: failed
       }
     });
     await appendEvent(snapshot.cwd, snapshot.runId, { type: "fanout_aggregated", stageId: stage.id, status, itemCount: outputs.length, blockedCount: blockedItems.length });
     changed = true;
   }
   return { index, changed };
+}
+
+async function fanoutItemRuntimeErrorResult(input: {
+  cwd: string;
+  runDir: string;
+  runId: string;
+  unit: AgentWorkUnit;
+  error: unknown;
+}): Promise<AgentWorkResult> {
+  const itemId = input.unit.itemId ?? "item";
+  const id = attemptId({ stageId: input.unit.stageId, itemId, kind: "attempt", ordinal: 1 });
+  const dir = attemptDir(input.runDir, { stageId: input.unit.stageId, itemId, kind: "attempt", ordinal: 1 });
+  const message = errorMessage(input.error);
+  const output = runtimeBlockedOutput({
+    code: RuntimeErrorCodes.FANOUT_ITEM_RUNTIME_ERROR,
+    message,
+    requestId: id,
+    sessionKey: input.unit.sessionKey,
+    agent: input.unit.role.agent,
+    roleMode: input.unit.role.mode
+  });
+  const now = new Date().toISOString();
+  await writeAttemptFile(dir, "output.json", output);
+  await fs.mkdir(path.dirname(input.unit.outputPath), { recursive: true });
+  await fs.writeFile(input.unit.outputPath, `${JSON.stringify(output, null, 2)}\n`, "utf8");
+  await appendEvent(input.cwd, input.runId, {
+    type: "output_written",
+    stageId: input.unit.stageId,
+    itemId,
+    attemptId: id,
+    outputPath: path.relative(input.runDir, input.unit.outputPath),
+    status: output.status,
+    errorCode: RuntimeErrorCodes.FANOUT_ITEM_RUNTIME_ERROR
+  });
+  return {
+    stageId: input.unit.stageId,
+    itemId,
+    status: "blocked",
+    output,
+    outputPath: input.unit.outputPath,
+    attempts: [{
+      id,
+      stageId: input.unit.stageId,
+      itemId,
+      kind: "attempt",
+      status: "failed",
+      path: path.relative(input.runDir, dir),
+      startedAt: now,
+      endedAt: now,
+      blockedReason: RuntimeErrorCodes.FANOUT_ITEM_RUNTIME_ERROR,
+      rawPreview: "",
+      promptPreview: "",
+      sessionKey: input.unit.sessionKey,
+      requestId: id,
+      runtimeErrorCode: RuntimeErrorCodes.FANOUT_ITEM_RUNTIME_ERROR,
+      agent: input.unit.role.agent,
+      roleMode: input.unit.role.mode,
+      runtimeDisposeInvoked: false
+    }],
+    agentCalls: 0,
+    repairCalls: 0,
+    blockedReason: RuntimeErrorCodes.FANOUT_ITEM_RUNTIME_ERROR,
+    errorCode: RuntimeErrorCodes.FANOUT_ITEM_RUNTIME_ERROR,
+    errorMessage: message
+  };
+}
+
+async function writeRecoveredFanoutItemFailure(input: {
+  cwd: string;
+  runDir: string;
+  runId: string;
+  stageId: string;
+  itemId: string;
+  attemptId: string;
+  startedAt?: string;
+  code: string;
+  message: string;
+  outputPath: string;
+}): Promise<{ outputPath: string; attempt: AttemptIndexEntry }> {
+  const dir = attemptDir(input.runDir, { stageId: input.stageId, itemId: input.itemId, kind: "attempt", ordinal: 1 });
+  const output = runtimeBlockedOutput({
+    code: input.code,
+    message: input.message,
+    requestId: input.attemptId,
+    sessionKey: undefined,
+    agent: undefined,
+    roleMode: undefined
+  });
+  const now = new Date().toISOString();
+  await writeAttemptFile(dir, "output.json", output);
+  await fs.mkdir(path.dirname(input.outputPath), { recursive: true });
+  await fs.writeFile(input.outputPath, `${JSON.stringify(output, null, 2)}\n`, "utf8");
+  await appendEvent(input.cwd, input.runId, {
+    type: "output_written",
+    stageId: input.stageId,
+    itemId: input.itemId,
+    attemptId: input.attemptId,
+    outputPath: path.relative(input.runDir, input.outputPath),
+    status: output.status,
+    errorCode: input.code
+  });
+  return {
+    outputPath: input.outputPath,
+    attempt: {
+      id: input.attemptId,
+      stageId: input.stageId,
+      itemId: input.itemId,
+      kind: "attempt",
+      status: "failed",
+      path: path.relative(input.runDir, dir),
+      startedAt: input.startedAt,
+      endedAt: now,
+      blockedReason: input.code,
+      runtimeErrorCode: input.code,
+      rawPreview: "",
+      promptPreview: ""
+    }
+  };
+}
+
+function runtimeBlockedOutput(input: {
+  code: string;
+  message: string;
+  requestId: string;
+  sessionKey?: string;
+  agent?: string;
+  roleMode?: string;
+}): Record<string, unknown> {
+  return {
+    status: "blocked",
+    summary: input.message,
+    artifacts: [],
+    nextFocus: "diagnose",
+    blockedReason: input.code,
+    runtimeDiagnostics: {
+      requestId: input.requestId,
+      sessionKey: input.sessionKey,
+      agent: input.agent,
+      roleMode: input.roleMode,
+      runtimeDisposeInvoked: false,
+      errorCode: input.code,
+      rawTextPreview: ""
+    }
+  };
+}
+
+function fanoutItemOutputPath(runDir: string, stageId: string, item: { id: string; outputPath?: string }): string {
+  return item.outputPath ? path.join(runDir, item.outputPath) : path.join(runDir, "outputs", stageId, `${safeFileName(item.id)}.json`);
+}
+
+async function readJsonIfExists(filePath: string): Promise<Record<string, unknown> | undefined> {
+  try {
+    const parsed = JSON.parse(await fs.readFile(filePath, "utf8")) as unknown;
+    return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function statusFromItemOutput(output: Record<string, unknown>): StageStatus {
+  if (output.status === "completed") return "completed";
+  if (output.status === "failed") return "failed";
+  return "blocked";
+}
+
+function isStaleFanoutItem(startedAt: string | undefined): boolean {
+  if (!startedAt) return false;
+  const start = Date.parse(startedAt);
+  return Number.isFinite(start) && Date.now() - start >= STALE_FANOUT_ITEM_RECOVERY_MS;
+}
+
+function stringField(value: Record<string, unknown> | undefined, key: string): string | undefined {
+  const field = value?.[key];
+  return typeof field === "string" ? field : undefined;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function updateRunStatus(index: RunIndex, spec: WorkflowSpec): RunIndex {
@@ -442,6 +774,8 @@ function updateRunStatus(index: RunIndex, spec: WorkflowSpec): RunIndex {
   else if (statuses.includes("blocked")) status = "blocked";
   else if (summarize && index.stages[summarize.id]?.status === "completed") {
     status = finalVerdict && finalVerdict !== "success" && finalVerdict !== "success_with_warnings" ? "blocked" : "completed";
+  } else if (statuses.length > 0 && statuses.every((stageStatus) => stageStatus === "completed" || stageStatus === "skipped")) {
+    status = "completed";
   } else if (statuses.includes("running") || statuses.includes("ready") || statuses.includes("pending")) {
     status = "running";
   }
