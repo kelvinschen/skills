@@ -26,6 +26,7 @@ scripts/acpx-orchestrator report --run <logical-run-id>
 scripts/acpx-orchestrator report --run <logical-run-id> --html --output report.html
 scripts/acpx-orchestrator report --run <logical-run-id> --json --detailed
 scripts/acpx-orchestrator report serve --run <logical-run-id> --port 0
+scripts/acpx-orchestrator generate --name draft-workflow
 ```
 
 All commands support `--json` where structured output is useful.
@@ -38,6 +39,9 @@ advance until terminal status.
 `follow` observes and syncs the selected logical run. It does not create a new
 workflow.
 
+`generate` writes a starter workflow draft under `.acpx-orchestrator/drafts/`.
+Generated drafts are templates only; validate and preview them before running.
+
 `diagnose` prepares a read-only recovery diagnostic prompt/artifact. It does not
 rerun edit work and does not change the saved workflow spec.
 
@@ -47,6 +51,11 @@ rerun edit work and does not change the saved workflow spec.
 - `--max-fanout-items <stage=count>` lowers the effective fanout item cap.
 - `--skip-fanout-item <stage=index>` skips a zero-based item index.
 - `--allow-partial-fanout <stage>` allows partial read-only fanout results.
+
+Resume persists these policy overrides into `run.json` before advancing the
+scheduler. Blocked fanout stages are re-aggregated from existing item outputs
+without rerunning completed items; blocked/failed non-fanout stages are reset to
+pending so the next scheduler tick can retry them.
 
 `save` writes a saved workflow directory with `workflow.spec.json`,
 `execution-plan.json`, README, schema/docs, wrapper, and built helper files from

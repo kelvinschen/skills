@@ -48,7 +48,8 @@ export async function syncRun(cwd: string, logicalRunId: string, options: SyncRu
   index = await readRunIndex(cwd, logicalRunId);
   const selected = selectRunnableUnits(index, snapshot.plan, readyUnits);
   if (selected.length === 0) {
-    const next = updateRunStatus(index, snapshot.spec);
+    const budgetBlocked = blockReadyWorkIfAgentBudgetExhausted(index, snapshot.plan, readyUnits);
+    const next = updateRunStatus(budgetBlocked ?? index, snapshot.spec);
     if (changed || next.status !== index.status || next.blockedReason !== index.blockedReason || next.finalVerdict !== index.finalVerdict) {
       await writeRunIndex(cwd, next);
       await appendEvent(cwd, logicalRunId, { type: "run_synced", status: next.status });
@@ -310,14 +311,17 @@ async function collectFanoutUnits(snapshot: RuntimeSnapshot, stage: Extract<Stag
   let state = index.stages[stage.id];
   const plan = planStage.fanout;
   if (!state || !plan) return [];
+  const resumePolicy = fanoutResumePolicy(index, stage.id);
   if (!state.fanout) {
     const resolved = resolveSource(stage.items.source, snapshot.input, outputs);
     const allItems = Array.isArray(resolved) ? resolved : [];
-    const items = allItems.slice(0, plan.maxItems).map((item, itemIndex) => ({
+    const maxItems = Math.min(plan.maxItems, resumePolicy?.maxItems ?? plan.maxItems);
+    const skippedIndexes = new Set(resumePolicy?.skipItemIndexes ?? []);
+    const items = allItems.slice(0, maxItems).flatMap((item, itemIndex) => skippedIndexes.has(itemIndex) ? [] : [{
       id: stableItemId(item, itemIndex),
       index: itemIndex,
       status: "pending" as StageStatus
-    }));
+    }]);
     state = {
       ...state,
       status: items.length === 0 ? "completed" : "ready",
@@ -325,7 +329,7 @@ async function collectFanoutUnits(snapshot: RuntimeSnapshot, stage: Extract<Stag
         totalItems: items.length,
         completedItems: 0,
         blockedItems: 0,
-        allowPartial: plan.allowPartial,
+        allowPartial: plan.allowPartial || resumePolicy?.allowPartial === true,
         items
       }
     };
@@ -350,6 +354,13 @@ async function collectFanoutUnits(snapshot: RuntimeSnapshot, stage: Extract<Stag
       });
       await writeRunIndex(snapshot.cwd, index);
       return [];
+    }
+  } else {
+    const applied = applyFanoutResumePolicy(state, resumePolicy);
+    if (applied.changed && applied.stage) {
+      state = applied.stage;
+      index = updateStage(index, stage.id, state);
+      await writeRunIndex(snapshot.cwd, index);
     }
   }
   const sourceItems = Array.isArray(resolveSource(stage.items.source, snapshot.input, outputs)) ? resolveSource(stage.items.source, snapshot.input, outputs) as unknown[] : [];
@@ -419,6 +430,54 @@ function selectRunnableUnits(index: RunIndex, plan: ExecutionPlan, units: AgentW
     selected.push(unit);
   }
   return selected;
+}
+
+function blockReadyWorkIfAgentBudgetExhausted(index: RunIndex, plan: ExecutionPlan, units: AgentWorkUnit[]): RunIndex | undefined {
+  if (units.length === 0) return undefined;
+  const remainingAgents = Math.max(0, plan.limits.maxAgents - index.agentUsage.actual);
+  if (remainingAgents > 0) return undefined;
+  const now = new Date().toISOString();
+  let next = index;
+  const stageIds = new Set(units.map((unit) => unit.stageId));
+  for (const stageId of stageIds) {
+    const stage = next.stages[stageId];
+    if (!stage || stage.status === "completed" || stage.status === "blocked" || stage.status === "failed" || stage.status === "skipped") continue;
+    if (stage.fanout) {
+      const blockedItemIds = new Set(units.filter((unit) => unit.stageId === stageId).map((unit) => unit.itemId));
+      const items = stage.fanout.items.map((item) => blockedItemIds.has(item.id)
+        ? {
+            ...item,
+            status: "blocked" as StageStatus,
+            blockedReason: RuntimeErrorCodes.LIMIT_AGENT_BUDGET_EXHAUSTED,
+            errorCode: RuntimeErrorCodes.LIMIT_AGENT_BUDGET_EXHAUSTED,
+            completedAt: now
+          }
+        : item);
+      next = updateStage(next, stageId, {
+        ...stage,
+        status: "blocked",
+        blockedReason: RuntimeErrorCodes.LIMIT_AGENT_BUDGET_EXHAUSTED,
+        completedAt: now,
+        fanout: {
+          ...stage.fanout,
+          items,
+          blockedItems: items.filter((item) => item.status === "blocked").length,
+          failedItems: items.filter((item) => item.status === "failed").length,
+          completedItems: items.filter((item) => item.status === "completed").length
+        }
+      });
+      continue;
+    }
+    next = updateStage(next, stageId, {
+      status: "blocked",
+      blockedReason: RuntimeErrorCodes.LIMIT_AGENT_BUDGET_EXHAUSTED,
+      completedAt: now
+    });
+  }
+  return {
+    ...next,
+    blockedReason: RuntimeErrorCodes.LIMIT_AGENT_BUDGET_EXHAUSTED
+  };
 }
 
 function markUnitsRunning(index: RunIndex, units: AgentWorkUnit[], runDir: string): RunIndex {
@@ -525,12 +584,19 @@ async function completeReadyFanoutAggregates(snapshot: RuntimeSnapshot): Promise
   let index = snapshot.index;
   let changed = false;
   for (const stage of snapshot.spec.stages.filter((candidate): candidate is Extract<Stage, { kind: "fanout" }> => candidate.kind === "fanout")) {
-    const state = index.stages[stage.id];
+    let state = index.stages[stage.id];
+    const applied = applyFanoutResumePolicy(state, fanoutResumePolicy(index, stage.id));
+    if (applied.changed && applied.stage) {
+      state = applied.stage;
+      index = updateStage(index, stage.id, state);
+      changed = true;
+    }
     if (!state?.fanout || state.status === "completed" || state.status === "blocked" || state.status === "failed") continue;
     const items = state.fanout.items;
     if (items.length === 0) continue;
     if (items.some((item) => item.status === "pending" || item.status === "ready" || item.status === "running")) continue;
-    const outputs = await Promise.all(items.map(async (item) => {
+    const activeItems = items.filter((item) => item.status !== "skipped");
+    const outputs = await Promise.all(activeItems.map(async (item) => {
       const itemPath = path.join(snapshot.runDir, "outputs", stage.id, `${safeFileName(item.id)}.json`);
       try {
         return JSON.parse(await fs.readFile(itemPath, "utf8")) as Record<string, unknown>;
@@ -546,10 +612,11 @@ async function completeReadyFanoutAggregates(snapshot: RuntimeSnapshot): Promise
     }));
     const blockedItems = outputs.filter((output) => output.status === "blocked");
     const completed = outputs.filter((output) => output.status === "completed").length;
-    const failed = items.filter((item) => item.status === "failed").length;
+    const failed = activeItems.filter((item) => item.status === "failed").length;
     const ratio = outputs.length === 0 ? 1 : completed / outputs.length;
     const policy = stage.fanoutPolicy;
-    const partialAllowed = (policy?.allowPartial ?? false)
+    const resumePolicy = fanoutResumePolicy(index, stage.id);
+    const partialAllowed = resumePolicy?.allowPartial === true || (policy?.allowPartial ?? false)
       && (policy?.minCompletedRatio == null || ratio >= policy.minCompletedRatio)
       && (policy?.maxBlockedItems == null || blockedItems.length <= policy.maxBlockedItems);
     const status = blockedItems.length > 0 && !partialAllowed ? "blocked" : "completed";
@@ -573,6 +640,7 @@ async function completeReadyFanoutAggregates(snapshot: RuntimeSnapshot): Promise
       completedAt: new Date().toISOString(),
       fanout: {
         ...state.fanout,
+        totalItems: activeItems.length,
         completedItems: completed,
         blockedItems: blockedItems.length,
         failedItems: failed
@@ -582,6 +650,38 @@ async function completeReadyFanoutAggregates(snapshot: RuntimeSnapshot): Promise
     changed = true;
   }
   return { index, changed };
+}
+
+function fanoutResumePolicy(index: RunIndex, stageId: string): NonNullable<NonNullable<RunIndex["resumePolicy"]>["fanout"]>[string] | undefined {
+  return index.resumePolicy?.fanout?.[stageId];
+}
+
+function applyFanoutResumePolicy(
+  stage: StageIndexEntry | undefined,
+  policy: ReturnType<typeof fanoutResumePolicy>
+): { stage: StageIndexEntry | undefined; changed: boolean } {
+  if (!stage?.fanout || !policy) return { stage, changed: false };
+  const maxItems = policy.maxItems ?? Number.POSITIVE_INFINITY;
+  const skippedIndexes = new Set(policy.skipItemIndexes ?? []);
+  const items = stage.fanout.items.filter((item) => item.index < maxItems && !skippedIndexes.has(item.index));
+  const allowPartial = stage.fanout.allowPartial || policy.allowPartial === true;
+  const changed = items.length !== stage.fanout.items.length || allowPartial !== stage.fanout.allowPartial;
+  if (!changed) return { stage, changed: false };
+  return {
+    changed: true,
+    stage: {
+      ...stage,
+      fanout: {
+        ...stage.fanout,
+        totalItems: items.length,
+        completedItems: items.filter((item) => item.status === "completed").length,
+        blockedItems: items.filter((item) => item.status === "blocked").length,
+        failedItems: items.filter((item) => item.status === "failed").length,
+        allowPartial,
+        items
+      }
+    }
+  };
 }
 
 async function fanoutItemRuntimeErrorResult(input: {
@@ -770,7 +870,9 @@ function updateRunStatus(index: RunIndex, spec: WorkflowSpec): RunIndex {
     finalVerdict = readFinalVerdictFromOutput(index, summarize.id) ?? finalVerdict;
   }
   let status = index.status;
-  if (statuses.includes("failed")) status = "failed";
+  if (index.status === "diagnosed_blocked" && (statuses.includes("blocked") || statuses.includes("failed"))) {
+    status = "diagnosed_blocked";
+  } else if (statuses.includes("failed")) status = "failed";
   else if (statuses.includes("blocked")) status = "blocked";
   else if (summarize && index.stages[summarize.id]?.status === "completed") {
     status = finalVerdict && finalVerdict !== "success" && finalVerdict !== "success_with_warnings" ? "blocked" : "completed";
@@ -780,11 +882,15 @@ function updateRunStatus(index: RunIndex, spec: WorkflowSpec): RunIndex {
     status = "running";
   }
   const blocked = Object.values(index.stages).find((stage) => stage.status === "blocked");
+  const finalVerdictBlockedReason = blockedReasonFromFinalVerdict(finalVerdict);
+  const blockedReason = status === "blocked" || status === "diagnosed_blocked"
+    ? blocked?.blockedReason ?? finalVerdictBlockedReason ?? index.blockedReason
+    : undefined;
   return {
     ...index,
     status,
     finalVerdict,
-    blockedReason: blocked?.blockedReason ?? index.blockedReason
+    blockedReason
   };
 }
 
@@ -795,6 +901,13 @@ function readFinalVerdictFromOutput(_index: RunIndex, _stageId: string): RunInde
 function finalVerdictFromOutput(output: Record<string, unknown> | undefined): RunIndex["finalVerdict"] | undefined {
   const value = output?.finalVerdict;
   if (value === "success" || value === "success_with_warnings" || value === "blocked" || value === "failed" || value === "unknown") return value;
+  return undefined;
+}
+
+function blockedReasonFromFinalVerdict(finalVerdict: RunIndex["finalVerdict"] | undefined): string | undefined {
+  if (finalVerdict === "blocked") return RuntimeErrorCodes.FINAL_VERDICT_BLOCKED;
+  if (finalVerdict === "failed") return RuntimeErrorCodes.FINAL_VERDICT_FAILED;
+  if (finalVerdict === "unknown") return RuntimeErrorCodes.FINAL_VERDICT_UNKNOWN;
   return undefined;
 }
 

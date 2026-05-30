@@ -8,7 +8,11 @@ export const RuntimeErrorCodes = {
   RUN_INDEX_LOCK_TIMEOUT: "RUN_INDEX_LOCK_TIMEOUT",
   FANOUT_ITEM_RUNTIME_ERROR: "FANOUT_ITEM_RUNTIME_ERROR",
   FANOUT_ITEM_UNSTARTED_TIMEOUT: "FANOUT_ITEM_UNSTARTED_TIMEOUT",
-  RUN_INDEX_OUTPUT_MISMATCH: "RUN_INDEX_OUTPUT_MISMATCH"
+  RUN_INDEX_OUTPUT_MISMATCH: "RUN_INDEX_OUTPUT_MISMATCH",
+  FINAL_VERDICT_BLOCKED: "FINAL_VERDICT_BLOCKED",
+  FINAL_VERDICT_FAILED: "FINAL_VERDICT_FAILED",
+  FINAL_VERDICT_UNKNOWN: "FINAL_VERDICT_UNKNOWN",
+  LIMIT_AGENT_BUDGET_EXHAUSTED: "LIMIT_AGENT_BUDGET_EXHAUSTED"
 } as const;
 
 export type RuntimeErrorCode = (typeof RuntimeErrorCodes)[keyof typeof RuntimeErrorCodes];
@@ -130,6 +134,13 @@ export type RunIndex = {
   };
   finalVerdict?: "success" | "success_with_warnings" | "blocked" | "failed" | "unknown";
   blockedReason?: string;
+  resumePolicy?: {
+    fanout?: Record<string, {
+      allowPartial?: boolean;
+      maxItems?: number;
+      skipItemIndexes?: number[];
+    }>;
+  };
 };
 
 export async function writeRunIndex(cwd: string, index: RunIndex): Promise<void> {

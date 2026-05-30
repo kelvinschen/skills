@@ -35,6 +35,7 @@ export type RunReportView = {
     workflowName: string;
     status: RunViewStatus;
     finalVerdict?: RunIndex["finalVerdict"];
+    blockedReason?: string;
     createdAt: string;
     updatedAt: string;
     durationMs?: number;
@@ -236,6 +237,7 @@ export async function buildRunReportView(
       workflowName: index.workflowName,
       status: index.status,
       finalVerdict: index.finalVerdict,
+      blockedReason: index.blockedReason,
       createdAt: index.createdAt,
       updatedAt: index.updatedAt,
       durationMs: terminalStatus(index.status) ? positiveDuration(index.createdAt, index.updatedAt) : undefined,
@@ -483,6 +485,14 @@ async function readDiagnostics(dir: string, limits: typeof DEFAULT_LIMITS): Prom
 
 async function buildRuntimeDiagnostics(dir: string, index: RunIndex, events: ReportEvent[], limits: typeof DEFAULT_LIMITS): Promise<ReportDiagnostic[]> {
   const diagnostics: ReportDiagnostic[] = [];
+  if (index.blockedReason && isRunLevelRuntimeCode(index.blockedReason)) {
+    diagnostics.push(runtimeDiagnostic({
+      code: index.blockedReason,
+      path: path.join(dir, "run.json"),
+      summary: runLevelBlockedSummary(index),
+      limits
+    }));
+  }
   for (const stage of Object.values(index.stages)) {
     if (!stage.fanout) continue;
     for (const item of stage.fanout.items) {
@@ -532,6 +542,22 @@ async function buildRuntimeDiagnostics(dir: string, index: RunIndex, events: Rep
     }));
   }
   return diagnostics;
+}
+
+function isRunLevelRuntimeCode(value: string): boolean {
+  return value === RuntimeErrorCodes.FINAL_VERDICT_BLOCKED
+    || value === RuntimeErrorCodes.FINAL_VERDICT_FAILED
+    || value === RuntimeErrorCodes.FINAL_VERDICT_UNKNOWN
+    || value === RuntimeErrorCodes.LIMIT_AGENT_BUDGET_EXHAUSTED;
+}
+
+function runLevelBlockedSummary(index: RunIndex): string {
+  if (index.blockedReason === RuntimeErrorCodes.LIMIT_AGENT_BUDGET_EXHAUSTED) {
+    return `Ready agent work could not start because actual agent calls reached limits.maxAgents (${index.agentUsage.actual}/${index.agentUsage.planned}).`;
+  }
+  if (index.finalVerdict === "blocked") return "Summarizer returned finalVerdict=blocked.";
+  if (index.finalVerdict === "failed") return "Summarizer returned finalVerdict=failed.";
+  return "Summarizer returned finalVerdict=unknown.";
 }
 
 function runtimeDiagnostic(input: {

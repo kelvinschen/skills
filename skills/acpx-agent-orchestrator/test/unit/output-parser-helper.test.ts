@@ -53,6 +53,31 @@ describe("runtime output parser", () => {
     expect(parsed.outputParse.repaired).toBe(true);
   });
 
+  it("does not truncate workflow-output when JSON strings contain markdown fences", () => {
+    const parsed = parseWorkflowOutput(fenced("workflow-output", implementationOutput({
+      summary: "Reviewed code block.",
+      checks: [{
+        name: "nested-fence",
+        status: "pass",
+        summary: "Snippet is embedded.",
+        details: "```typescript\\nconst value = 1;\\n```"
+      }]
+    })), "implementation");
+
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.outputParse).toMatchObject({
+      mode: "workflowOutputFence",
+      candidateCount: 1
+    });
+    expect(parsed.value.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: "nested-fence",
+        details: expect.stringContaining("```typescript")
+      })
+    ]));
+  });
+
   it("normalizes only checks[].result to checks[].status", () => {
     const parsed = parseWorkflowOutput(fenced("workflow-output", implementationOutput({
       checks: [{ name: "unit", result: "pass" }]

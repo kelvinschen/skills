@@ -111,7 +111,7 @@ export function ReportApp(): React.ReactElement {
             <Metric label="Stages" value={`${view.metrics.stagesCompleted}/${view.metrics.stagesTotal}`} hint={`${view.metrics.stagesBlocked} blocked`} />
             <Metric label="Attempts" value={`${view.metrics.attemptsCompleted}/${view.metrics.attemptsTotal}`} hint={`${view.metrics.attemptsBlocked} blocked`} />
             <Metric label="Agent Calls" value={`${view.metrics.agentCallsActual ?? 0}/${view.metrics.agentCallsPlanned}`} hint={`${view.metrics.repairCalls ?? 0} repairs`} />
-            <Metric label="Verdict" value={view.run.finalVerdict ?? "n/a"} hint={view.run.status} />
+            <Metric label="Verdict" value={view.run.finalVerdict ?? "n/a"} hint={view.run.blockedReason ?? view.run.status} />
           </section>
 
           <section className="workspace">

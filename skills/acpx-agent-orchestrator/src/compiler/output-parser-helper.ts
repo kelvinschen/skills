@@ -103,18 +103,23 @@ function collectWorkflowOutputCandidates(text) {
   const candidates = [];
   const seen = new Set();
   const tick = String.fromCharCode(96);
-  const fencePattern = new RegExp(tick + "{3}([^\\n\\r" + tick + "]*)\\r?\\n([\\s\\S]*?)" + tick + "{3}", "g");
+  const fencePattern = new RegExp("(^|\\r?\\n)" + tick + "{3}([^\\n\\r" + tick + "]*)\\r?\\n", "g");
   let match;
   while ((match = fencePattern.exec(source)) && candidates.length < CANDIDATE_LIMIT) {
-    const info = String(match[1] || "").trim();
-    const body = String(match[2] || "").trim();
+    const fenceStart = match.index + String(match[1] || "").length;
+    const bodyStart = fencePattern.lastIndex;
+    const close = findClosingFence(source, bodyStart);
+    if (!close) break;
+    const info = String(match[2] || "").trim();
+    const body = source.slice(bodyStart, close.start).trim();
+    fencePattern.lastIndex = close.end;
     const mode = candidateModeForFence(info, body);
     if (!mode) continue;
     pushCandidate(candidates, seen, {
       mode,
       raw: body,
-      start: match.index,
-      end: fencePattern.lastIndex,
+      start: fenceStart,
+      end: close.end,
       info
     });
   }
@@ -133,6 +138,18 @@ function collectWorkflowOutputCandidates(text) {
   }
 
   return candidates;
+}
+
+function findClosingFence(source, start) {
+  const tick = String.fromCharCode(96);
+  const closePattern = new RegExp("(^|\\r?\\n)[ \\t]*" + tick + "{3}[ \\t]*(?=\\r?\\n|$)", "g");
+  closePattern.lastIndex = start;
+  const match = closePattern.exec(source);
+  if (!match) return undefined;
+  return {
+    start: match.index + String(match[1] || "").length,
+    end: closePattern.lastIndex
+  };
 }
 
 function candidateModeForFence(info, body) {

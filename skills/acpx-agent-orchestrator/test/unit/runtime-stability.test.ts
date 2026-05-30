@@ -7,10 +7,11 @@ import { buildRunReportView } from "../../src/projections/run-report.js";
 import { runDir } from "../../src/run-index/paths.js";
 import { appendEvent, readRunIndex, RuntimeErrorCodes, writeRunIndex } from "../../src/run-index/read-write.js";
 import { setAgentRuntimeFactoryForTests, type AgentTurnRequest, type AgentTurnResult, type OrchestratorAgentRuntime } from "../../src/runtime/agent-runtime.js";
+import { startDiagnosticRun } from "../../src/runtime/diagnose-run.js";
 import { prepareRun, startPreparedRun } from "../../src/runtime/run-workflow.js";
 import { syncRun } from "../../src/runtime/sync.js";
 import { WorkflowSpecSchema, type WorkflowSpec } from "../../src/schema/workflow-spec.js";
-import { baseOutput, workflowOutput } from "../helpers/fake-runtime.js";
+import { baseOutput, summarizeOutput, workflowOutput } from "../helpers/fake-runtime.js";
 
 describe("fanout runtime stability", () => {
   afterEach(() => setAgentRuntimeFactoryForTests(undefined));
@@ -163,6 +164,104 @@ describe("fanout runtime stability", () => {
       itemId: "item-2"
     }));
   });
+
+  it("records a run-level blocked reason when the final verdict is unknown", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-final-verdict-"));
+    setAgentRuntimeFactoryForTests(() => new FinalVerdictRuntime("unknown"));
+    const spec = summarizeSpec(cwd);
+    const prepared = await prepareRun(spec, { cwd, input: { cwd } });
+
+    const index = await startPreparedRun(cwd, prepared);
+    const report = await buildRunReportView(cwd, spec, index, { mode: "snapshot" });
+
+    expect(index.status).toBe("blocked");
+    expect(index.blockedReason).toBe(RuntimeErrorCodes.FINAL_VERDICT_UNKNOWN);
+    expect(report.run.blockedReason).toBe(RuntimeErrorCodes.FINAL_VERDICT_UNKNOWN);
+    expect(report.diagnostics).toContainEqual(expect.objectContaining({
+      code: RuntimeErrorCodes.FINAL_VERDICT_UNKNOWN,
+      stageId: undefined,
+      itemId: undefined
+    }));
+  });
+
+  it("applies persisted resume policy when re-aggregating blocked fanout", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-resume-policy-"));
+    setAgentRuntimeFactoryForTests(() => new SelectiveFanoutRuntime("item-2"));
+    const spec = fanoutSpec(3, { allowPartial: false });
+    const prepared = await prepareRun(spec, {
+      cwd,
+      input: { cwd, items: [{ id: "item-1" }, { id: "item-2" }, { id: "item-3" }] }
+    });
+    const blocked = await startPreparedRun(cwd, prepared);
+
+    await writeRunIndex(cwd, {
+      ...blocked,
+      status: "running",
+      blockedReason: undefined,
+      resumePolicy: { fanout: { fanout: { allowPartial: true } } },
+      stages: {
+        ...blocked.stages,
+        fanout: {
+          ...blocked.stages.fanout,
+          status: "running",
+          blockedReason: undefined,
+          completedAt: undefined
+        }
+      }
+    });
+
+    const resumed = await syncRun(cwd, prepared.logicalRunId);
+
+    expect(resumed.status).toBe("completed");
+    expect(resumed.stages.fanout?.status).toBe("completed");
+    expect(resumed.stages.fanout?.fanout).toMatchObject({
+      totalItems: 3,
+      completedItems: 2,
+      blockedItems: 1,
+      allowPartial: true
+    });
+  });
+
+  it("preserves diagnosed_blocked status during observation-only sync", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-diagnosed-sync-"));
+    setAgentRuntimeFactoryForTests(() => new SelectiveFanoutRuntime("item-2"));
+    const spec = fanoutSpec(2, { allowPartial: false });
+    const prepared = await prepareRun(spec, {
+      cwd,
+      input: { cwd, items: [{ id: "item-1" }, { id: "item-2" }] }
+    });
+    await startPreparedRun(cwd, prepared);
+
+    const diagnosed = await startDiagnosticRun(cwd, prepared.logicalRunId);
+    const observed = await syncRun(cwd, prepared.logicalRunId, { startPending: false });
+
+    expect(diagnosed.status).toBe("diagnosed_blocked");
+    expect(observed.status).toBe("diagnosed_blocked");
+  });
+
+  it("terminates ready work as blocked when the agent budget is exhausted", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-agent-budget-"));
+    setAgentRuntimeFactoryForTests(() => new StaticRuntime());
+    const spec = budgetSpec(cwd);
+    const prepared = await prepareRun(spec, { cwd, input: { cwd } });
+
+    const firstTick = await startPreparedRun(cwd, prepared);
+    const secondTick = await syncRun(cwd, prepared.logicalRunId);
+    const report = await buildRunReportView(cwd, spec, secondTick, { mode: "snapshot" });
+
+    expect(firstTick.status).toBe("running");
+    expect(secondTick.status).toBe("blocked");
+    expect(secondTick.blockedReason).toBe(RuntimeErrorCodes.LIMIT_AGENT_BUDGET_EXHAUSTED);
+    expect(secondTick.stages.validate).toMatchObject({
+      status: "blocked",
+      blockedReason: RuntimeErrorCodes.LIMIT_AGENT_BUDGET_EXHAUSTED
+    });
+    expect(report.diagnostics).toContainEqual(expect.objectContaining({
+      code: RuntimeErrorCodes.LIMIT_AGENT_BUDGET_EXHAUSTED,
+      stageId: undefined,
+      itemId: undefined
+    }));
+  });
 });
 
 function fanoutSpec(count: number, policy: { allowPartial: boolean }): WorkflowSpec {
@@ -184,6 +283,35 @@ function fanoutSpec(count: number, policy: { allowPartial: boolean }): WorkflowS
       prompt: "Handle one item",
       fanoutPolicy: policy
     }]
+  });
+}
+
+function summarizeSpec(cwd: string): WorkflowSpec {
+  return WorkflowSpecSchema.parse({
+    schemaVersion: "acpx-orchestrator.workflow/v1",
+    name: "final-verdict",
+    root: "summarize",
+    inputs: { cwd: { type: "path", default: cwd } },
+    roles: { summarizer: { category: "summarization", agent: "fake", mode: "readOnly" } },
+    limits: { maxAgents: 1, maxConcurrency: 1, maxFanoutItems: 1, maxFixRounds: 0, stageTimeoutMinutes: 1 },
+    stages: [{ id: "summarize", kind: "summarize", role: "summarizer", prompt: "Summarize" }]
+  });
+}
+
+function budgetSpec(cwd: string): WorkflowSpec {
+  return WorkflowSpecSchema.parse({
+    schemaVersion: "acpx-orchestrator.workflow/v1",
+    name: "agent-budget",
+    root: "plan",
+    inputs: { cwd: { type: "path", default: cwd } },
+    roles: {
+      worker: { category: "coordination", agent: "fake", mode: "readOnly" }
+    },
+    limits: { maxAgents: 1, maxConcurrency: 1, maxFanoutItems: 1, maxFixRounds: 0, stageTimeoutMinutes: 1 },
+    stages: [
+      { id: "plan", kind: "agentTask", role: "worker", prompt: "Plan" },
+      { id: "validate", kind: "agentTask", role: "worker", dependsOn: ["plan"], prompt: "Validate" }
+    ]
   });
 }
 
@@ -217,6 +345,36 @@ class CancelledRuntime implements OrchestratorAgentRuntime {
       events: [],
       status: "cancelled",
       stopReason: "cancelled"
+    };
+  }
+}
+
+class FinalVerdictRuntime implements OrchestratorAgentRuntime {
+  constructor(private readonly verdict: "blocked" | "failed" | "unknown") {}
+
+  async runTurn(input: AgentTurnRequest, onEvent?: (event: AcpRuntimeEvent) => Promise<void> | void): Promise<AgentTurnResult> {
+    const rawText = workflowOutput(summarizeOutput({ finalVerdict: this.verdict }));
+    const event: AcpRuntimeEvent = { type: "text_delta", text: rawText, stream: "output" };
+    await onEvent?.(event);
+    return {
+      handle: fakeHandle(input),
+      rawText,
+      events: [event],
+      status: "completed"
+    };
+  }
+}
+
+class StaticRuntime implements OrchestratorAgentRuntime {
+  async runTurn(input: AgentTurnRequest, onEvent?: (event: AcpRuntimeEvent) => Promise<void> | void): Promise<AgentTurnResult> {
+    const rawText = workflowOutput(baseOutput({ summary: input.sessionKey }));
+    const event: AcpRuntimeEvent = { type: "text_delta", text: rawText, stream: "output" };
+    await onEvent?.(event);
+    return {
+      handle: fakeHandle(input),
+      rawText,
+      events: [event],
+      status: "completed"
     };
   }
 }

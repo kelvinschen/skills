@@ -5,7 +5,7 @@ import { issue, resultFromIssues, type OrchestratorIssue } from "../errors.js";
 import { resolveRunLocator } from "../run-index/locator.js";
 import { runDir } from "../run-index/paths.js";
 import { appendEvent, readRunIndex, writeRunIndex } from "../run-index/read-write.js";
-import { parseResumePolicyOptions, validateResumePolicy } from "../runtime/resume-policy.js";
+import { mergeResumePolicy, parseResumePolicyOptions, validateResumePolicy } from "../runtime/resume-policy.js";
 import { syncRun } from "../runtime/sync.js";
 import { WorkflowSpecSchema, type WorkflowSpec } from "../schema/workflow-spec.js";
 import { printIssues, printJson } from "./common.js";
@@ -30,7 +30,10 @@ export function registerResume(program: Command): void {
       }
 
       const index = await readRunIndex(locator.cwd, locator.runId);
-      const reset = resetRecoverableFailedStages(index);
+      const reset = resetRecoverableStages({
+        ...index,
+        resumePolicy: mergeResumePolicy(index.resumePolicy, parsedPolicy.policy)
+      });
       await writeRunIndex(locator.cwd, reset);
       let finalIndex;
       try {
@@ -54,12 +57,19 @@ async function readRunSpec(cwd: string, runId: string): Promise<WorkflowSpec> {
   return WorkflowSpecSchema.parse(JSON.parse(await fs.readFile(path.join(runDir(runId, cwd), "workflow.spec.json"), "utf8")));
 }
 
-function resetRecoverableFailedStages(index: Awaited<ReturnType<typeof readRunIndex>>) {
+function resetRecoverableStages(index: Awaited<ReturnType<typeof readRunIndex>>) {
   const stages = Object.fromEntries(Object.entries(index.stages).map(([id, stage]) => [
     id,
-    stage.status === "failed" ? { ...stage, status: "pending" as const, blockedReason: undefined } : stage
+    stage.status === "failed" || stage.status === "blocked"
+      ? {
+          ...stage,
+          status: stage.fanout ? "running" as const : "pending" as const,
+          blockedReason: undefined,
+          completedAt: undefined
+        }
+      : stage
   ]));
-  return { ...index, status: "running" as const, stages };
+  return { ...index, status: "running" as const, stages, blockedReason: undefined, finalVerdict: undefined };
 }
 
 function printResumeIssues(json: boolean | undefined, issues: OrchestratorIssue[]): void {

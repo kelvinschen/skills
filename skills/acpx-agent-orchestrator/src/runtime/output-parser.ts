@@ -146,18 +146,23 @@ export function collectWorkflowOutputCandidates(text: string, limit = DEFAULT_CA
   const source = String(text ?? "");
   const candidates: RawCandidate[] = [];
   const seen = new Set<string>();
-  const fencePattern = /```([^\n\r`]*)\r?\n([\s\S]*?)```/g;
+  const fencePattern = /(^|\r?\n)```([^\n\r`]*)\r?\n/g;
   let match: RegExpExecArray | null;
   while ((match = fencePattern.exec(source)) && candidates.length < limit) {
-    const info = String(match[1] ?? "").trim();
-    const body = String(match[2] ?? "").trim();
+    const fenceStart = match.index + String(match[1] ?? "").length;
+    const bodyStart = fencePattern.lastIndex;
+    const close = findClosingFence(source, bodyStart);
+    if (!close) break;
+    const info = String(match[2] ?? "").trim();
+    const body = source.slice(bodyStart, close.start).trim();
+    fencePattern.lastIndex = close.end;
     const mode = candidateModeForFence(info, body);
     if (!mode) continue;
     pushCandidate(candidates, seen, {
       mode,
       raw: body,
-      start: match.index,
-      end: fencePattern.lastIndex,
+      start: fenceStart,
+      end: close.end,
       info
     });
   }
@@ -176,6 +181,17 @@ export function collectWorkflowOutputCandidates(text: string, limit = DEFAULT_CA
   }
 
   return candidates;
+}
+
+function findClosingFence(source: string, start: number): { start: number; end: number } | undefined {
+  const closePattern = /(^|\r?\n)[ \t]*```[ \t]*(?=\r?\n|$)/g;
+  closePattern.lastIndex = start;
+  const match = closePattern.exec(source);
+  if (!match) return undefined;
+  return {
+    start: match.index + String(match[1] ?? "").length,
+    end: closePattern.lastIndex
+  };
 }
 
 function evaluateCandidate(rawCandidate: RawCandidate, contract: ReturnType<typeof getOutputContract>): OutputCandidateDiagnostic {

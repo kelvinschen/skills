@@ -50,3 +50,19 @@ Output contract codes emitted by the runtime parser:
 Output contract failures map to blocked attempt/stage/run state, not failed.
 `failed` is reserved for compiler, scheduler, ACPX runtime, or other
 unrecoverable runtime errors.
+
+Runtime run-level codes emitted in reports:
+
+- `FINAL_VERDICT_BLOCKED`: the terminal summarizer completed but explicitly
+  returned `finalVerdict: "blocked"`, so the run is blocked at run level even
+  if author stages are otherwise terminal.
+- `FINAL_VERDICT_FAILED`: the terminal summarizer completed but explicitly
+  returned `finalVerdict: "failed"`. The run records a blocked workflow outcome;
+  runtime `failed` remains reserved for infrastructure failures.
+- `FINAL_VERDICT_UNKNOWN`: the terminal summarizer completed but could not
+  determine a pass/fail outcome. Inspect the summarizer output and any upstream
+  fanout item outputs before treating the workflow as verified.
+- `LIMIT_AGENT_BUDGET_EXHAUSTED`: a run had ready agent work but
+  `agentUsage.actual` had already reached `limits.maxAgents`. The scheduler
+  terminalizes the ready stage as blocked instead of leaving the run in
+  `running`.

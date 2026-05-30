@@ -26,6 +26,7 @@ export type RunView = {
   workflowName: string;
   status: RunViewStatus;
   finalVerdict?: "success" | "success_with_warnings" | "blocked" | "failed" | "unknown";
+  blockedReason?: string;
   summary: string;
   checks: Array<{ command?: string; name?: string; status?: string; summary?: string }>;
   finalWarnings: string[];
@@ -101,6 +102,7 @@ export async function runViewFromIndex(cwd: string, spec: WorkflowSpec, index: R
     workflowName: index.workflowName,
     status: index.status,
     finalVerdict: index.finalVerdict ?? finalVerdict(final),
+    blockedReason: index.blockedReason,
     summary: typeof final?.summary === "string" ? final.summary : (index.blockedReason ?? spec.description ?? ""),
     checks,
     finalWarnings,
