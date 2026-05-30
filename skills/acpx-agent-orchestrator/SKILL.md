@@ -35,11 +35,16 @@ skills/acpx-agent-orchestrator/scripts/acpx-orchestrator run --workflow <saved-n
 ```bash
 skills/acpx-agent-orchestrator/scripts/acpx-orchestrator follow <logical-run-id>
 skills/acpx-agent-orchestrator/scripts/acpx-orchestrator report --run <logical-run-id>
+skills/acpx-agent-orchestrator/scripts/acpx-orchestrator report --run <logical-run-id> --html --output report.html
+skills/acpx-agent-orchestrator/scripts/acpx-orchestrator report serve --run <logical-run-id> --port 0
 ```
 
 Use `--wait` when the user wants the command to block until the logical run
 finishes. Use `diagnose <logical-run-id> --wait` for blocked runs; it appends a
 read-only recovery segment and keeps edit work from being rerun.
+HTML reports are observation-only. Snapshot HTML is a single self-contained
+file, while `report serve` streams run state over SSE and never starts pending
+workflow segments.
 
 ## Spec Authoring
 
@@ -68,5 +73,6 @@ Read:
 - [docs/dynamic-workflow-design.md](docs/dynamic-workflow-design.md)
 - [docs/workflow-spec.md](docs/workflow-spec.md)
 - [docs/cli.md](docs/cli.md)
+- [docs/html-report-design.md](docs/html-report-design.md)
 
 Examples live in `workflows/examples/`.

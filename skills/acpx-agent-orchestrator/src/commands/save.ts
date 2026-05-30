@@ -53,17 +53,28 @@ async function writeHelperSnapshot(target: string): Promise<void> {
 }
 
 async function assertBuiltHelperAvailable(root: string): Promise<void> {
+  let hasCli = false;
   try {
     await fs.access(path.join(root, "dist", "cli.mjs"));
-    return;
+    hasCli = true;
   } catch {
     // Keep checking alternate build output.
   }
-  try {
-    await fs.access(path.join(root, "dist", "cli.js"));
-    return;
-  } catch {
+  if (!hasCli) {
+    try {
+      await fs.access(path.join(root, "dist", "cli.js"));
+      hasCli = true;
+    } catch {
+      // Report below.
+    }
+  }
+  if (!hasCli) {
     throw new Error(`Cannot save a self-contained helper snapshot because ${path.join(root, "dist")} is missing a built CLI. Run npm run build in ${root} first.`);
+  }
+  try {
+    await fs.access(path.join(root, "dist", "report-web", "index.html"));
+  } catch {
+    throw new Error(`Cannot save a self-contained helper snapshot because ${path.join(root, "dist", "report-web")} is missing. Run npm run build in ${root} first.`);
   }
 }
 

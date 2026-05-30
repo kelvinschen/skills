@@ -23,6 +23,9 @@ scripts/acpx-orchestrator diagnose <logical-run-id> --wait
 scripts/acpx-orchestrator resume <logical-run-id> --wait
 scripts/acpx-orchestrator resume <logical-run-id> --max-fanout-items review_files=4 --allow-partial-fanout review_files
 scripts/acpx-orchestrator report --run <logical-run-id>
+scripts/acpx-orchestrator report --run <logical-run-id> --html --output report.html
+scripts/acpx-orchestrator report --run <logical-run-id> --json --detailed
+scripts/acpx-orchestrator report serve --run <logical-run-id> --port 0
 ```
 
 All commands support `--json` where structured output is useful.
@@ -53,3 +56,9 @@ derived `workflow.flow.ts`, README, schema/docs, wrapper, and built helper files
 from the current package build. It fails if the helper CLI has not been built,
 instead of writing a partial snapshot. Approval to run is not save approval;
 saving is always explicit.
+
+`report --html --output <file>` writes a single self-contained HTML snapshot
+based only on the run index and artifacts. `report serve` starts an
+observation-only local server that streams RunReportView snapshots over SSE
+after syncing existing artifacts with `startPending: false`; it does not expose
+workflow control endpoints.

@@ -29,4 +29,5 @@ pnpm-debug.log*
 **/.acpx/
 **/.acpx-orchestrator/runs/
 **/.acpx-orchestrator/drafts/
+**/.acpx-orchestrator/review-html-report/
 skills/acpx-agent-orchestrator/dist/

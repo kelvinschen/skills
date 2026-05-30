@@ -18,6 +18,8 @@ scripts/acpx-orchestrator run --spec workflows/examples/simple-feature.workflow.
 scripts/acpx-orchestrator follow <logical-run-id>
 scripts/acpx-orchestrator diagnose <logical-run-id> --wait
 scripts/acpx-orchestrator report --run <logical-run-id>
+scripts/acpx-orchestrator report --run <logical-run-id> --html --output report.html
+scripts/acpx-orchestrator report serve --run <logical-run-id> --port 0
 ```
 
 The saved workflow interface is `workflow.spec.json`. Generated flow snapshots,
@@ -28,5 +30,6 @@ Docs:
 
 - [docs/workflow-spec.md](docs/workflow-spec.md)
 - [docs/cli.md](docs/cli.md)
+- [docs/html-report-design.md](docs/html-report-design.md)
 - [docs/error-codes.md](docs/error-codes.md)
 - [docs/dynamic-workflow-design.md](docs/dynamic-workflow-design.md)
