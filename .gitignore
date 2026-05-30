@@ -27,9 +27,6 @@ pnpm-debug.log*
 
 # Local ACPX runtime state and generated reports
 **/.acpx/
-skills/acpx-agent-orchestrator/acpx-inspector/demo-minimal/home/
-skills/acpx-agent-orchestrator/acpx-inspector/demo-minimal/*.html
-
-# Upstream/reference checkout embedded while developing the inspector.
-# Keep the lightweight inspector tool files, but do not track the full acpx repo.
-skills/acpx-agent-orchestrator/acpx-inspector/acpx/
+**/.acpx-orchestrator/runs/
+**/.acpx-orchestrator/drafts/
+skills/acpx-agent-orchestrator/dist/

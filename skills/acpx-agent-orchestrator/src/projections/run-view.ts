@@ -1,0 +1,148 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import type { OrchestratorIssue } from "../errors.js";
+import type { WorkflowSpec } from "../schema/workflow-spec.js";
+import { runDir } from "../run-index/paths.js";
+import type { RunIndex } from "../run-index/read-write.js";
+
+export type RunViewStatus = "pending" | "running" | "completed" | "blocked" | "diagnosed_blocked" | "failed" | "cancelled";
+
+export type RunView = {
+  logicalRunId?: string;
+  workflowName: string;
+  status: RunViewStatus;
+  finalVerdict?: "success" | "success_with_warnings" | "blocked" | "failed" | "unknown";
+  summary: string;
+  checks: Array<{ command?: string; name?: string; status?: string; summary?: string }>;
+  finalWarnings: string[];
+  risks: string[];
+  warnings: OrchestratorIssue[];
+  errors: OrchestratorIssue[];
+  roles: Array<{ name: string; category: string; agent: string; mode: string }>;
+  stages: Array<{ id: string; kind: string; dependsOn: string[]; status?: string; summary?: string }>;
+  agentUsage: { planned: number; actual?: number; repairCalls?: number };
+  artifacts: Array<{ kind?: string; path?: string; label?: string }>;
+  commands: Record<string, string>;
+};
+
+export function previewRunView(spec: WorkflowSpec, issues: OrchestratorIssue[] = [], commands: Record<string, string> = {}): RunView {
+  const risks = previewRisks(spec);
+  return {
+    workflowName: spec.name,
+    status: issues.some((entry) => entry.severity !== "warning") ? "blocked" : "pending",
+    summary: spec.description || `Workflow ${spec.name}`,
+    checks: [],
+    finalWarnings: issues.filter((entry) => entry.severity === "warning").map((entry) => `${entry.code}: ${entry.message}`),
+    risks,
+    warnings: issues.filter((entry) => entry.severity === "warning"),
+    errors: issues.filter((entry) => entry.severity !== "warning"),
+    roles: Object.entries(spec.roles).map(([name, role]) => ({ name, ...role })),
+    stages: spec.stages.map((stage) => ({
+      id: stage.id,
+      kind: stage.kind,
+      dependsOn: stage.dependsOn ?? []
+    })),
+    agentUsage: {
+      planned: estimateAgentCalls(spec)
+    },
+    artifacts: [],
+    commands
+  };
+}
+
+export async function runViewFromIndex(cwd: string, spec: WorkflowSpec, index: RunIndex, issues: OrchestratorIssue[] = []): Promise<RunView> {
+  const stageOutputs = await readStageOutputs(cwd, index.logicalRunId, spec);
+  const summarizeStage = spec.stages.find((stage) => stage.kind === "summarize")?.id;
+  const finalOutput = summarizeStage ? stageOutputs[summarizeStage] : undefined;
+  const final = objectRecord(finalOutput);
+  const artifacts = Object.values(stageOutputs)
+    .flatMap((output) => Array.isArray(objectRecord(output)?.artifacts) ? objectRecord(output)?.artifacts as Array<{ kind?: string; path?: string; label?: string }> : []);
+  const finalWarnings = stringArray(final?.warnings);
+  const outputRisks = stringArray(final?.risks);
+  const checks = Array.isArray(final?.checks) ? final.checks as RunView["checks"] : [];
+  const preview = previewRunView(spec, issues);
+  return {
+    ...preview,
+    logicalRunId: index.logicalRunId,
+    workflowName: index.workflowName,
+    status: index.status,
+    finalVerdict: index.finalVerdict ?? finalVerdict(final),
+    summary: typeof final?.summary === "string" ? final.summary : (index.blockedReason ?? spec.description ?? ""),
+    checks,
+    finalWarnings,
+    risks: [...preview.risks, ...outputRisks],
+    stages: spec.stages.map((stage) => {
+      const output = objectRecord(stageOutputs[stage.id]);
+      return {
+        id: stage.id,
+        kind: stage.kind,
+        dependsOn: stage.dependsOn ?? [],
+        status: typeof output?.status === "string" ? output.status : undefined,
+        summary: typeof output?.summary === "string" ? output.summary : undefined
+      };
+    }),
+    agentUsage: {
+      planned: index.agentUsage.planned,
+      actual: index.agentUsage.actual,
+      repairCalls: index.agentUsage.repairCalls
+    },
+    artifacts: artifacts.filter((artifact) => artifact && typeof artifact === "object")
+  };
+}
+
+export function estimateAgentCalls(spec: WorkflowSpec): number {
+  let baseCalls = 0;
+  for (const stage of spec.stages) {
+    if (stage.kind === "agentTask" || stage.kind === "summarize") baseCalls += 1;
+    if (stage.kind === "discover" && stage.method === "agent") baseCalls += 1;
+    if (stage.kind === "reduce" && stage.mode === "agent") baseCalls += 1;
+    if (stage.kind === "decisionGate" && stage.mode === "agent") baseCalls += 1;
+    if (stage.kind === "fanout") baseCalls += stage.limits?.maxFanoutItems ?? spec.limits.maxFanoutItems ?? 1;
+    if (stage.kind === "fixLoop") baseCalls += stage.maxRounds + Math.max(0, stage.maxRounds - 1);
+  }
+  // Each agent call can consume one format-repair call in the generated flow.
+  return baseCalls * 2;
+}
+
+async function readStageOutputs(cwd: string, logicalRunId: string, spec: WorkflowSpec): Promise<Record<string, unknown>> {
+  const outputs: Record<string, unknown> = {};
+  const dir = path.join(runDir(logicalRunId, cwd), "outputs");
+  for (const stage of spec.stages) {
+    try {
+      outputs[stage.id] = JSON.parse(await fs.readFile(path.join(dir, `${stage.id}.json`), "utf8"));
+    } catch {
+      // Missing output means the stage has not run or was skipped by routing.
+    }
+  }
+  return outputs;
+}
+
+function objectRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" ? value as Record<string, unknown> : undefined;
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function finalVerdict(output?: Record<string, unknown>): RunView["finalVerdict"] | undefined {
+  const value = output?.finalVerdict;
+  if (value === "success" || value === "success_with_warnings" || value === "blocked" || value === "failed" || value === "unknown") return value;
+  return undefined;
+}
+
+function previewRisks(spec: WorkflowSpec): string[] {
+  const risks: string[] = [
+    "Approval permits this run only; saving for reuse requires an explicit save command.",
+    "Audit artifacts are written under .acpx-orchestrator/runs/<logicalRunId>/ with spec, flow, prompts, outputs, and events.",
+    "Role modes are enforced by injected prompts and audit metadata when acpx does not expose per-stage permission controls."
+  ];
+  const editRoles = Object.entries(spec.roles).filter(([, role]) => role.mode === "edit").map(([name]) => name);
+  if (editRoles.length > 0) risks.push(`Edit-capable roles may modify files: ${editRoles.join(", ")}.`);
+  const editFanout = spec.stages.filter((stage) => stage.kind === "fanout" && spec.roles[stage.role]?.mode === "edit").map((stage) => stage.id);
+  if (editFanout.length > 0) risks.push(`Edit fanout is high risk; batch segments may run under the global concurrency pool: ${editFanout.join(", ")}.`);
+  const allowPartial = spec.stages.filter((stage) => stage.kind === "fanout" && stage.fanoutPolicy?.allowPartial).map((stage) => stage.id);
+  if (allowPartial.length > 0) risks.push(`Partial fanout results are explicitly allowed for: ${allowPartial.join(", ")}.`);
+  if ((spec.limits.maxConcurrency ?? 1) > 1) risks.push(`Global maxConcurrency is ${spec.limits.maxConcurrency}; stage limits may only reduce it.`);
+  return risks;
+}

@@ -1,0 +1,20 @@
+import { defineConfig } from "tsdown";
+
+export default defineConfig({
+  entry: {
+    cli: "src/cli.ts",
+    index: "src/index.ts"
+  },
+  format: ["esm"],
+  dts: true,
+  clean: true,
+  platform: "node",
+  target: "node20",
+  deps: {
+    alwaysBundle: [/^(commander|proper-lockfile|zod)(\/.*)?$/],
+    onlyBundle: false,
+    dts: {
+      neverBundle: [/^zod(\/.*)?$/]
+    }
+  }
+});

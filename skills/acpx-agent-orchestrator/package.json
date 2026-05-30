@@ -1,0 +1,36 @@
+{
+  "name": "@kelvinschen/acpx-agent-orchestrator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "acpx-orchestrator": "dist/cli.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e:fake": "vitest run test/e2e/fake",
+    "test:e2e:real": "RUN_REAL_ACPX_E2E=1 vitest run test/e2e/real",
+    "generate:schema": "tsx src/schema/generate-json-schema.ts",
+    "validate": "npm run typecheck && npm run test && npm run generate:schema && npm run build"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "execa": "^9.6.0",
+    "fast-glob": "^3.3.3",
+    "kleur": "^4.1.5",
+    "proper-lockfile": "^4.1.2",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "tsdown": "^0.22.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

@@ -1,8 +1,0 @@
-{
-  "task": "SMOKE ONLY: 修复用户描述的最小 bug，然后让 independent agent 验证行为。",
-  "cwd": "/tmp/acpx-quick-bugfix-smoke",
-  "implAgent": "trae",
-  "testAgent": "aiden",
-  "testHints": "优先使用 black-box verification，在检查 fix 前先复现 bug。",
-  "maxFixRounds": 0
-}

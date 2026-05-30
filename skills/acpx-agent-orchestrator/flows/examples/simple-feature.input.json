@@ -1,9 +1,0 @@
-{
-  "task": "SMOKE ONLY: 实现一个小型 local feature，并进行 independent validation review，最多一轮 automatic fix。",
-  "cwd": "/tmp/acpx-simple-feature-smoke",
-  "planAgent": "claude",
-  "implAgent": "trae",
-  "validateAgent": "aiden",
-  "testHints": "创建 black-box checks 来验证 user-visible behavior，而不仅是 implementation details。",
-  "maxFixRounds": 1
-}
