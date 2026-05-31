@@ -220,17 +220,14 @@ async function reconcileFanoutRuntimeState(snapshot: RuntimeSnapshot): Promise<{
       }
     }
     if (!stageChanged) continue;
-    const completedItems = items.filter((item) => item.status === "completed").length;
-    const blockedItems = items.filter((item) => item.status === "blocked").length;
-    const failedItems = items.filter((item) => item.status === "failed").length;
+    const counts = fanoutItemCounts(items);
     index = updateStage(index, stage.id, {
       ...state,
+      status: fanoutTransientStatus(items),
       fanout: {
         ...state.fanout,
         items,
-        completedItems,
-        blockedItems,
-        failedItems
+        ...counts
       }
     });
     for (const attempt of attempts) index = upsertAttemptIndex(index, attempt);
@@ -296,7 +293,8 @@ async function collectReadyAgentWork(snapshot: RuntimeSnapshot): Promise<AgentWo
   const units: AgentWorkUnit[] = [];
   for (const stage of snapshot.spec.stages) {
     const state = snapshot.index.stages[stage.id];
-    if (!state || state.status === "completed" || state.status === "blocked" || state.status === "failed" || state.status === "skipped" || state.status === "running") continue;
+    if (!state || state.status === "completed" || state.status === "blocked" || state.status === "failed" || state.status === "skipped") continue;
+    if (state.status === "running" && shouldSkipRunningStage(stage, state)) continue;
     if (!dependenciesCompleted(stage, snapshot.index)) continue;
     const planStage = snapshot.plan.stages.find((candidate) => candidate.id === stage.id);
     if (!planStage) continue;
@@ -548,18 +546,14 @@ function mergeAgentResult(index: RunIndex, result: AgentWorkResult, runDir: stri
         errorMessage: result.errorMessage ?? result.error ?? item.errorMessage
       };
     });
-    const completedItems = items.filter((item) => item.status === "completed").length;
-    const blockedItems = items.filter((item) => item.status === "blocked").length;
-    const failedItems = items.filter((item) => item.status === "failed").length;
+    const counts = fanoutItemCounts(items);
     next = updateStage(next, result.stageId, {
       ...stage,
-      status: items.some((item) => item.status === "pending" || item.status === "ready" || item.status === "running") ? "running" : stage.status,
+      status: fanoutTransientStatus(items),
       fanout: {
         ...stage.fanout,
         items,
-        completedItems,
-        blockedItems,
-        failedItems
+        ...counts
       }
     });
   } else {
@@ -671,20 +665,52 @@ function applyFanoutResumePolicy(
   const allowPartial = stage.fanout.allowPartial || policy.allowPartial === true;
   const changed = items.length !== stage.fanout.items.length || allowPartial !== stage.fanout.allowPartial;
   if (!changed) return { stage, changed: false };
+  const counts = fanoutItemCounts(items);
   return {
     changed: true,
     stage: {
       ...stage,
+      status: isTerminalStageStatus(stage.status) ? stage.status : fanoutTransientStatus(items),
       fanout: {
         ...stage.fanout,
         totalItems: items.length,
-        completedItems: items.filter((item) => item.status === "completed").length,
-        blockedItems: items.filter((item) => item.status === "blocked").length,
-        failedItems: items.filter((item) => item.status === "failed").length,
+        ...counts,
         allowPartial,
         items
       }
     }
+  };
+}
+
+type FanoutItemIndexEntry = NonNullable<StageIndexEntry["fanout"]>["items"][number];
+
+function fanoutTransientStatus(items: FanoutItemIndexEntry[]): StageStatus {
+  return hasRunningFanoutItems(items) ? "running" : "ready";
+}
+
+function isTerminalStageStatus(status: StageStatus): boolean {
+  return status === "completed" || status === "blocked" || status === "failed" || status === "skipped";
+}
+
+function shouldSkipRunningStage(stage: Stage, state: StageIndexEntry): boolean {
+  if (stage.kind !== "fanout" || !state.fanout) return true;
+  const items = state.fanout.items;
+  return hasRunningFanoutItems(items) || !hasQueuedFanoutItems(items);
+}
+
+function hasRunningFanoutItems(items: FanoutItemIndexEntry[]): boolean {
+  return items.some((item) => item.status === "running");
+}
+
+function hasQueuedFanoutItems(items: FanoutItemIndexEntry[]): boolean {
+  return items.some((item) => item.status === "pending" || item.status === "ready");
+}
+
+function fanoutItemCounts(items: FanoutItemIndexEntry[]): Pick<NonNullable<StageIndexEntry["fanout"]>, "completedItems" | "blockedItems" | "failedItems"> {
+  return {
+    completedItems: items.filter((item) => item.status === "completed").length,
+    blockedItems: items.filter((item) => item.status === "blocked").length,
+    failedItems: items.filter((item) => item.status === "failed").length
   };
 }
 

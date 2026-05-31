@@ -5,7 +5,7 @@ import type { AcpRuntimeEvent, AcpRuntimeHandle } from "acpx/runtime";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildRunReportView } from "../../src/projections/run-report.js";
 import { runDir } from "../../src/run-index/paths.js";
-import { appendEvent, readRunIndex, RuntimeErrorCodes, writeRunIndex } from "../../src/run-index/read-write.js";
+import { appendEvent, readRunIndex, RuntimeErrorCodes, writeRunIndex, type RunIndex } from "../../src/run-index/read-write.js";
 import { setAgentRuntimeFactoryForTests, type AgentTurnRequest, type AgentTurnResult, type OrchestratorAgentRuntime } from "../../src/runtime/agent-runtime.js";
 import { startDiagnosticRun } from "../../src/runtime/diagnose-run.js";
 import { prepareRun, startPreparedRun } from "../../src/runtime/run-workflow.js";
@@ -59,6 +59,56 @@ describe("fanout runtime stability", () => {
     expect(events).toContain("scheduler_batch_completed");
   });
 
+  it("continues batched fanout after the first concurrency window completes", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-fanout-batches-"));
+    setAgentRuntimeFactoryForTests(() => new StaticRuntime());
+    const spec = fanoutSpec(20, { allowPartial: false }, { maxAgents: 20, maxConcurrency: 10 });
+    const prepared = await prepareRun(spec, {
+      cwd,
+      input: { cwd, items: fanoutInputItems(20) }
+    });
+
+    const firstTick = await startPreparedRun(cwd, prepared);
+    const secondTick = await syncRun(cwd, prepared.logicalRunId);
+
+    expect(firstTick.status).toBe("running");
+    expect(firstTick.stages.fanout?.status).toBe("ready");
+    expect(firstTick.stages.fanout?.fanout?.completedItems).toBe(10);
+    expect(queuedFanoutItemCount(firstTick)).toBe(10);
+    expect(secondTick.status).toBe("completed");
+    expect(secondTick.stages.fanout?.status).toBe("completed");
+    expect(secondTick.stages.fanout?.fanout?.completedItems).toBe(20);
+    expect(await schedulerBatchStartedCount(prepared.dir)).toBeGreaterThanOrEqual(2);
+    expect(hasStuckFanoutPendingBatch(secondTick)).toBe(false);
+  });
+
+  it("continues queued fanout items after a partial item runtime error", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-fanout-partial-batches-"));
+    setAgentRuntimeFactoryForTests(() => new SelectiveFanoutRuntime("item-2"));
+    const spec = fanoutSpec(20, { allowPartial: true }, { maxAgents: 20, maxConcurrency: 10 });
+    const prepared = await prepareRun(spec, {
+      cwd,
+      input: { cwd, items: fanoutInputItems(20) }
+    });
+
+    const firstTick = await startPreparedRun(cwd, prepared);
+    const secondTick = await syncRun(cwd, prepared.logicalRunId);
+
+    expect(firstTick.status).toBe("running");
+    expect(firstTick.stages.fanout?.status).toBe("ready");
+    expect(firstTick.stages.fanout?.fanout?.completedItems).toBe(9);
+    expect(firstTick.stages.fanout?.fanout?.blockedItems).toBe(1);
+    expect(queuedFanoutItemCount(firstTick)).toBe(10);
+    expect(secondTick.status).toBe("completed");
+    expect(secondTick.stages.fanout?.status).toBe("completed");
+    expect(secondTick.stages.fanout?.fanout).toMatchObject({
+      completedItems: 19,
+      blockedItems: 1
+    });
+    expect(await schedulerBatchStartedCount(prepared.dir)).toBeGreaterThanOrEqual(2);
+    expect(hasStuckFanoutPendingBatch(secondTick)).toBe(false);
+  });
+
   it("recovers a running fanout item when its output file already exists", async () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-fanout-recover-"));
     const spec = fanoutSpec(1, { allowPartial: false });
@@ -101,6 +151,98 @@ describe("fanout runtime stability", () => {
       outputPath: path.join("outputs", "fanout", "item-1.json")
     });
     await expect(fs.stat(path.join(prepared.dir, "outputs", "fanout.json"))).resolves.toBeTruthy();
+  });
+
+  it("recovers a stale running fanout item and continues queued work", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-fanout-stale-queued-"));
+    setAgentRuntimeFactoryForTests(() => new StaticRuntime());
+    const spec = fanoutSpec(2, { allowPartial: true }, { maxAgents: 2, maxConcurrency: 1 });
+    const prepared = await prepareRun(spec, {
+      cwd,
+      input: { cwd, items: fanoutInputItems(2) }
+    });
+    const staleStartedAt = new Date(Date.now() - 60_000).toISOString();
+    await writeRunIndex(cwd, {
+      ...prepared.index,
+      status: "running",
+      stages: {
+        ...prepared.index.stages,
+        fanout: {
+          stageId: "fanout",
+          status: "running",
+          attempts: [],
+          startedAt: staleStartedAt,
+          fanout: {
+            totalItems: 2,
+            completedItems: 0,
+            blockedItems: 0,
+            allowPartial: true,
+            items: [
+              { id: "item-1", index: 0, status: "running", startedAt: staleStartedAt, attemptId: "fanout:item-1:attempt-1" },
+              { id: "item-2", index: 1, status: "pending" }
+            ]
+          }
+        }
+      }
+    });
+
+    const recovered = await syncRun(cwd, prepared.logicalRunId);
+    const items = recovered.stages.fanout?.fanout?.items ?? [];
+
+    expect(recovered.status).toBe("completed");
+    expect(recovered.stages.fanout?.status).toBe("completed");
+    expect(items.map((item) => [item.id, item.status, item.errorCode])).toEqual([
+      ["item-1", "blocked", RuntimeErrorCodes.FANOUT_ITEM_RUNTIME_ERROR],
+      ["item-2", "completed", undefined]
+    ]);
+    expect(recovered.stages.fanout?.fanout).toMatchObject({
+      completedItems: 1,
+      blockedItems: 1
+    });
+    expect(hasStuckFanoutPendingBatch(recovered)).toBe(false);
+  });
+
+  it("continues a legacy fanout stage stuck running with queued items", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-fanout-legacy-stuck-"));
+    setAgentRuntimeFactoryForTests(() => new StaticRuntime());
+    const spec = fanoutSpec(2, { allowPartial: false }, { maxAgents: 2, maxConcurrency: 1 });
+    const prepared = await prepareRun(spec, {
+      cwd,
+      input: { cwd, items: fanoutInputItems(2) }
+    });
+    const firstOutputPath = path.join(prepared.dir, "outputs", "fanout", "item-1.json");
+    await fs.mkdir(path.dirname(firstOutputPath), { recursive: true });
+    await fs.writeFile(firstOutputPath, `${JSON.stringify(baseOutput({ summary: "already complete" }), null, 2)}\n`, "utf8");
+    await writeRunIndex(cwd, {
+      ...prepared.index,
+      status: "running",
+      stages: {
+        ...prepared.index.stages,
+        fanout: {
+          stageId: "fanout",
+          status: "running",
+          attempts: [],
+          fanout: {
+            totalItems: 2,
+            completedItems: 1,
+            blockedItems: 0,
+            allowPartial: false,
+            items: [
+              { id: "item-1", index: 0, status: "completed", outputPath: path.join("outputs", "fanout", "item-1.json"), completedAt: new Date().toISOString() },
+              { id: "item-2", index: 1, status: "pending" }
+            ]
+          }
+        }
+      }
+    });
+
+    const synced = await syncRun(cwd, prepared.logicalRunId);
+
+    expect(synced.status).toBe("completed");
+    expect(synced.stages.fanout?.status).toBe("completed");
+    expect(synced.stages.fanout?.fanout?.completedItems).toBe(2);
+    expect(await schedulerBatchStartedCount(prepared.dir)).toBe(1);
+    expect(hasStuckFanoutPendingBatch(synced)).toBe(false);
   });
 
   it("preserves cancelled turn diagnostics in output and attempt index", async () => {
@@ -162,6 +304,46 @@ describe("fanout runtime stability", () => {
       code: RuntimeErrorCodes.FANOUT_ITEM_RUNTIME_ERROR,
       stageId: "fanout",
       itemId: "item-2"
+    }));
+  });
+
+  it("diagnoses a fanout stage stuck running with queued items", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-fanout-stuck-report-"));
+    const spec = fanoutSpec(2, { allowPartial: false }, { maxAgents: 2, maxConcurrency: 1 });
+    const prepared = await prepareRun(spec, {
+      cwd,
+      input: { cwd, items: fanoutInputItems(2) }
+    });
+    const stuckIndex: RunIndex = {
+      ...prepared.index,
+      status: "running",
+      stages: {
+        ...prepared.index.stages,
+        fanout: {
+          stageId: "fanout",
+          status: "running",
+          attempts: [],
+          fanout: {
+            totalItems: 2,
+            completedItems: 1,
+            blockedItems: 0,
+            allowPartial: false,
+            items: [
+              { id: "item-1", index: 0, status: "completed", completedAt: new Date().toISOString() },
+              { id: "item-2", index: 1, status: "pending" }
+            ]
+          }
+        }
+      }
+    };
+
+    const report = await buildRunReportView(cwd, spec, stuckIndex, { mode: "snapshot" });
+
+    expect(report.diagnostics).toContainEqual(expect.objectContaining({
+      code: RuntimeErrorCodes.FANOUT_STAGE_STUCK_PENDING_BATCH,
+      stageId: "fanout",
+      itemId: undefined,
+      summary: expect.stringContaining("queued item")
     }));
   });
 
@@ -264,7 +446,11 @@ describe("fanout runtime stability", () => {
   });
 });
 
-function fanoutSpec(count: number, policy: { allowPartial: boolean }): WorkflowSpec {
+function fanoutSpec(
+  count: number,
+  policy: { allowPartial: boolean },
+  limits: { maxAgents?: number; maxConcurrency?: number; maxFanoutItems?: number } = {}
+): WorkflowSpec {
   return WorkflowSpecSchema.parse({
     schemaVersion: "acpx-orchestrator.workflow/v1",
     name: "fanout-stability",
@@ -274,7 +460,13 @@ function fanoutSpec(count: number, policy: { allowPartial: boolean }): WorkflowS
       items: { type: "array<json>" }
     },
     roles: { worker: { category: "coordination", agent: "fake", mode: "readOnly" } },
-    limits: { maxAgents: count, maxConcurrency: count, maxFanoutItems: count, maxFixRounds: 0, stageTimeoutMinutes: 1 },
+    limits: {
+      maxAgents: limits.maxAgents ?? count,
+      maxConcurrency: limits.maxConcurrency ?? count,
+      maxFanoutItems: limits.maxFanoutItems ?? count,
+      maxFixRounds: 0,
+      stageTimeoutMinutes: 1
+    },
     stages: [{
       id: "fanout",
       kind: "fanout",
@@ -284,6 +476,32 @@ function fanoutSpec(count: number, policy: { allowPartial: boolean }): WorkflowS
       fanoutPolicy: policy
     }]
   });
+}
+
+function fanoutInputItems(count: number): Array<{ id: string }> {
+  return Array.from({ length: count }, (_, index) => ({ id: `item-${index + 1}` }));
+}
+
+function queuedFanoutItemCount(index: RunIndex): number {
+  return index.stages.fanout?.fanout?.items.filter((item) => item.status === "pending" || item.status === "ready").length ?? 0;
+}
+
+function hasStuckFanoutPendingBatch(index: RunIndex): boolean {
+  return Object.values(index.stages).some((stage) => {
+    if (stage.status !== "running" || !stage.fanout) return false;
+    const hasRunningItems = stage.fanout.items.some((item) => item.status === "running");
+    const hasQueuedItems = stage.fanout.items.some((item) => item.status === "pending" || item.status === "ready");
+    return !hasRunningItems && hasQueuedItems;
+  });
+}
+
+async function schedulerBatchStartedCount(dir: string): Promise<number> {
+  const text = await fs.readFile(path.join(dir, "events.ndjson"), "utf8");
+  return text.trim().split("\n").filter((line) => {
+    if (!line) return false;
+    const event = JSON.parse(line) as { type?: string };
+    return event.type === "scheduler_batch_started";
+  }).length;
 }
 
 function summarizeSpec(cwd: string): WorkflowSpec {
@@ -322,7 +540,7 @@ class SelectiveFanoutRuntime implements OrchestratorAgentRuntime {
 
   async runTurn(input: AgentTurnRequest, onEvent?: (event: AcpRuntimeEvent) => Promise<void> | void): Promise<AgentTurnResult> {
     this.requests.push(input);
-    if (input.sessionKey.includes(`item:${this.failingItemId}`)) {
+    if (input.sessionKey.endsWith(`item:${this.failingItemId}`)) {
       throw new Error("backend queue rejected item turn");
     }
     const rawText = plainJsonOutput(baseOutput({ summary: input.sessionKey }));

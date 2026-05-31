@@ -494,6 +494,17 @@ async function buildRuntimeDiagnostics(dir: string, index: RunIndex, events: Rep
   }
   for (const stage of Object.values(index.stages)) {
     if (!stage.fanout) continue;
+    const hasRunningItems = stage.fanout.items.some((item) => item.status === "running");
+    const queuedItems = stage.fanout.items.filter((item) => item.status === "pending" || item.status === "ready");
+    if (stage.status === "running" && !hasRunningItems && queuedItems.length > 0) {
+      diagnostics.push(runtimeDiagnostic({
+        code: RuntimeErrorCodes.FANOUT_STAGE_STUCK_PENDING_BATCH,
+        stageId: stage.stageId,
+        path: path.join(dir, "run.json"),
+        summary: `Fanout stage ${stage.stageId} is running with no running items and ${queuedItems.length} queued item(s).`,
+        limits
+      }));
+    }
     for (const item of stage.fanout.items) {
       const outputPath = item.outputPath ? path.join(dir, item.outputPath) : path.join(dir, "outputs", stage.stageId, `${safeFileName(item.id)}.json`);
       const outputExists = await fileExists(outputPath);
