@@ -38,14 +38,13 @@ Code families are stable and should not be renamed casually:
 
 Output contract codes emitted by the runtime parser:
 
-- `OUTPUT_PARSE_FAILED`: no acceptable JSON candidate could be parsed from an
-  agent response.
-- `OUTPUT_SCHEMA_FAILED`: JSON candidates were found, but none satisfied the
-  stage-specific Zod-backed `workflow-output` contract.
-- `OUTPUT_AMBIGUOUS`: multiple different valid `workflow-output` candidates were
-  found, so the parser failed closed.
+- `OUTPUT_PARSE_FAILED`: no balanced JSON object could be parsed from an agent
+  response.
+- `OUTPUT_SCHEMA_FAILED`: a balanced JSON object was found, but the last
+  parseable object did not satisfy the stage-specific Zod-backed output
+  contract.
 - `OUTPUT_REPAIR_FAILED`: the one allowed schema-aware repair turn did not
-  produce a valid `workflow-output`.
+  produce a valid balanced JSON object.
 
 Output contract failures map to blocked attempt/stage/run state, not failed.
 `failed` is reserved for compiler, scheduler, ACPX runtime, or other

@@ -510,7 +510,7 @@ function lintDiscover(spec: WorkflowSpec): OrchestratorIssue[] {
           severity: "error",
           path: `/stages/${index}/prompt`,
           message: `Agent discover stage ${stage.id} requires a prompt.`,
-          suggestions: ["Add a prompt that instructs the agent to return workflow-output JSON containing discovered items."]
+          suggestions: ["Add a prompt that instructs the agent to end with a final JSON object containing discovered items."]
         }));
       }
       if (!stage.limits?.maxFanoutItems && !spec.limits.maxFanoutItems) {

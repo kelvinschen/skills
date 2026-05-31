@@ -290,7 +290,6 @@ function StageDetail({ stage }: { stage: ReportStageDetail }): React.ReactElemen
         <p>
           Output parse: {stage.outputParse.mode ?? "unknown"}
           {stage.outputParse.candidateCount !== undefined ? `, ${stage.outputParse.candidateCount} candidate(s)` : ""}
-          {stage.outputParse.unwrapped ? ", unwrapped" : ""}
           {stage.outputParse.repaired ? ", repaired" : ""}
         </p>
       )}

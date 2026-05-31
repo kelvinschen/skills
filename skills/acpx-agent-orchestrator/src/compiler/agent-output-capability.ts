@@ -13,7 +13,7 @@ export function rawTextOutputCapability(contract: OutputContractName): AgentOutp
   return {
     mode: "rawText",
     contract,
-    schemaName: `workflow-output.${contract}`,
+    schemaName: `final-json.${contract}`,
     rawTextFallback: true
   };
 }

@@ -45,7 +45,7 @@ export function compileExecutionPlan(spec: WorkflowSpec, options: CompileExecuti
     contracts,
     repairPolicy: {
       maxRepairTurns: 1,
-      repairableReasons: ["OUTPUT_PARSE_FAILED", "OUTPUT_SCHEMA_FAILED", "OUTPUT_AMBIGUOUS"]
+      repairableReasons: ["OUTPUT_PARSE_FAILED", "OUTPUT_SCHEMA_FAILED"]
     },
     fanout
   };

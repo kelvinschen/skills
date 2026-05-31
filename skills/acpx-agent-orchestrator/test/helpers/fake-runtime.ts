@@ -18,7 +18,7 @@ export class FakeAgentRuntime implements OrchestratorAgentRuntime {
     const selectedIndex = turnIndex >= 0 ? turnIndex : this.index;
     const selected = this.turns[selectedIndex] ?? this.turns.at(-1);
     this.index = selectedIndex + 1;
-    const text = selected?.text ?? workflowOutput({ status: "completed", summary: "ok", artifacts: [], nextFocus: "done" });
+    const text = selected?.text ?? plainJsonOutput({ status: "completed", summary: "ok", artifacts: [], nextFocus: "done" });
     await onEvent?.({ type: "text_delta", text, stream: "output" });
     return {
       handle: fakeHandle(input),
@@ -43,8 +43,8 @@ export function fakeRuntimeFactory(turns: FakeTurn[]): { runtime: FakeAgentRunti
   };
 }
 
-export function workflowOutput(value: unknown, tag = "workflow-output"): string {
-  return `\`\`\`${tag}\n${JSON.stringify(value, null, 2)}\n\`\`\``;
+export function plainJsonOutput(value: unknown): string {
+  return JSON.stringify(value, null, 2);
 }
 
 export function baseOutput(extra: Record<string, unknown> = {}): Record<string, unknown> {

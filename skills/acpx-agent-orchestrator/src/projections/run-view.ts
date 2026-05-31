@@ -9,7 +9,6 @@ export type RunViewStatus = "pending" | "running" | "completed" | "blocked" | "d
 export type RunViewOutputParse = {
   mode?: string;
   repaired?: boolean;
-  unwrapped?: boolean;
   candidateCount?: number;
   warnings: string[];
 };
@@ -177,7 +176,6 @@ function outputParseSummary(output: Record<string, unknown> | undefined): RunVie
   return {
     mode: typeof outputParse.mode === "string" ? outputParse.mode : undefined,
     repaired: typeof outputParse.repaired === "boolean" ? outputParse.repaired : undefined,
-    unwrapped: typeof outputParse.unwrapped === "boolean" ? outputParse.unwrapped : undefined,
     candidateCount: typeof outputParse.candidateCount === "number" ? outputParse.candidateCount : undefined,
     warnings: stringArray(outputParse.warnings)
   };

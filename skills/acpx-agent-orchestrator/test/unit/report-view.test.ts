@@ -18,7 +18,7 @@ describe("RunReportView", () => {
       mode: "edit",
       status: "completed",
       outputParse: {
-        mode: "workflowOutputFence",
+        mode: "lastBalancedJson",
         candidateCount: 1
       }
     });
@@ -39,7 +39,7 @@ describe("RunReportView", () => {
       parseDiagnostics: {
         errorCode: "OUTPUT_SCHEMA_FAILED",
         candidateCount: 1,
-        schemaErrors: [{ path: "/status", message: "workflow-output.status must be completed or blocked." }]
+        schemaErrors: [{ path: "/status", message: "Invalid option: expected one of \"completed\"|\"blocked\"" }]
       }
     });
     expect(view.stages.find((stage) => stage.id === "summarize")).toMatchObject({ status: "skipped", output: undefined });

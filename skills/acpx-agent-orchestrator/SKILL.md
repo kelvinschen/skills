@@ -61,8 +61,10 @@ stage id, and authoring stage kinds:
 - `summarize`
 
 Prompt text is freeform, but variables are explicit and interpolated as
-`${variableName}`. Agent outputs must end with one fenced `workflow-output` JSON
-block. Zod-backed contracts validate outputs, deterministic
+`${variableName}`. Agent outputs should end with one plain JSON object; the
+parser selects the last balanced JSON object and tolerates non-JSON tail text.
+Markdown code fences are not part of the output protocol. Zod-backed contracts
+validate outputs, deterministic
 `checks[].result -> checks[].status` normalization is allowed, and one
 schema-aware repair turn may run in the same session.
 

@@ -35,7 +35,7 @@ export function renderMarkdownReport(view: RunView): string {
     ...view.stages.flatMap((stage) => [
       `- ${stage.id} (${stage.kind})${stage.status ? ` status=${stage.status}` : ""}${stage.dependsOn.length ? ` depends on ${stage.dependsOn.join(", ")}` : ""}${stage.summary ? ` - ${stage.summary}` : ""}`,
       stage.blockedReason ? `  - Blocked reason: ${stage.blockedReason}` : undefined,
-      stage.outputParse ? `  - Output parse: ${stage.outputParse.mode ?? "unknown"}; candidates=${stage.outputParse.candidateCount ?? "unknown"}${stage.outputParse.unwrapped ? "; unwrapped" : ""}${stage.outputParse.repaired ? "; repaired" : ""}` : undefined,
+      stage.outputParse ? `  - Output parse: ${stage.outputParse.mode ?? "unknown"}; candidates=${stage.outputParse.candidateCount ?? "unknown"}${stage.outputParse.repaired ? "; repaired" : ""}` : undefined,
       stage.parseDiagnostics ? `  - Parse diagnostics: ${stage.parseDiagnostics.errorCode ?? "unknown"}; candidates=${stage.parseDiagnostics.candidateCount ?? "unknown"}${stage.parseDiagnostics.schemaErrors.length ? `; first error=${stage.parseDiagnostics.schemaErrors[0]?.path ?? ""} ${stage.parseDiagnostics.schemaErrors[0]?.message ?? ""}` : ""}` : undefined
     ].filter((line): line is string => line !== undefined)),
     "",

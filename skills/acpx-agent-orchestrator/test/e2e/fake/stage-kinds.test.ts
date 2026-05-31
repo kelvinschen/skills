@@ -6,7 +6,7 @@ import { setAgentRuntimeFactoryForTests } from "../../../src/runtime/agent-runti
 import { prepareRun } from "../../../src/runtime/run-workflow.js";
 import { syncRun } from "../../../src/runtime/sync.js";
 import { WorkflowSpecSchema, type WorkflowSpec } from "../../../src/schema/workflow-spec.js";
-import { baseOutput, fakeRuntimeFactory, implementationOutput, summarizeOutput, validationOutput, workflowOutput } from "../../helpers/fake-runtime.js";
+import { baseOutput, fakeRuntimeFactory, implementationOutput, summarizeOutput, validationOutput, plainJsonOutput } from "../../helpers/fake-runtime.js";
 
 describe("stage kind fake runtime e2e", () => {
   afterEach(() => setAgentRuntimeFactoryForTests(undefined));
@@ -14,8 +14,8 @@ describe("stage kind fake runtime e2e", () => {
   it("runs agent discovery into program reduce", async () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-stage-agent-discover-"));
     const fake = fakeRuntimeFactory([
-      { text: workflowOutput({ ...baseOutput({ nextFocus: "reduce" }), items: [{ findings: [{ severity: "P1", summary: "one" }] }, { findings: [{ severity: "P3", summary: "two" }] }] }) },
-      { text: workflowOutput(summarizeOutput({ summary: "done" })) }
+      { text: plainJsonOutput({ ...baseOutput({ nextFocus: "reduce" }), items: [{ findings: [{ severity: "P1", summary: "one" }] }, { findings: [{ severity: "P3", summary: "two" }] }] }) },
+      { text: plainJsonOutput(summarizeOutput({ summary: "done" })) }
     ]);
     setAgentRuntimeFactoryForTests(fake.factory);
     const prepared = await prepareRun(agentDiscoverProgramReduceSpec(cwd), { cwd, input: { cwd } });
@@ -30,10 +30,10 @@ describe("stage kind fake runtime e2e", () => {
   it("skips unselected downstream routes for agent decision gates", async () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-stage-agent-decision-"));
     const fake = fakeRuntimeFactory([
-      { text: workflowOutput({ ...baseOutput({ nextFocus: "left" }), route: "left" }) },
-      { text: workflowOutput(baseOutput({ summary: "left ran" })) },
-      { text: workflowOutput(baseOutput({ summary: "left ran" })) },
-      { text: workflowOutput(summarizeOutput({ summary: "done" })) }
+      { text: plainJsonOutput({ ...baseOutput({ nextFocus: "left" }), route: "left" }) },
+      { text: plainJsonOutput(baseOutput({ summary: "left ran" })) },
+      { text: plainJsonOutput(baseOutput({ summary: "left ran" })) },
+      { text: plainJsonOutput(summarizeOutput({ summary: "done" })) }
     ]);
     setAgentRuntimeFactoryForTests(fake.factory);
     const prepared = await prepareRun(agentDecisionSpec(cwd), { cwd, input: { cwd } });
@@ -51,10 +51,10 @@ describe("stage kind fake runtime e2e", () => {
   it("runs fixLoop validator and fixer attempts without overwriting attempt ids", async () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-stage-fixloop-"));
     const fake = fakeRuntimeFactory([
-      { text: workflowOutput(validationOutput({ verdict: "fix", findings: [{ severity: "P1", summary: "fix it" }] })) },
-      { text: workflowOutput(implementationOutput({ summary: "fixed" })) },
-      { text: workflowOutput(validationOutput({ verdict: "pass", summary: "passed" })) },
-      { text: workflowOutput(summarizeOutput({ summary: "done" })) }
+      { text: plainJsonOutput(validationOutput({ verdict: "fix", findings: [{ severity: "P1", summary: "fix it" }] })) },
+      { text: plainJsonOutput(implementationOutput({ summary: "fixed" })) },
+      { text: plainJsonOutput(validationOutput({ verdict: "pass", summary: "passed" })) },
+      { text: plainJsonOutput(summarizeOutput({ summary: "done" })) }
     ]);
     setAgentRuntimeFactoryForTests(fake.factory);
     const prepared = await prepareRun(fixLoopSpec(cwd), { cwd, input: { cwd } });

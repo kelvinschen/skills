@@ -155,11 +155,11 @@ async function writeLinearFixture(cwd: string, runId: string, dir: string, kind:
           blockedReason: "Required file is outside the allowed path scope.",
           parseDiagnostics: {
             errorCode: "OUTPUT_SCHEMA_FAILED",
-            summary: "Found JSON candidates, but none satisfied the implementation workflow-output contract.",
+            summary: "Last balanced JSON object did not satisfy the implementation contract.",
             candidateCount: 1,
             bestCandidateId: "candidate-1",
             recoverability: "repairable",
-            candidates: [{ id: "candidate-1", schemaErrors: [{ path: "/status", message: "workflow-output.status must be completed or blocked." }] }]
+            candidates: [{ id: "candidate-1", schemaErrors: [{ path: "/status", message: "Invalid option: expected one of \"completed\"|\"blocked\"" }] }]
           },
           artifacts: [],
           nextFocus: "diagnose"
@@ -169,7 +169,7 @@ async function writeLinearFixture(cwd: string, runId: string, dir: string, kind:
           summary: kind === "long-content" ? long : "Implementation complete",
           artifacts: [{ kind: "file", path: "src/app.ts", label: "Changed app file" }],
           nextFocus: "summarize",
-          metadata: { outputParse: { mode: "workflowOutputFence", repaired: false, unwrapped: false, candidateCount: 1, warnings: [] } },
+          metadata: { outputParse: { mode: "lastBalancedJson", repaired: false, candidateCount: 1, warnings: [] } },
           changedFiles: ["src/app.ts"],
           checks: [{ command: "npm test", status: "pass", summary: "Tests passed" }],
           data: kind === "long-content" ? { body: long } : undefined

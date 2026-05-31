@@ -6,7 +6,7 @@ describe("agent output capability", () => {
     expect(rawTextOutputCapability("implementation")).toEqual({
       mode: "rawText",
       contract: "implementation",
-      schemaName: "workflow-output.implementation",
+      schemaName: "final-json.implementation",
       rawTextFallback: true
     });
   });

@@ -6,7 +6,7 @@ import { prepareRun, startPreparedRun } from "../../../src/runtime/run-workflow.
 import { syncRun } from "../../../src/runtime/sync.js";
 import { setAgentRuntimeFactoryForTests } from "../../../src/runtime/agent-runtime.js";
 import { WorkflowSpecSchema } from "../../../src/schema/workflow-spec.js";
-import { fakeRuntimeFactory, implementationOutput, summarizeOutput, validationOutput, workflowOutput } from "../../helpers/fake-runtime.js";
+import { fakeRuntimeFactory, implementationOutput, summarizeOutput, validationOutput, plainJsonOutput } from "../../helpers/fake-runtime.js";
 
 describe("runtime-driven fake e2e", () => {
   afterEach(() => setAgentRuntimeFactoryForTests(undefined));
@@ -30,10 +30,10 @@ describe("runtime-driven fake e2e", () => {
     const temp = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-orchestrator-linear-"));
     const spec = WorkflowSpecSchema.parse(JSON.parse(await fs.readFile(path.resolve(__dirname, "..", "..", "..", "workflows/examples/simple-feature.workflow.spec.json"), "utf8")));
     const fake = fakeRuntimeFactory([
-      { text: workflowOutput({ status: "completed", summary: "plan", artifacts: [], nextFocus: "implement" }) },
-      { text: workflowOutput(implementationOutput({ summary: "implemented", changedFiles: ["src/app.ts"] })) },
-      { text: workflowOutput(validationOutput({ summary: "validated" })) },
-      { text: workflowOutput(summarizeOutput({ summary: "done", changedFiles: ["src/app.ts"] })) }
+      { text: plainJsonOutput({ status: "completed", summary: "plan", artifacts: [], nextFocus: "implement" }) },
+      { text: plainJsonOutput(implementationOutput({ summary: "implemented", changedFiles: ["src/app.ts"] })) },
+      { text: plainJsonOutput(validationOutput({ summary: "validated" })) },
+      { text: plainJsonOutput(summarizeOutput({ summary: "done", changedFiles: ["src/app.ts"] })) }
     ]);
     setAgentRuntimeFactoryForTests(fake.factory);
     const prepared = await prepareRun(spec, { cwd: temp, input: { task: "test", cwd: temp, testHints: "" } });
@@ -94,11 +94,11 @@ describe("runtime-driven fake e2e", () => {
     const temp = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-orchestrator-repair-"));
     const spec = WorkflowSpecSchema.parse(JSON.parse(await fs.readFile(path.resolve(__dirname, "..", "..", "..", "workflows/examples/simple-feature.workflow.spec.json"), "utf8")));
     const fake = fakeRuntimeFactory([
-      { text: workflowOutput({ status: "completed", summary: "plan", artifacts: [], nextFocus: "implement" }) },
-      { text: workflowOutput({ card: "domain-report" }) },
-      { text: workflowOutput(implementationOutput({ summary: "repaired implementation" })) },
-      { text: workflowOutput(validationOutput()) },
-      { text: workflowOutput(summarizeOutput()) }
+      { text: plainJsonOutput({ status: "completed", summary: "plan", artifacts: [], nextFocus: "implement" }) },
+      { text: plainJsonOutput({ card: "domain-report" }) },
+      { text: plainJsonOutput(implementationOutput({ summary: "repaired implementation" })) },
+      { text: plainJsonOutput(validationOutput()) },
+      { text: plainJsonOutput(summarizeOutput()) }
     ]);
     setAgentRuntimeFactoryForTests(fake.factory);
     const prepared = await prepareRun(spec, { cwd: temp, input: { task: "test", cwd: temp, testHints: "" } });
@@ -116,10 +116,10 @@ describe("runtime-driven fake e2e", () => {
     const temp = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-orchestrator-alias-"));
     const spec = WorkflowSpecSchema.parse(JSON.parse(await fs.readFile(path.resolve(__dirname, "..", "..", "..", "workflows/examples/simple-feature.workflow.spec.json"), "utf8")));
     const fake = fakeRuntimeFactory([
-      { text: workflowOutput({ status: "completed", summary: "plan", artifacts: [], nextFocus: "implement" }) },
-      { text: workflowOutput(implementationOutput({ checks: [{ name: "unit", result: "pass" }] })) },
-      { text: workflowOutput(validationOutput()) },
-      { text: workflowOutput(summarizeOutput()) }
+      { text: plainJsonOutput({ status: "completed", summary: "plan", artifacts: [], nextFocus: "implement" }) },
+      { text: plainJsonOutput(implementationOutput({ checks: [{ name: "unit", result: "pass" }] })) },
+      { text: plainJsonOutput(validationOutput()) },
+      { text: plainJsonOutput(summarizeOutput()) }
     ]);
     setAgentRuntimeFactoryForTests(fake.factory);
     const prepared = await prepareRun(spec, { cwd: temp, input: { task: "test", cwd: temp, testHints: "" } });
@@ -137,9 +137,9 @@ describe("runtime-driven fake e2e", () => {
     const temp = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-orchestrator-repair-fail-"));
     const spec = WorkflowSpecSchema.parse(JSON.parse(await fs.readFile(path.resolve(__dirname, "..", "..", "..", "workflows/examples/simple-feature.workflow.spec.json"), "utf8")));
     const fake = fakeRuntimeFactory([
-      { text: workflowOutput({ status: "completed", summary: "plan", artifacts: [], nextFocus: "implement" }) },
-      { text: workflowOutput({ card: "domain-report" }) },
-      { text: workflowOutput({ still: "invalid" }) }
+      { text: plainJsonOutput({ status: "completed", summary: "plan", artifacts: [], nextFocus: "implement" }) },
+      { text: plainJsonOutput({ card: "domain-report" }) },
+      { text: plainJsonOutput({ still: "invalid" }) }
     ]);
     setAgentRuntimeFactoryForTests(fake.factory);
     const prepared = await prepareRun(spec, { cwd: temp, input: { task: "test", cwd: temp, testHints: "" } });
@@ -156,10 +156,10 @@ describe("runtime-driven fake e2e", () => {
     const temp = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-orchestrator-fanout-"));
     const spec = WorkflowSpecSchema.parse(JSON.parse(await fs.readFile(path.resolve(__dirname, "..", "..", "..", "workflows/examples/edit-fanout-reconcile.workflow.spec.json"), "utf8")));
     const fake = fakeRuntimeFactory([
-      { text: workflowOutput(implementationOutput({ summary: "item 1" })) },
-      { text: workflowOutput(implementationOutput({ summary: "item 2" })) },
-      { text: workflowOutput(validationOutput({ summary: "reconciled" })) },
-      { text: workflowOutput(summarizeOutput({ summary: "done" })) }
+      { text: plainJsonOutput(implementationOutput({ summary: "item 1" })) },
+      { text: plainJsonOutput(implementationOutput({ summary: "item 2" })) },
+      { text: plainJsonOutput(validationOutput({ summary: "reconciled" })) },
+      { text: plainJsonOutput(summarizeOutput({ summary: "done" })) }
     ]);
     setAgentRuntimeFactoryForTests(fake.factory);
     const prepared = await prepareRun(spec, { cwd: temp, input: { task: "edit", cwd: temp, items: [{ path: "a.ts" }, { path: "b.ts" }] } });

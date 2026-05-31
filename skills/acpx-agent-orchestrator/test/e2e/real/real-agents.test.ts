@@ -98,7 +98,7 @@ describe.skipIf(!runReal)("real acpx agents e2e", () => {
             "In the current working directory, complete this task:",
             "${task}",
             "",
-            "Do the file edit directly. Keep the final response brief and finish with the required workflow-output block."
+            "Do the file edit directly. Keep the final response brief and finish with the required final JSON object."
           ].join("\n")
         },
         {

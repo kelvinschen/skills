@@ -39,7 +39,8 @@ Key rules:
 - variables must declare `source` and optional fixed built-in transforms
 - input defaults and runtime `--input-json` values are checked against the
   lightweight input type declarations
-- agent output must end with a `workflow-output` fenced JSON block
+- agent output should end with one plain JSON object; the parser selects the
+  last balanced JSON object and tolerates non-JSON tail text
 
 Stage output contracts are inferred from role category:
 

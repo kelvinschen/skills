@@ -11,7 +11,7 @@ import { startDiagnosticRun } from "../../src/runtime/diagnose-run.js";
 import { prepareRun, startPreparedRun } from "../../src/runtime/run-workflow.js";
 import { syncRun } from "../../src/runtime/sync.js";
 import { WorkflowSpecSchema, type WorkflowSpec } from "../../src/schema/workflow-spec.js";
-import { baseOutput, summarizeOutput, workflowOutput } from "../helpers/fake-runtime.js";
+import { baseOutput, summarizeOutput, plainJsonOutput } from "../helpers/fake-runtime.js";
 
 describe("fanout runtime stability", () => {
   afterEach(() => setAgentRuntimeFactoryForTests(undefined));
@@ -325,7 +325,7 @@ class SelectiveFanoutRuntime implements OrchestratorAgentRuntime {
     if (input.sessionKey.includes(`item:${this.failingItemId}`)) {
       throw new Error("backend queue rejected item turn");
     }
-    const rawText = workflowOutput(baseOutput({ summary: input.sessionKey }));
+    const rawText = plainJsonOutput(baseOutput({ summary: input.sessionKey }));
     const event: AcpRuntimeEvent = { type: "text_delta", text: rawText, stream: "output" };
     await onEvent?.(event);
     return {
@@ -353,7 +353,7 @@ class FinalVerdictRuntime implements OrchestratorAgentRuntime {
   constructor(private readonly verdict: "blocked" | "failed" | "unknown") {}
 
   async runTurn(input: AgentTurnRequest, onEvent?: (event: AcpRuntimeEvent) => Promise<void> | void): Promise<AgentTurnResult> {
-    const rawText = workflowOutput(summarizeOutput({ finalVerdict: this.verdict }));
+    const rawText = plainJsonOutput(summarizeOutput({ finalVerdict: this.verdict }));
     const event: AcpRuntimeEvent = { type: "text_delta", text: rawText, stream: "output" };
     await onEvent?.(event);
     return {
@@ -367,7 +367,7 @@ class FinalVerdictRuntime implements OrchestratorAgentRuntime {
 
 class StaticRuntime implements OrchestratorAgentRuntime {
   async runTurn(input: AgentTurnRequest, onEvent?: (event: AcpRuntimeEvent) => Promise<void> | void): Promise<AgentTurnResult> {
-    const rawText = workflowOutput(baseOutput({ summary: input.sessionKey }));
+    const rawText = plainJsonOutput(baseOutput({ summary: input.sessionKey }));
     const event: AcpRuntimeEvent = { type: "text_delta", text: rawText, stream: "output" };
     await onEvent?.(event);
     return {

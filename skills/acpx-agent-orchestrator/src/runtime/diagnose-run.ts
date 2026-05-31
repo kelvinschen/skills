@@ -94,5 +94,5 @@ ${JSON.stringify(input.events, null, 2)}
 
 Diagnose why the run is blocked and recommend the smallest safe recovery plan. Do not edit files. Do not rerun prior edit work.
 
-End the response with exactly one workflow-output fenced block matching the diagnostic contract.`;
+End the response with exactly one JSON object matching the diagnostic contract and nothing after it. Do not wrap it in Markdown code fences.`;
 }

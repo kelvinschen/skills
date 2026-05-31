@@ -2,7 +2,7 @@ import { getOutputContract, type OutputContractName } from "../contracts/output-
 import type { OutputParseFailure } from "./output-parser.js";
 
 export function isRepairableOutputFailure(reason: string | undefined): boolean {
-  return reason === "OUTPUT_PARSE_FAILED" || reason === "OUTPUT_SCHEMA_FAILED" || reason === "OUTPUT_AMBIGUOUS";
+  return reason === "OUTPUT_PARSE_FAILED" || reason === "OUTPUT_SCHEMA_FAILED";
 }
 
 export function formatRepairPrompt(input: {
@@ -19,10 +19,10 @@ export function formatRepairPrompt(input: {
   const bestBody = best?.normalizedPreview ?? best?.rawPreview ?? "(no parseable candidate body)";
 
   return [
-    "You are repairing only the workflow-output JSON contract for the previous agent response.",
+    "You are repairing only the final JSON output contract for the previous agent response.",
     "",
     "Do not redo task work. Do not edit files. Do not invent command results. Do not change factual content except to convert it into the required schema.",
-    "Emit exactly one fenced JSON block tagged workflow-output and no other JSON.",
+    "End with exactly one JSON object and nothing after it. Do not wrap it in Markdown code fences.",
     "",
     `Contract: ${input.contractName}`,
     "Canonical schema:",

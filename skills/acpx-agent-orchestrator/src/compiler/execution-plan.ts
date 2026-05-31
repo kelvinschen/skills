@@ -50,7 +50,7 @@ export type ContractPlan = {
 
 export type RepairPolicyPlan = {
   maxRepairTurns: 1;
-  repairableReasons: ["OUTPUT_PARSE_FAILED", "OUTPUT_SCHEMA_FAILED", "OUTPUT_AMBIGUOUS"];
+  repairableReasons: ["OUTPUT_PARSE_FAILED", "OUTPUT_SCHEMA_FAILED"];
 };
 
 export type SessionKeyStrategy =
