@@ -171,6 +171,10 @@ export type ReportAttemptDetail = {
   durationMs?: number;
   blockedReason?: string;
   parseErrorCode?: string;
+  runtimeErrorCode?: string;
+  runtimeRetryOf?: string;
+  runtimeRetryOrdinal?: number;
+  runtimeRetryReason?: string;
   path: string;
   prompt?: ReportPreview;
   raw?: ReportPreview;
@@ -284,6 +288,10 @@ async function buildAttemptDetails(dir: string, index: RunIndex, limits: typeof 
       durationMs: attempt.startedAt && attempt.endedAt ? positiveDuration(attempt.startedAt, attempt.endedAt) : undefined,
       blockedReason: attempt.blockedReason,
       parseErrorCode: attempt.parseErrorCode,
+      runtimeErrorCode: attempt.runtimeErrorCode,
+      runtimeRetryOf: attempt.runtimeRetryOf,
+      runtimeRetryOrdinal: attempt.runtimeRetryOrdinal,
+      runtimeRetryReason: attempt.runtimeRetryReason,
       path: attempt.path,
       prompt,
       raw,
@@ -493,6 +501,16 @@ async function buildRuntimeDiagnostics(dir: string, index: RunIndex, events: Rep
     }));
   }
   for (const stage of Object.values(index.stages)) {
+    if (!stage.fanout && stage.blockedReason === RuntimeErrorCodes.AGENT_RUNTIME_ERROR) {
+      const outputPath = stage.outputPath ? path.join(dir, stage.outputPath) : path.join(dir, "outputs", `${stage.stageId}.json`);
+      diagnostics.push(runtimeDiagnostic({
+        code: RuntimeErrorCodes.AGENT_RUNTIME_ERROR,
+        stageId: stage.stageId,
+        path: outputPath,
+        summary: "Agent runtime failed after one retry.",
+        limits
+      }));
+    }
     if (!stage.fanout) continue;
     const hasRunningItems = stage.fanout.items.some((item) => item.status === "running");
     const queuedItems = stage.fanout.items.filter((item) => item.status === "pending" || item.status === "ready");
@@ -558,13 +576,15 @@ function isRunLevelRuntimeCode(value: string): boolean {
   return value === RuntimeErrorCodes.FINAL_VERDICT_BLOCKED
     || value === RuntimeErrorCodes.FINAL_VERDICT_FAILED
     || value === RuntimeErrorCodes.FINAL_VERDICT_UNKNOWN
-    || value === RuntimeErrorCodes.LIMIT_AGENT_BUDGET_EXHAUSTED;
+    || value === RuntimeErrorCodes.LIMIT_AGENT_BUDGET_EXHAUSTED
+    || value === RuntimeErrorCodes.AGENT_RUNTIME_ERROR;
 }
 
 function runLevelBlockedSummary(index: RunIndex): string {
   if (index.blockedReason === RuntimeErrorCodes.LIMIT_AGENT_BUDGET_EXHAUSTED) {
     return `Ready agent work could not start because actual agent calls reached limits.maxAgents (${index.agentUsage.actual}/${index.agentUsage.planned}).`;
   }
+  if (index.blockedReason === RuntimeErrorCodes.AGENT_RUNTIME_ERROR) return "Agent runtime failed after one retry.";
   if (index.finalVerdict === "blocked") return "Summarizer returned finalVerdict=blocked.";
   if (index.finalVerdict === "failed") return "Summarizer returned finalVerdict=failed.";
   return "Summarizer returned finalVerdict=unknown.";

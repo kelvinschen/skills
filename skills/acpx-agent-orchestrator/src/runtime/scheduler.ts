@@ -10,6 +10,7 @@ import { attemptDir, attemptId, safeFileName, upsertAttemptIndex, writeAttemptFi
 import { resolveSource, runAgentWork, runProgramStage, stableItemId, type AgentWorkResult, type AgentWorkUnit } from "./stage-runner.js";
 
 const STALE_FANOUT_ITEM_RECOVERY_MS = 30_000;
+const MAX_RUNTIME_RETRIES = 1;
 
 export type SyncRunOptions = {
   startPending?: boolean;
@@ -32,6 +33,9 @@ export async function syncRun(cwd: string, logicalRunId: string, options: SyncRu
   const reconciled = await reconcileFanoutRuntimeState({ ...snapshot, index });
   index = reconciled.index;
   changed ||= reconciled.changed;
+  const stagesReconciled = await reconcileStageRuntimeState({ ...snapshot, index });
+  index = stagesReconciled.index;
+  changed ||= stagesReconciled.changed;
   const deterministic = await advanceDeterministicStages({ ...snapshot, index });
   index = deterministic.index;
   changed ||= deterministic.changed;
@@ -181,6 +185,44 @@ async function reconcileFanoutRuntimeState(snapshot: RuntimeSnapshot): Promise<{
       }
 
       if (item.status === "running" && isStaleFanoutItem(item.startedAt ?? state.startedAt)) {
+        if (item.attemptId && canScheduleRuntimeRetry(item.runtimeRetryOrdinal)) {
+          const retryOrdinal = (item.runtimeRetryOrdinal ?? 0) + 1;
+          const retryAttemptId = attemptId({ stageId: stage.id, itemId: item.id, kind: "attempt", ordinal: 1, runtimeRetryOrdinal: retryOrdinal });
+          const message = "Fanout item attempt did not produce a terminal output before scheduler recovery; scheduling one runtime retry.";
+          attempts.push(recoveredRuntimeAttempt(index, snapshot.runDir, {
+            stageId: stage.id,
+            itemId: item.id,
+            attemptId: item.attemptId,
+            startedAt: item.startedAt ?? state.startedAt,
+            code: RuntimeErrorCodes.FANOUT_ITEM_RUNTIME_ERROR,
+            message,
+            runtimeRetryOrdinal: item.runtimeRetryOrdinal
+          }));
+          items[itemPosition] = {
+            ...item,
+            status: "ready",
+            startedAt: undefined,
+            completedAt: undefined,
+            blockedReason: undefined,
+            errorCode: undefined,
+            errorMessage: undefined,
+            attemptId: retryAttemptId,
+            runtimeRetryOf: item.runtimeRetryOf ?? item.attemptId,
+            runtimeRetryOrdinal: retryOrdinal
+          };
+          stageChanged = true;
+          await appendEvent(snapshot.cwd, snapshot.runId, {
+            type: "runtime_retry_scheduled",
+            stageId: stage.id,
+            itemId: item.id,
+            attemptId: item.attemptId,
+            retryAttemptId,
+            runtimeRetryOrdinal: retryOrdinal,
+            errorCode: RuntimeErrorCodes.FANOUT_ITEM_RUNTIME_ERROR,
+            errorMessage: message
+          });
+          continue;
+        }
         const code = item.attemptId ? RuntimeErrorCodes.FANOUT_ITEM_RUNTIME_ERROR : RuntimeErrorCodes.FANOUT_ITEM_UNSTARTED_TIMEOUT;
         const message = item.attemptId
           ? "Fanout item attempt did not produce a terminal output before scheduler recovery."
@@ -231,6 +273,111 @@ async function reconcileFanoutRuntimeState(snapshot: RuntimeSnapshot): Promise<{
       }
     });
     for (const attempt of attempts) index = upsertAttemptIndex(index, attempt);
+    changed = true;
+  }
+  return { index, changed };
+}
+
+async function reconcileStageRuntimeState(snapshot: RuntimeSnapshot): Promise<{ index: RunIndex; changed: boolean }> {
+  let index = snapshot.index;
+  let changed = false;
+  for (const stage of snapshot.spec.stages) {
+    if (stage.kind === "fanout") continue;
+    let state = index.stages[stage.id];
+    if (!state || state.status !== "running") continue;
+    const planStage = snapshot.plan.stages.find((candidate) => candidate.id === stage.id);
+    if (!planStage || !agentUnitForStage({ ...snapshot, index }, stage, planStage)) continue;
+
+    const outputPath = path.join(snapshot.runDir, "outputs", `${stage.id}.json`);
+    const output = await readJsonIfExists(outputPath);
+    if (output) {
+      const status = statusFromItemOutput(output);
+      index = updateStage(index, stage.id, {
+        ...state,
+        status,
+        outputPath: path.relative(snapshot.runDir, outputPath),
+        blockedReason: stringField(output, "blockedReason") ?? state.blockedReason,
+        completedAt: state.completedAt ?? new Date().toISOString()
+      });
+      await appendEvent(snapshot.cwd, snapshot.runId, {
+        type: "run_index_output_mismatch",
+        code: RuntimeErrorCodes.RUN_INDEX_OUTPUT_MISMATCH,
+        stageId: stage.id,
+        outputPath: path.relative(snapshot.runDir, outputPath),
+        previousStatus: state.status,
+        recoveredStatus: status
+      });
+      changed = true;
+      continue;
+    }
+
+    if (!isStaleFanoutItem(state.startedAt)) continue;
+    const currentAttemptId = runningStageAttemptId(index, state, stage.id);
+    if (canScheduleRuntimeRetry(state.runtimeRetryOrdinal)) {
+      const retryOrdinal = (state.runtimeRetryOrdinal ?? 0) + 1;
+      const retryAttemptId = attemptId({ stageId: stage.id, kind: "attempt", ordinal: 1, runtimeRetryOrdinal: retryOrdinal });
+      const message = "Agent stage attempt did not produce a terminal output before scheduler recovery; scheduling one runtime retry.";
+      index = upsertAttemptIndex(index, recoveredRuntimeAttempt(index, snapshot.runDir, {
+        stageId: stage.id,
+        attemptId: currentAttemptId,
+        startedAt: state.startedAt,
+        code: RuntimeErrorCodes.AGENT_RUNTIME_ERROR,
+        message,
+        runtimeRetryOrdinal: state.runtimeRetryOrdinal
+      }));
+      state = index.stages[stage.id];
+      index = updateStage(index, stage.id, {
+        ...state,
+        status: "ready",
+        startedAt: undefined,
+        completedAt: undefined,
+        blockedReason: undefined,
+        runtimeRetryOf: state.runtimeRetryOf ?? currentAttemptId,
+        runtimeRetryOrdinal: retryOrdinal
+      });
+      await appendEvent(snapshot.cwd, snapshot.runId, {
+        type: "runtime_retry_scheduled",
+        stageId: stage.id,
+        attemptId: currentAttemptId,
+        retryAttemptId,
+        runtimeRetryOrdinal: retryOrdinal,
+        errorCode: RuntimeErrorCodes.AGENT_RUNTIME_ERROR,
+        errorMessage: message
+      });
+      changed = true;
+      continue;
+    }
+
+    const message = "Agent stage attempt did not produce a terminal output before scheduler recovery.";
+    const result = await writeRecoveredStageFailure({
+      index,
+      cwd: snapshot.cwd,
+      runDir: snapshot.runDir,
+      runId: snapshot.runId,
+      stageId: stage.id,
+      attemptId: currentAttemptId,
+      startedAt: state.startedAt,
+      code: RuntimeErrorCodes.AGENT_RUNTIME_ERROR,
+      message,
+      outputPath
+    });
+    index = upsertAttemptIndex(index, result.attempt);
+    index = updateStage(index, stage.id, {
+      ...state,
+      status: "blocked",
+      outputPath: path.relative(snapshot.runDir, result.outputPath),
+      blockedReason: RuntimeErrorCodes.AGENT_RUNTIME_ERROR,
+      completedAt: new Date().toISOString()
+    });
+    await appendEvent(snapshot.cwd, snapshot.runId, {
+      type: "runtime_retry_exhausted",
+      stageId: stage.id,
+      attemptId: currentAttemptId,
+      runtimeRetryOf: state.runtimeRetryOf,
+      runtimeRetryOrdinal: state.runtimeRetryOrdinal,
+      errorCode: RuntimeErrorCodes.AGENT_RUNTIME_ERROR,
+      errorMessage: message
+    });
     changed = true;
   }
   return { index, changed };
@@ -384,7 +531,9 @@ async function collectFanoutUnits(snapshot: RuntimeSnapshot, stage: Extract<Stag
         contract: planStage.contract ?? { name: "base" },
         outputPath,
         cwd: workflowCwd(snapshot.input),
-        timeoutMs: timeoutMs(snapshot.plan, planStage)
+        timeoutMs: timeoutMs(snapshot.plan, planStage),
+        runtimeRetryOf: item.runtimeRetryOf,
+        runtimeRetryOrdinal: item.runtimeRetryOrdinal
       };
     });
 }
@@ -414,7 +563,9 @@ function agentUnitForStage(snapshot: RuntimeSnapshot, stage: Stage, planStage: E
     contract: planStage.contract ?? { name: "base" },
     outputPath: path.join(snapshot.runDir, "outputs", `${stage.id}.json`),
     cwd: workflowCwd(snapshot.input),
-    timeoutMs: timeoutMs(snapshot.plan, planStage)
+    timeoutMs: timeoutMs(snapshot.plan, planStage),
+    runtimeRetryOf: snapshot.index.stages[stage.id]?.runtimeRetryOf,
+    runtimeRetryOrdinal: snapshot.index.stages[stage.id]?.runtimeRetryOrdinal
   };
 }
 
@@ -489,12 +640,14 @@ function markUnitsRunning(index: RunIndex, units: AgentWorkUnit[], runDir: strin
     if (!stage) continue;
     const startedAt = new Date().toISOString();
     if (unit.itemId && stage.fanout) {
-      const selectedAttemptId = attemptId({ stageId: unit.stageId, itemId: unit.itemId, kind: "attempt", ordinal: 1 });
+      const selectedAttemptId = attemptId({ stageId: unit.stageId, itemId: unit.itemId, kind: "attempt", ordinal: 1, runtimeRetryOrdinal: unit.runtimeRetryOrdinal });
       const items = stage.fanout.items.map((item) => item.id === unit.itemId ? {
         ...item,
         status: "running" as StageStatus,
         attemptId: item.attemptId ?? selectedAttemptId,
         startedAt: item.startedAt ?? startedAt,
+        runtimeRetryOf: unit.runtimeRetryOf ?? item.runtimeRetryOf,
+        runtimeRetryOrdinal: unit.runtimeRetryOrdinal ?? item.runtimeRetryOrdinal,
         errorCode: undefined,
         errorMessage: undefined
       } : item);
@@ -510,18 +663,38 @@ function markUnitsRunning(index: RunIndex, units: AgentWorkUnit[], runDir: strin
         itemId: unit.itemId,
         kind: "attempt",
         status: "running",
-        path: path.relative(runDir, attemptDir(runDir, { stageId: unit.stageId, itemId: unit.itemId, kind: "attempt", ordinal: 1 })),
+        path: path.relative(runDir, attemptDir(runDir, { stageId: unit.stageId, itemId: unit.itemId, kind: "attempt", ordinal: 1, runtimeRetryOrdinal: unit.runtimeRetryOrdinal })),
         startedAt,
         sessionKey: unit.sessionKey,
         requestId: selectedAttemptId,
+        runtimeRetryOf: unit.runtimeRetryOf,
+        runtimeRetryOrdinal: unit.runtimeRetryOrdinal,
         agent: unit.role.agent,
         roleMode: unit.role.mode,
         runtimeDisposeInvoked: false
       });
     } else {
+      const selectedAttemptId = attemptId({ stageId: unit.stageId, kind: "attempt", ordinal: 1, runtimeRetryOrdinal: unit.runtimeRetryOrdinal });
       next = updateStage(next, unit.stageId, {
         status: "running",
-        startedAt: stage.startedAt ?? startedAt
+        startedAt: stage.startedAt ?? startedAt,
+        runtimeRetryOf: unit.runtimeRetryOf,
+        runtimeRetryOrdinal: unit.runtimeRetryOrdinal
+      });
+      next = upsertAttemptIndex(next, {
+        id: selectedAttemptId,
+        stageId: unit.stageId,
+        kind: "attempt",
+        status: "running",
+        path: path.relative(runDir, attemptDir(runDir, { stageId: unit.stageId, kind: "attempt", ordinal: 1, runtimeRetryOrdinal: unit.runtimeRetryOrdinal })),
+        startedAt,
+        sessionKey: unit.sessionKey,
+        requestId: selectedAttemptId,
+        runtimeRetryOf: unit.runtimeRetryOf,
+        runtimeRetryOrdinal: unit.runtimeRetryOrdinal,
+        agent: unit.role.agent,
+        roleMode: unit.role.mode,
+        runtimeDisposeInvoked: false
       });
     }
   }
@@ -533,6 +706,7 @@ function mergeAgentResult(index: RunIndex, result: AgentWorkResult, runDir: stri
   for (const attempt of result.attempts) next = upsertAttemptIndex(next, attempt);
   const stage = next.stages[result.stageId];
   if (!stage) return next;
+  const retryMetadata = runtimeRetryMetadataFromAttempts(result.attempts);
   if (result.itemId && stage.fanout) {
     const items = stage.fanout.items.map((item) => {
       if (item.id !== result.itemId) return item;
@@ -543,7 +717,8 @@ function mergeAgentResult(index: RunIndex, result: AgentWorkResult, runDir: stri
         blockedReason: result.blockedReason,
         completedAt: new Date().toISOString(),
         errorCode: result.errorCode ?? result.blockedReason ?? item.errorCode,
-        errorMessage: result.errorMessage ?? result.error ?? item.errorMessage
+        errorMessage: result.errorMessage ?? result.error ?? item.errorMessage,
+        ...retryMetadata
       };
     });
     const counts = fanoutItemCounts(items);
@@ -561,7 +736,8 @@ function mergeAgentResult(index: RunIndex, result: AgentWorkResult, runDir: stri
       status: result.status === "failed" ? "failed" : result.status,
       outputPath: result.outputPath ? path.relative(runDir, result.outputPath) : stage.outputPath,
       completedAt: new Date().toISOString(),
-      blockedReason: result.blockedReason
+      blockedReason: result.blockedReason,
+      ...retryMetadata
     });
     const stageSpec = Object.values(next.stages).find((entry) => entry.stageId === result.stageId);
     void stageSpec;
@@ -575,6 +751,14 @@ function mergeAgentResult(index: RunIndex, result: AgentWorkResult, runDir: stri
       actual: next.agentUsage.actual + result.agentCalls,
       repairCalls: next.agentUsage.repairCalls + result.repairCalls
     }
+  };
+}
+
+function runtimeRetryMetadataFromAttempts(attempts: AttemptIndexEntry[]): Pick<StageIndexEntry, "runtimeRetryOf" | "runtimeRetryOrdinal"> {
+  const retryAttempt = [...attempts].reverse().find((attempt) => attempt.runtimeRetryOrdinal !== undefined);
+  return {
+    runtimeRetryOf: retryAttempt?.runtimeRetryOf,
+    runtimeRetryOrdinal: retryAttempt?.runtimeRetryOrdinal
   };
 }
 
@@ -722,8 +906,8 @@ async function fanoutItemRuntimeErrorResult(input: {
   error: unknown;
 }): Promise<AgentWorkResult> {
   const itemId = input.unit.itemId ?? "item";
-  const id = attemptId({ stageId: input.unit.stageId, itemId, kind: "attempt", ordinal: 1 });
-  const dir = attemptDir(input.runDir, { stageId: input.unit.stageId, itemId, kind: "attempt", ordinal: 1 });
+  const id = attemptId({ stageId: input.unit.stageId, itemId, kind: "attempt", ordinal: 1, runtimeRetryOrdinal: input.unit.runtimeRetryOrdinal });
+  const dir = attemptDir(input.runDir, { stageId: input.unit.stageId, itemId, kind: "attempt", ordinal: 1, runtimeRetryOrdinal: input.unit.runtimeRetryOrdinal });
   const message = errorMessage(input.error);
   const output = runtimeBlockedOutput({
     code: RuntimeErrorCodes.FANOUT_ITEM_RUNTIME_ERROR,
@@ -766,6 +950,8 @@ async function fanoutItemRuntimeErrorResult(input: {
       promptPreview: "",
       sessionKey: input.unit.sessionKey,
       requestId: id,
+      runtimeRetryOf: input.unit.runtimeRetryOf,
+      runtimeRetryOrdinal: input.unit.runtimeRetryOrdinal,
       runtimeErrorCode: RuntimeErrorCodes.FANOUT_ITEM_RUNTIME_ERROR,
       agent: input.unit.role.agent,
       roleMode: input.unit.role.mode,
@@ -791,7 +977,8 @@ async function writeRecoveredFanoutItemFailure(input: {
   message: string;
   outputPath: string;
 }): Promise<{ outputPath: string; attempt: AttemptIndexEntry }> {
-  const dir = attemptDir(input.runDir, { stageId: input.stageId, itemId: input.itemId, kind: "attempt", ordinal: 1 });
+  const runtimeRetryOrdinal = runtimeRetryOrdinalFromAttemptId(input.attemptId);
+  const dir = attemptDir(input.runDir, { stageId: input.stageId, itemId: input.itemId, kind: "attempt", ordinal: 1, runtimeRetryOrdinal });
   const output = runtimeBlockedOutput({
     code: input.code,
     message: input.message,
@@ -826,10 +1013,111 @@ async function writeRecoveredFanoutItemFailure(input: {
       endedAt: now,
       blockedReason: input.code,
       runtimeErrorCode: input.code,
+      runtimeRetryOrdinal,
       rawPreview: "",
       promptPreview: ""
     }
   };
+}
+
+async function writeRecoveredStageFailure(input: {
+  index: RunIndex;
+  cwd: string;
+  runDir: string;
+  runId: string;
+  stageId: string;
+  attemptId: string;
+  startedAt?: string;
+  code: string;
+  message: string;
+  outputPath: string;
+}): Promise<{ outputPath: string; attempt: AttemptIndexEntry }> {
+  const dir = attemptDir(input.runDir, { stageId: input.stageId, kind: "attempt", ordinal: 1, runtimeRetryOrdinal: runtimeRetryOrdinalFromAttemptId(input.attemptId) });
+  const output = runtimeBlockedOutput({
+    code: input.code,
+    message: input.message,
+    requestId: input.attemptId,
+    sessionKey: undefined,
+    agent: undefined,
+    roleMode: undefined
+  });
+  const now = new Date().toISOString();
+  await writeAttemptFile(dir, "output.json", output);
+  await fs.mkdir(path.dirname(input.outputPath), { recursive: true });
+  await fs.writeFile(input.outputPath, `${JSON.stringify(output, null, 2)}\n`, "utf8");
+  await appendEvent(input.cwd, input.runId, {
+    type: "output_written",
+    stageId: input.stageId,
+    attemptId: input.attemptId,
+    outputPath: path.relative(input.runDir, input.outputPath),
+    status: output.status,
+    errorCode: input.code
+  });
+  return {
+    outputPath: input.outputPath,
+    attempt: recoveredRuntimeAttempt(input.index, input.runDir, {
+      stageId: input.stageId,
+      attemptId: input.attemptId,
+      startedAt: input.startedAt,
+      code: input.code,
+      message: input.message,
+      runtimeRetryOrdinal: runtimeRetryOrdinalFromAttemptId(input.attemptId),
+      endedAt: now
+    })
+  };
+}
+
+function recoveredRuntimeAttempt(index: RunIndex, runDir: string, input: {
+  stageId: string;
+  attemptId: string;
+  itemId?: string;
+  startedAt?: string;
+  code: string;
+  message: string;
+  runtimeRetryOrdinal?: number;
+  endedAt?: string;
+}): AttemptIndexEntry {
+  const existing = index.attempts[input.attemptId];
+  const runtimeRetryOrdinal = input.runtimeRetryOrdinal ?? runtimeRetryOrdinalFromAttemptId(input.attemptId);
+  return {
+    id: input.attemptId,
+    stageId: input.stageId,
+    itemId: input.itemId,
+    kind: "attempt",
+    status: "failed",
+    path: existing?.path ?? path.relative(runDir, attemptDir(runDir, { stageId: input.stageId, itemId: input.itemId, kind: "attempt", ordinal: 1, runtimeRetryOrdinal })),
+    startedAt: existing?.startedAt ?? input.startedAt,
+    endedAt: input.endedAt ?? new Date().toISOString(),
+    blockedReason: input.code,
+    runtimeErrorCode: input.code,
+    runtimeRetryOf: existing?.runtimeRetryOf,
+    runtimeRetryOrdinal: existing?.runtimeRetryOrdinal ?? runtimeRetryOrdinal,
+    runtimeRetryReason: input.message,
+    rawPreview: existing?.rawPreview ?? "",
+    promptPreview: existing?.promptPreview ?? "",
+    sessionKey: existing?.sessionKey,
+    requestId: existing?.requestId ?? input.attemptId,
+    agent: existing?.agent,
+    roleMode: existing?.roleMode,
+    runtimeDisposeInvoked: existing?.runtimeDisposeInvoked ?? false
+  };
+}
+
+function canScheduleRuntimeRetry(runtimeRetryOrdinal: number | undefined): boolean {
+  return (runtimeRetryOrdinal ?? 0) < MAX_RUNTIME_RETRIES;
+}
+
+function runningStageAttemptId(index: RunIndex, state: StageIndexEntry, stageId: string): string {
+  const latestRunning = [...state.attempts]
+    .reverse()
+    .map((id) => index.attempts[id])
+    .find((attempt) => attempt?.status === "running");
+  return latestRunning?.id ?? attemptId({ stageId, kind: "attempt", ordinal: 1, runtimeRetryOrdinal: state.runtimeRetryOrdinal });
+}
+
+function runtimeRetryOrdinalFromAttemptId(attemptIdValue: string): number | undefined {
+  const match = attemptIdValue.match(/-runtime-retry-(\d+)$/);
+  return match ? Number(match[1]) : undefined;
 }
 
 function runtimeBlockedOutput(input: {

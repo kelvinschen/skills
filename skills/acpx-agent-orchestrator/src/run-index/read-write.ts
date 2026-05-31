@@ -6,6 +6,7 @@ import { runDir } from "./paths.js";
 export const RuntimeErrorCodes = {
   EVENT_APPEND_LOCK_TIMEOUT: "EVENT_APPEND_LOCK_TIMEOUT",
   RUN_INDEX_LOCK_TIMEOUT: "RUN_INDEX_LOCK_TIMEOUT",
+  AGENT_RUNTIME_ERROR: "AGENT_RUNTIME_ERROR",
   FANOUT_ITEM_RUNTIME_ERROR: "FANOUT_ITEM_RUNTIME_ERROR",
   FANOUT_ITEM_UNSTARTED_TIMEOUT: "FANOUT_ITEM_UNSTARTED_TIMEOUT",
   FANOUT_STAGE_STUCK_PENDING_BATCH: "FANOUT_STAGE_STUCK_PENDING_BATCH",
@@ -78,6 +79,9 @@ export type AttemptIndexEntry = {
   requestId?: string;
   stopReason?: string;
   runtimeErrorCode?: string;
+  runtimeRetryOf?: string;
+  runtimeRetryOrdinal?: number;
+  runtimeRetryReason?: string;
   agent?: string;
   roleMode?: string;
   runtimeDisposeInvoked?: boolean;
@@ -92,6 +96,8 @@ export type StageIndexEntry = {
   startedAt?: string;
   completedAt?: string;
   skippedReason?: string;
+  runtimeRetryOf?: string;
+  runtimeRetryOrdinal?: number;
   fanout?: {
     totalItems: number;
     completedItems: number;
@@ -109,6 +115,8 @@ export type StageIndexEntry = {
       completedAt?: string;
       errorCode?: string;
       errorMessage?: string;
+      runtimeRetryOf?: string;
+      runtimeRetryOrdinal?: number;
     }>;
   };
 };

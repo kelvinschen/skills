@@ -22,6 +22,7 @@ export type AgentTurnResult = {
   error?: string;
   errorCode?: string;
   errorDetailCode?: string;
+  retryable?: boolean;
   stopReason?: string;
 };
 
@@ -83,7 +84,8 @@ class AcpxRuntimeAdapter implements OrchestratorAgentRuntime {
         status: "failed",
         error: result.error.message,
         errorCode: result.error.code,
-        errorDetailCode: result.error.detailCode
+        errorDetailCode: result.error.detailCode,
+        retryable: result.error.retryable
       };
     }
     return {

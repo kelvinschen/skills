@@ -52,6 +52,11 @@ unrecoverable runtime errors.
 
 Runtime run-level codes emitted in reports:
 
+- `AGENT_RUNTIME_ERROR`: a non-fanout agent runtime turn failed after one
+  transient retry. This covers backend/process/transport failures, not output
+  contract failures.
+- `FANOUT_ITEM_RUNTIME_ERROR`: a fanout item runtime turn failed after one
+  transient retry, or stale recovery exhausted its retry for that item.
 - `FINAL_VERDICT_BLOCKED`: the terminal summarizer completed but explicitly
   returned `finalVerdict: "blocked"`, so the run is blocked at run level even
   if author stages are otherwise terminal.

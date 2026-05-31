@@ -10,7 +10,7 @@ import type { ContractPlan, ExecutionPlan, ExecutionPlanStage, PromptPlan } from
 import type { Role, Stage, WorkflowSpec, ConditionNode, Variable } from "../schema/workflow-spec.js";
 import { applyTransforms } from "../transformers/builtins.js";
 import { renderPrompt } from "../variables/interpolate.js";
-import { appendEvent, type AttemptIndexEntry } from "../run-index/read-write.js";
+import { appendEvent, RuntimeErrorCodes, type AttemptIndexEntry } from "../run-index/read-write.js";
 import { attemptDir, attemptId, previewText, safeFileName, writeAttemptFile } from "./attempts.js";
 import type { AgentTurnResult, OrchestratorAgentRuntime } from "./agent-runtime.js";
 import { formatRepairPrompt, isRepairableOutputFailure, repairFailedEnvelope } from "./repair.js";
@@ -18,6 +18,7 @@ import { parseWorkflowOutput } from "./output-parser.js";
 import { recordSessionBinding } from "./session-bindings.js";
 
 const execFileAsync = promisify(execFile);
+const MAX_RUNTIME_RETRIES = 1;
 
 export type AgentWorkUnit = {
   type: "stage" | "fanoutItem" | "fixLoop" | "diagnostic";
@@ -33,6 +34,8 @@ export type AgentWorkUnit = {
   outputPath: string;
   cwd: string;
   timeoutMs: number;
+  runtimeRetryOf?: string;
+  runtimeRetryOrdinal?: number;
 };
 
 export type AgentWorkResult = {
@@ -48,6 +51,25 @@ export type AgentWorkResult = {
   error?: string;
   errorCode?: string;
   errorMessage?: string;
+};
+
+type RuntimeTurnExecution = {
+  ok: true;
+  turn: AgentTurnResult;
+  attempts: AttemptIndexEntry[];
+  attemptBase: AttemptIndexEntry;
+  attemptId: string;
+  attemptDir: string;
+  agentCalls: number;
+} | ({ ok: false } & AgentWorkResult);
+
+type RuntimeFailureSummary = {
+  code: string;
+  message: string;
+  requestId: string;
+  retryable?: boolean;
+  rawText?: string;
+  stopReason?: string;
 };
 
 export async function runProgramStage(input: {
@@ -292,53 +314,15 @@ async function executeAttemptWithRepair(input: {
   attemptOrdinal?: number;
 }): Promise<AgentWorkResult> {
   const ordinal = input.attemptOrdinal ?? 1;
-  const dir = attemptDir(input.runDir, { stageId: input.unit.stageId, itemId: input.unit.itemId, kind: "attempt", ordinal });
-  const id = attemptId({ stageId: input.unit.stageId, itemId: input.unit.itemId, kind: "attempt", ordinal });
-  const promptPath = await writeAttemptFile(dir, "prompt.md", input.prompt);
-  await writePromptAudit(input.runDir, input.unit.itemId ? `${input.unit.stageId}__${input.unit.itemId}` : input.unit.stageId, input.prompt);
-  const startedAt = new Date().toISOString();
-  const attemptEntryBase = {
-    id,
-    stageId: input.unit.stageId,
-    itemId: input.unit.itemId,
-    kind: "attempt" as const,
-    status: "running" as const,
-    path: path.relative(input.runDir, dir),
-    startedAt,
-    promptPreview: previewText(input.prompt),
-    sessionKey: input.unit.sessionKey,
-    requestId: id,
-    agent: input.unit.role.agent,
-    roleMode: input.unit.role.mode,
-    runtimeDisposeInvoked: false
-  };
-  await appendEvent(input.cwd, input.runId, { type: "attempt_created", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id });
-  await appendEvent(input.cwd, input.runId, { type: "attempt_started", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id });
-  await appendEvent(input.cwd, input.runId, { type: "turn_started", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, sessionKey: input.unit.sessionKey, agent: input.unit.role.agent, roleMode: input.unit.role.mode });
-  let turn: AgentTurnResult;
-  try {
-    turn = await input.runtime.runTurn({
-      sessionKey: input.unit.sessionKey,
-      roleName: input.unit.roleName,
-      role: input.unit.role,
-      cwd: input.unit.cwd,
-      prompt: input.prompt,
-      requestId: id,
-      timeoutMs: input.unit.timeoutMs
-    }, async (event) => appendTurnEvent(input.cwd, input.runId, input.unit.stageId, input.unit.itemId, id, event));
-    await appendEvent(input.cwd, input.runId, { type: "turn_finished", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, status: turn.status, stopReason: turn.stopReason, errorCode: turn.errorDetailCode ?? turn.errorCode });
-  } catch (error) {
-    await appendEvent(input.cwd, input.runId, { type: "turn_finished", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, status: "failed", error: errorMessage(error) });
-    throw error;
-  }
-  await recordSessionBinding(input.runDir, {
-    sessionKey: input.unit.sessionKey,
-    roleName: input.unit.roleName,
-    agent: input.unit.role.agent,
-    cwd: input.unit.cwd,
-    handle: turn.handle
+  const execution = await executeRuntimeTurnWithRetry({
+    ...input,
+    kind: "attempt",
+    ordinal,
+    prompt: input.prompt,
+    repair: false
   });
-  await writeAttemptFile(dir, "raw.txt", turn.rawText);
+  if (!execution.ok) return execution;
+  const { turn, attemptBase: attemptEntryBase, attemptDir: dir, attemptId: id } = execution;
 
   if (turn.status !== "completed") {
     const diagnostics = runtimeDiagnostics(input, id, turn);
@@ -358,7 +342,7 @@ async function executeAttemptWithRepair(input: {
       status: "blocked",
       output,
       outputPath: input.unit.outputPath,
-      attempts: [{
+      attempts: [...execution.attempts, {
         ...attemptEntryBase,
         status: "blocked",
         endedAt: new Date().toISOString(),
@@ -367,7 +351,7 @@ async function executeAttemptWithRepair(input: {
         stopReason: turn.stopReason,
         runtimeErrorCode: turn.errorDetailCode ?? turn.errorCode ?? String(output.blockedReason)
       }],
-      agentCalls: 1,
+      agentCalls: execution.agentCalls,
       repairCalls: 0,
       blockedReason: String(output.blockedReason)
     };
@@ -388,8 +372,8 @@ async function executeAttemptWithRepair(input: {
       status: output.status === "blocked" ? "blocked" : "completed",
       output,
       outputPath: input.unit.outputPath,
-      attempts: [{ ...attemptEntryBase, status: output.status === "blocked" ? "blocked" : "completed", endedAt: new Date().toISOString(), blockedReason: typeof output.blockedReason === "string" ? output.blockedReason : undefined, parseErrorCode: parsed.diagnostics.errorCode, rawPreview: previewText(turn.rawText) }],
-      agentCalls: 1,
+      attempts: [...execution.attempts, { ...attemptEntryBase, status: output.status === "blocked" ? "blocked" : "completed", endedAt: new Date().toISOString(), blockedReason: typeof output.blockedReason === "string" ? output.blockedReason : undefined, parseErrorCode: parsed.diagnostics.errorCode, rawPreview: previewText(turn.rawText) }],
+      agentCalls: execution.agentCalls,
       repairCalls: 0,
       blockedReason: typeof output.blockedReason === "string" ? output.blockedReason : undefined
     };
@@ -412,8 +396,8 @@ async function executeAttemptWithRepair(input: {
       status: "blocked",
       output: blocked,
       outputPath: input.unit.outputPath,
-      attempts: [{ ...attemptEntryBase, status: "blocked", endedAt: new Date().toISOString(), blockedReason: parsed.errorCode, parseErrorCode: parsed.errorCode, rawPreview: previewText(turn.rawText) }],
-      agentCalls: 1,
+      attempts: [...execution.attempts, { ...attemptEntryBase, status: "blocked", endedAt: new Date().toISOString(), blockedReason: parsed.errorCode, parseErrorCode: parsed.errorCode, rawPreview: previewText(turn.rawText) }],
+      agentCalls: execution.agentCalls,
       repairCalls: 0,
       blockedReason: parsed.errorCode
     };
@@ -433,8 +417,8 @@ async function executeAttemptWithRepair(input: {
   });
   return {
     ...repair,
-    attempts: [{ ...attemptEntryBase, status: repair.status === "completed" ? "completed" : "blocked", endedAt: new Date().toISOString(), blockedReason: repair.status === "blocked" ? parsed.errorCode : undefined, parseErrorCode: parsed.errorCode, rawPreview: previewText(turn.rawText) }, ...repair.attempts],
-    agentCalls: repair.agentCalls + 1,
+    attempts: [...execution.attempts, { ...attemptEntryBase, status: repair.status === "completed" ? "completed" : "blocked", endedAt: new Date().toISOString(), blockedReason: repair.status === "blocked" ? parsed.errorCode : undefined, parseErrorCode: parsed.errorCode, rawPreview: previewText(turn.rawText) }, ...repair.attempts],
+    agentCalls: repair.agentCalls + execution.agentCalls,
     repairCalls: repair.repairCalls
   };
 }
@@ -455,45 +439,20 @@ async function executeRepairAttempt(input: {
   originalReason: string;
   ordinal: number;
 }): Promise<AgentWorkResult> {
-  const dir = attemptDir(input.runDir, { stageId: input.unit.stageId, itemId: input.unit.itemId, kind: "repair", ordinal: input.ordinal });
-  const id = attemptId({ stageId: input.unit.stageId, itemId: input.unit.itemId, kind: "repair", ordinal: input.ordinal });
-  await writeAttemptFile(dir, "prompt.md", input.prompt);
-  const entryBase = {
-    id,
-    stageId: input.unit.stageId,
-    itemId: input.unit.itemId,
-    kind: "repair" as const,
-    status: "running" as const,
-    path: path.relative(input.runDir, dir),
-    startedAt: new Date().toISOString(),
-    promptPreview: previewText(input.prompt),
-    sessionKey: input.unit.sessionKey,
-    requestId: id,
-    agent: input.unit.role.agent,
-    roleMode: input.unit.role.mode,
-    runtimeDisposeInvoked: false
+  const execution = await executeRuntimeTurnWithRetry({
+    ...input,
+    kind: "repair",
+    ordinal: input.ordinal,
+    prompt: input.prompt,
+    repair: true,
+    originalReason: input.originalReason
+  });
+  if (!execution.ok) return {
+    ...execution,
+    attempts: [input.originalAttempt, ...execution.attempts],
+    repairCalls: execution.agentCalls
   };
-  await appendEvent(input.cwd, input.runId, { type: "attempt_created", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, repair: true });
-  await appendEvent(input.cwd, input.runId, { type: "repair_started", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, originalReason: input.originalReason });
-  await appendEvent(input.cwd, input.runId, { type: "turn_started", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, sessionKey: input.unit.sessionKey, agent: input.unit.role.agent, roleMode: input.unit.role.mode, repair: true });
-  let turn: AgentTurnResult;
-  try {
-    turn = await input.runtime.runTurn({
-      sessionKey: input.unit.sessionKey,
-      roleName: input.unit.roleName,
-      role: input.unit.role,
-      cwd: input.unit.cwd,
-      prompt: input.prompt,
-      requestId: id,
-      timeoutMs: input.unit.timeoutMs,
-      repair: true
-    }, async (event) => appendTurnEvent(input.cwd, input.runId, input.unit.stageId, input.unit.itemId, id, event));
-    await appendEvent(input.cwd, input.runId, { type: "turn_finished", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, status: turn.status, stopReason: turn.stopReason, errorCode: turn.errorDetailCode ?? turn.errorCode, repair: true });
-  } catch (error) {
-    await appendEvent(input.cwd, input.runId, { type: "turn_finished", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, status: "failed", error: errorMessage(error), repair: true });
-    throw error;
-  }
-  await writeAttemptFile(dir, "raw.txt", turn.rawText);
+  const { turn, attemptBase: entryBase, attemptDir: dir, attemptId: id } = execution;
   const parsed = turn.status === "completed"
     ? parseWorkflowOutput(turn.rawText, input.contractName, {
         contractOptions: input.contractOptions,
@@ -514,9 +473,9 @@ async function executeRepairAttempt(input: {
       status: output.status === "blocked" ? "blocked" : "completed",
       output,
       outputPath: input.unit.outputPath,
-      attempts: [{ ...entryBase, status: output.status === "blocked" ? "blocked" : "completed", endedAt: new Date().toISOString(), parseErrorCode: parsed.diagnostics.errorCode, rawPreview: previewText(turn.rawText) }],
-      agentCalls: 1,
-      repairCalls: 1,
+      attempts: [...execution.attempts, { ...entryBase, status: output.status === "blocked" ? "blocked" : "completed", endedAt: new Date().toISOString(), parseErrorCode: parsed.diagnostics.errorCode, rawPreview: previewText(turn.rawText) }],
+      agentCalls: execution.agentCalls,
+      repairCalls: execution.agentCalls,
       blockedReason: typeof output.blockedReason === "string" ? output.blockedReason : undefined
     };
   }
@@ -533,9 +492,9 @@ async function executeRepairAttempt(input: {
     status: "blocked",
     output,
     outputPath: input.unit.outputPath,
-    attempts: [{ ...entryBase, status: "blocked", endedAt: new Date().toISOString(), blockedReason: "OUTPUT_REPAIR_FAILED", parseErrorCode: parsed?.diagnostics.errorCode ?? "AGENT_TURN_FAILED", rawPreview: previewText(turn.rawText) }],
-    agentCalls: 1,
-    repairCalls: 1,
+    attempts: [...execution.attempts, { ...entryBase, status: "blocked", endedAt: new Date().toISOString(), blockedReason: "OUTPUT_REPAIR_FAILED", parseErrorCode: parsed?.diagnostics.errorCode ?? "AGENT_TURN_FAILED", rawPreview: previewText(turn.rawText) }],
+    agentCalls: execution.agentCalls,
+    repairCalls: execution.agentCalls,
     blockedReason: "OUTPUT_REPAIR_FAILED"
   };
 }
@@ -558,6 +517,287 @@ function withOutputParseMetadata(output: Record<string, unknown>, outputParse: R
       outputParse
     }
   };
+}
+
+async function executeRuntimeTurnWithRetry(input: {
+  cwd: string;
+  runDir: string;
+  runId: string;
+  unit: AgentWorkUnit;
+  runtime: OrchestratorAgentRuntime;
+  kind: "attempt" | "repair";
+  ordinal: number;
+  prompt: string;
+  repair: boolean;
+  originalReason?: string;
+}): Promise<RuntimeTurnExecution> {
+  if (!input.repair) {
+    await writePromptAudit(input.runDir, input.unit.itemId ? `${input.unit.stageId}__${input.unit.itemId}` : input.unit.stageId, input.prompt);
+  }
+  const priorAttempts: AttemptIndexEntry[] = [];
+  let calls = 0;
+  let runtimeRetryOf = input.unit.runtimeRetryOf;
+  let runtimeRetryOrdinal = input.unit.runtimeRetryOrdinal;
+  while (true) {
+    const id = attemptId({
+      stageId: input.unit.stageId,
+      itemId: input.unit.itemId,
+      kind: input.kind,
+      ordinal: input.ordinal,
+      runtimeRetryOrdinal
+    });
+    const dir = attemptDir(input.runDir, {
+      stageId: input.unit.stageId,
+      itemId: input.unit.itemId,
+      kind: input.kind,
+      ordinal: input.ordinal,
+      runtimeRetryOrdinal
+    });
+    const promptPath = await writeAttemptFile(dir, "prompt.md", input.prompt);
+    void promptPath;
+    const startedAt = new Date().toISOString();
+    const attemptBase: AttemptIndexEntry = {
+      id,
+      stageId: input.unit.stageId,
+      itemId: input.unit.itemId,
+      kind: input.kind,
+      status: "running",
+      path: path.relative(input.runDir, dir),
+      startedAt,
+      promptPreview: previewText(input.prompt),
+      sessionKey: input.unit.sessionKey,
+      requestId: id,
+      agent: input.unit.role.agent,
+      roleMode: input.unit.role.mode,
+      runtimeDisposeInvoked: false,
+      runtimeRetryOf,
+      runtimeRetryOrdinal,
+      runtimeRetryReason: runtimeRetryOf ? "Retrying a transient agent runtime failure." : undefined
+    };
+    if (runtimeRetryOrdinal) {
+      await appendEvent(input.cwd, input.runId, {
+        type: "runtime_retry_started",
+        stageId: input.unit.stageId,
+        itemId: input.unit.itemId,
+        attemptId: id,
+        runtimeRetryOf,
+        runtimeRetryOrdinal,
+        repair: input.repair
+      });
+    }
+    await appendEvent(input.cwd, input.runId, { type: "attempt_created", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, repair: input.repair, runtimeRetryOf, runtimeRetryOrdinal });
+    if (input.repair) {
+      await appendEvent(input.cwd, input.runId, { type: "repair_started", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, originalReason: input.originalReason, runtimeRetryOf, runtimeRetryOrdinal });
+    } else {
+      await appendEvent(input.cwd, input.runId, { type: "attempt_started", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, runtimeRetryOf, runtimeRetryOrdinal });
+    }
+    await appendEvent(input.cwd, input.runId, { type: "turn_started", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, sessionKey: input.unit.sessionKey, agent: input.unit.role.agent, roleMode: input.unit.role.mode, repair: input.repair, runtimeRetryOf, runtimeRetryOrdinal });
+
+    calls += 1;
+    let turn: AgentTurnResult;
+    try {
+      turn = await input.runtime.runTurn({
+        sessionKey: input.unit.sessionKey,
+        roleName: input.unit.roleName,
+        role: input.unit.role,
+        cwd: input.unit.cwd,
+        prompt: input.prompt,
+        requestId: id,
+        timeoutMs: input.unit.timeoutMs,
+        repair: input.repair
+      }, async (event) => appendTurnEvent(input.cwd, input.runId, input.unit.stageId, input.unit.itemId, id, event));
+      await appendEvent(input.cwd, input.runId, { type: "turn_finished", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, status: turn.status, stopReason: turn.stopReason, errorCode: turn.errorDetailCode ?? turn.errorCode, repair: input.repair, runtimeRetryOf, runtimeRetryOrdinal });
+      await recordSessionBinding(input.runDir, {
+        sessionKey: input.unit.sessionKey,
+        roleName: input.unit.roleName,
+        agent: input.unit.role.agent,
+        cwd: input.unit.cwd,
+        handle: turn.handle
+      });
+      await writeAttemptFile(dir, "raw.txt", turn.rawText);
+    } catch (error) {
+      const failure = runtimeFailureFromError(error, id);
+      await appendEvent(input.cwd, input.runId, { type: "turn_finished", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, status: "failed", error: failure.message, errorCode: failure.code, repair: input.repair, runtimeRetryOf, runtimeRetryOrdinal });
+      if (canRetryRuntimeFailure(runtimeRetryOrdinal)) {
+        priorAttempts.push(finalizeRuntimeFailedAttempt(attemptBase, failure));
+        const nextRetryOrdinal = (runtimeRetryOrdinal ?? 0) + 1;
+        const nextAttemptId = attemptId({ stageId: input.unit.stageId, itemId: input.unit.itemId, kind: input.kind, ordinal: input.ordinal, runtimeRetryOrdinal: nextRetryOrdinal });
+        await appendEvent(input.cwd, input.runId, { type: "runtime_retry_scheduled", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, retryAttemptId: nextAttemptId, runtimeRetryOrdinal: nextRetryOrdinal, errorCode: failure.code, errorMessage: failure.message, repair: input.repair });
+        runtimeRetryOf = runtimeRetryOf ?? id;
+        runtimeRetryOrdinal = nextRetryOrdinal;
+        continue;
+      }
+      await appendEvent(input.cwd, input.runId, { type: "runtime_retry_exhausted", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, runtimeRetryOf, runtimeRetryOrdinal, errorCode: failure.code, errorMessage: failure.message, repair: input.repair });
+      return runtimeFailureAgentWorkResult({
+        input,
+        attempt: finalizeRuntimeFailedAttempt(attemptBase, failure),
+        priorAttempts,
+        attemptDir: dir,
+        agentCalls: calls,
+        failure,
+        repairCalls: input.repair ? calls : 0
+      });
+    }
+
+    const retryFailure = retryableRuntimeTurnFailure(turn, id);
+    if (retryFailure) {
+      if (canRetryRuntimeFailure(runtimeRetryOrdinal)) {
+        priorAttempts.push(finalizeRuntimeFailedAttempt(attemptBase, retryFailure));
+        const nextRetryOrdinal = (runtimeRetryOrdinal ?? 0) + 1;
+        const nextAttemptId = attemptId({ stageId: input.unit.stageId, itemId: input.unit.itemId, kind: input.kind, ordinal: input.ordinal, runtimeRetryOrdinal: nextRetryOrdinal });
+        await appendEvent(input.cwd, input.runId, { type: "runtime_retry_scheduled", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, retryAttemptId: nextAttemptId, runtimeRetryOrdinal: nextRetryOrdinal, errorCode: retryFailure.code, errorMessage: retryFailure.message, repair: input.repair });
+        runtimeRetryOf = runtimeRetryOf ?? id;
+        runtimeRetryOrdinal = nextRetryOrdinal;
+        continue;
+      }
+      await appendEvent(input.cwd, input.runId, { type: "runtime_retry_exhausted", stageId: input.unit.stageId, itemId: input.unit.itemId, attemptId: id, runtimeRetryOf, runtimeRetryOrdinal, errorCode: retryFailure.code, errorMessage: retryFailure.message, repair: input.repair });
+      return runtimeFailureAgentWorkResult({
+        input,
+        attempt: finalizeRuntimeFailedAttempt(attemptBase, retryFailure),
+        priorAttempts,
+        attemptDir: dir,
+        agentCalls: calls,
+        failure: retryFailure,
+        repairCalls: input.repair ? calls : 0
+      });
+    }
+
+    return {
+      ok: true,
+      turn,
+      attempts: priorAttempts,
+      attemptBase,
+      attemptId: id,
+      attemptDir: dir,
+      agentCalls: calls
+    };
+  }
+}
+
+function canRetryRuntimeFailure(runtimeRetryOrdinal: number | undefined): boolean {
+  return (runtimeRetryOrdinal ?? 0) < MAX_RUNTIME_RETRIES;
+}
+
+function retryableRuntimeTurnFailure(turn: AgentTurnResult, requestId: string): RuntimeFailureSummary | undefined {
+  if (turn.status !== "failed") return undefined;
+  if (turn.retryable === false) return undefined;
+  const code = turn.errorDetailCode ?? turn.errorCode ?? "AGENT_TURN_FAILED";
+  const message = turn.error ?? `Agent turn ${turn.status}.`;
+  if (turn.retryable === true || looksTransientRuntimeFailure([code, message])) {
+    return {
+      code,
+      message,
+      requestId,
+      retryable: turn.retryable,
+      rawText: turn.rawText,
+      stopReason: turn.stopReason
+    };
+  }
+  return undefined;
+}
+
+function looksTransientRuntimeFailure(parts: string[]): boolean {
+  const text = parts.filter(Boolean).join(" ").toLowerCase();
+  if (!text) return false;
+  if (/(permission|denied|unauthorized|forbidden|invalid runtime option|invalid config|auth|credential|schema|parse)/.test(text)) return false;
+  return /(429|rate.?limit|too many requests|queue|rejected|transport|reset|econnreset|socket|network|timeout|timed out|temporary|temporar|unavailable|backend unavailable|session init|spawn|process|connection|stream|aborted)/.test(text);
+}
+
+function runtimeFailureFromError(error: unknown, requestId: string): RuntimeFailureSummary {
+  const code = stringField(error, "detailCode") ?? stringField(error, "code") ?? RuntimeErrorCodes.AGENT_RUNTIME_ERROR;
+  return {
+    code,
+    message: errorMessage(error),
+    requestId,
+    retryable: true
+  };
+}
+
+function finalizeRuntimeFailedAttempt(attempt: AttemptIndexEntry, failure: RuntimeFailureSummary): AttemptIndexEntry {
+  return {
+    ...attempt,
+    status: "failed",
+    endedAt: new Date().toISOString(),
+    blockedReason: failure.code,
+    runtimeErrorCode: failure.code,
+    runtimeRetryReason: failure.message,
+    rawPreview: previewText(failure.rawText ?? ""),
+    stopReason: failure.stopReason
+  };
+}
+
+async function runtimeFailureAgentWorkResult(input: {
+  input: {
+    cwd: string;
+    runDir: string;
+    runId: string;
+    unit: AgentWorkUnit;
+  };
+  attempt: AttemptIndexEntry;
+  priorAttempts: AttemptIndexEntry[];
+  attemptDir: string;
+  agentCalls: number;
+  repairCalls?: number;
+  failure: RuntimeFailureSummary;
+}): Promise<{ ok: false } & AgentWorkResult>;
+async function runtimeFailureAgentWorkResult(input: {
+  input: {
+    cwd: string;
+    runDir: string;
+    runId: string;
+    unit: AgentWorkUnit;
+  };
+  attempt?: AttemptIndexEntry;
+  priorAttempts?: AttemptIndexEntry[];
+  attemptDir?: string;
+  agentCalls?: number;
+  repairCalls?: number;
+  failure: RuntimeFailureSummary;
+}): Promise<{ ok: false } & AgentWorkResult> {
+  const unit = input.input.unit;
+  const code = runtimeBlockedCodeForUnit(unit);
+  const attempt = input.attempt!;
+  const attempts = [...(input.priorAttempts ?? []), attempt];
+  const dir = input.attemptDir!;
+  const output = {
+    status: "blocked",
+    summary: input.failure.message,
+    artifacts: [],
+    nextFocus: "diagnose",
+    blockedReason: code,
+    runtimeDiagnostics: {
+      requestId: input.failure.requestId,
+      sessionKey: unit.sessionKey,
+      agent: unit.role.agent,
+      roleMode: unit.role.mode,
+      runtimeDisposeInvoked: false,
+      errorCode: input.failure.code,
+      errorMessage: input.failure.message,
+      retryable: input.failure.retryable,
+      runtimeRetryOf: attempt.runtimeRetryOf,
+      runtimeRetryOrdinal: attempt.runtimeRetryOrdinal
+    }
+  };
+  await writeAttemptFile(dir, "output.json", output);
+  await writeUnitOutput(input.input, output, attempt.id);
+  return {
+    ok: false,
+    stageId: unit.stageId,
+    itemId: unit.itemId,
+    status: "blocked",
+    output,
+    outputPath: unit.outputPath,
+    attempts,
+    agentCalls: input.agentCalls ?? 1,
+    repairCalls: input.repairCalls ?? 0,
+    blockedReason: code,
+    errorCode: code,
+    errorMessage: input.failure.message
+  };
+}
+
+function runtimeBlockedCodeForUnit(unit: AgentWorkUnit): string {
+  return unit.type === "fanoutItem" ? RuntimeErrorCodes.FANOUT_ITEM_RUNTIME_ERROR : RuntimeErrorCodes.AGENT_RUNTIME_ERROR;
 }
 
 async function writeUnitOutput(input: {
@@ -589,6 +829,7 @@ function runtimeDiagnostics(input: {
     roleMode: input.unit.role.mode,
     runtimeDisposeInvoked: false,
     errorCode: turn.errorDetailCode ?? turn.errorCode,
+    retryable: turn.retryable,
     rawTextPreview: previewText(turn.rawText)
   };
 }
@@ -605,6 +846,12 @@ async function appendTurnEvent(cwd: string, runId: string, stageId: string, item
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function stringField(value: unknown, key: string): string | undefined {
+  return value && typeof value === "object" && typeof (value as Record<string, unknown>)[key] === "string"
+    ? (value as Record<string, string>)[key]
+    : undefined;
 }
 
 async function writePromptAudit(runDir: string, id: string, prompt: string): Promise<void> {

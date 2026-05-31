@@ -55,3 +55,5 @@ undeclared variables or unsafe graph shapes with JSON Pointer errors.
 `limits.maxAgents` is enforced against worst-case planned agent calls, including
 fanout item agents and one possible output-repair call per agent invocation.
 At runtime, actual agent and repair attempts are recorded in `run.json`.
+Transient agent runtime failures get one automatic retry; the retry is counted
+in `agentUsage.actual`, and repair-turn retries also count in `repairCalls`.

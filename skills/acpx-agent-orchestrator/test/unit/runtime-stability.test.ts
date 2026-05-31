@@ -11,7 +11,7 @@ import { startDiagnosticRun } from "../../src/runtime/diagnose-run.js";
 import { prepareRun, startPreparedRun } from "../../src/runtime/run-workflow.js";
 import { syncRun } from "../../src/runtime/sync.js";
 import { WorkflowSpecSchema, type WorkflowSpec } from "../../src/schema/workflow-spec.js";
-import { baseOutput, summarizeOutput, plainJsonOutput } from "../helpers/fake-runtime.js";
+import { baseOutput, summarizeOutput, validationOutput, plainJsonOutput } from "../helpers/fake-runtime.js";
 
 describe("fanout runtime stability", () => {
   afterEach(() => setAgentRuntimeFactoryForTests(undefined));
@@ -85,7 +85,7 @@ describe("fanout runtime stability", () => {
   it("continues queued fanout items after a partial item runtime error", async () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-fanout-partial-batches-"));
     setAgentRuntimeFactoryForTests(() => new SelectiveFanoutRuntime("item-2"));
-    const spec = fanoutSpec(20, { allowPartial: true }, { maxAgents: 20, maxConcurrency: 10 });
+    const spec = fanoutSpec(20, { allowPartial: true }, { maxAgents: 21, maxConcurrency: 10 });
     const prepared = await prepareRun(spec, {
       cwd,
       input: { cwd, items: fanoutInputItems(20) }
@@ -186,18 +186,33 @@ describe("fanout runtime stability", () => {
       }
     });
 
+    const retryTick = await syncRun(cwd, prepared.logicalRunId);
     const recovered = await syncRun(cwd, prepared.logicalRunId);
     const items = recovered.stages.fanout?.fanout?.items ?? [];
 
+    expect(retryTick.stages.fanout?.fanout?.items.find((item) => item.id === "item-1")).toMatchObject({
+      status: "completed",
+      runtimeRetryOf: "fanout:item-1:attempt-1",
+      runtimeRetryOrdinal: 1
+    });
     expect(recovered.status).toBe("completed");
     expect(recovered.stages.fanout?.status).toBe("completed");
     expect(items.map((item) => [item.id, item.status, item.errorCode])).toEqual([
-      ["item-1", "blocked", RuntimeErrorCodes.FANOUT_ITEM_RUNTIME_ERROR],
+      ["item-1", "completed", undefined],
       ["item-2", "completed", undefined]
     ]);
     expect(recovered.stages.fanout?.fanout).toMatchObject({
-      completedItems: 1,
-      blockedItems: 1
+      completedItems: 2,
+      blockedItems: 0
+    });
+    expect(recovered.attempts["fanout:item-1:attempt-1"]).toMatchObject({
+      status: "failed",
+      runtimeErrorCode: RuntimeErrorCodes.FANOUT_ITEM_RUNTIME_ERROR
+    });
+    expect(recovered.attempts["fanout:item-1:attempt-1-runtime-retry-1"]).toMatchObject({
+      status: "completed",
+      runtimeRetryOf: "fanout:item-1:attempt-1",
+      runtimeRetryOrdinal: 1
     });
     expect(hasStuckFanoutPendingBatch(recovered)).toBe(false);
   });
@@ -243,6 +258,266 @@ describe("fanout runtime stability", () => {
     expect(synced.stages.fanout?.fanout?.completedItems).toBe(2);
     expect(await schedulerBatchStartedCount(prepared.dir)).toBe(1);
     expect(hasStuckFanoutPendingBatch(synced)).toBe(false);
+  });
+
+  it("retries a transient agentTask runtime throw once and completes", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-runtime-retry-stage-"));
+    const runtime = new ScriptedRuntime([
+      { kind: "throw", message: "transport reset while starting agent" },
+      { kind: "text", text: plainJsonOutput(baseOutput({ summary: "retried" })) }
+    ]);
+    setAgentRuntimeFactoryForTests(() => runtime);
+    const spec = simpleTaskSpec(cwd, { maxAgents: 2 });
+    const prepared = await prepareRun(spec, { cwd, input: { cwd } });
+
+    const index = await startPreparedRun(cwd, prepared);
+
+    expect(index.status).toBe("completed");
+    expect(index.agentUsage.actual).toBe(2);
+    expect(runtime.requests).toHaveLength(2);
+    expect(index.attempts["task:attempt-1"]).toMatchObject({
+      status: "failed",
+      runtimeErrorCode: RuntimeErrorCodes.AGENT_RUNTIME_ERROR
+    });
+    expect(index.attempts["task:attempt-1-runtime-retry-1"]).toMatchObject({
+      status: "completed",
+      runtimeRetryOf: "task:attempt-1",
+      runtimeRetryOrdinal: 1
+    });
+  });
+
+  it("retries one transient fanout item runtime throw without surfacing an item error", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-runtime-retry-fanout-"));
+    const runtime = new TransientFanoutRuntime("item-2");
+    setAgentRuntimeFactoryForTests(() => runtime);
+    const spec = fanoutSpec(2, { allowPartial: false }, { maxAgents: 3, maxConcurrency: 2 });
+    const prepared = await prepareRun(spec, {
+      cwd,
+      input: { cwd, items: [{ id: "item-1" }, { id: "item-2" }] }
+    });
+
+    const index = await startPreparedRun(cwd, prepared);
+    const report = await buildRunReportView(cwd, spec, index, { mode: "snapshot" });
+
+    expect(index.status).toBe("completed");
+    const retriedItem = index.stages.fanout?.fanout?.items.find((item) => item.id === "item-2");
+    expect(retriedItem).toMatchObject({
+      status: "completed",
+      runtimeRetryOrdinal: 1
+    });
+    expect(retriedItem?.errorCode).toBeUndefined();
+    expect(index.attempts["fanout:item-2:attempt-1"]).toMatchObject({
+      status: "failed",
+      runtimeErrorCode: RuntimeErrorCodes.AGENT_RUNTIME_ERROR
+    });
+    expect(index.attempts["fanout:item-2:attempt-1-runtime-retry-1"]).toMatchObject({
+      status: "completed",
+      runtimeRetryOf: "fanout:item-2:attempt-1"
+    });
+    expect(report.diagnostics).not.toContainEqual(expect.objectContaining({
+      code: RuntimeErrorCodes.FANOUT_ITEM_RUNTIME_ERROR,
+      itemId: "item-2"
+    }));
+  });
+
+  it("retries a transient fixLoop validator runtime throw and continues the loop", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-runtime-retry-fixloop-"));
+    const runtime = new ScriptedRuntime([
+      { kind: "throw", message: "agent process failed to start" },
+      { kind: "text", text: plainJsonOutput(validationOutput({ verdict: "pass", summary: "passed" })) }
+    ]);
+    setAgentRuntimeFactoryForTests(() => runtime);
+    const spec = fixLoopOnlySpec(cwd, { maxAgents: 3 });
+    const prepared = await prepareRun(spec, { cwd, input: { cwd } });
+
+    const index = await startPreparedRun(cwd, prepared);
+
+    expect(index.status).toBe("completed");
+    expect(index.attempts["quality_loop:attempt-1"]).toMatchObject({
+      status: "failed",
+      runtimeErrorCode: RuntimeErrorCodes.AGENT_RUNTIME_ERROR
+    });
+    expect(index.attempts["quality_loop:attempt-1-runtime-retry-1"]).toMatchObject({
+      status: "completed",
+      runtimeRetryOf: "quality_loop:attempt-1"
+    });
+  });
+
+  it("retries a transient repair runtime throw and completes from repaired output", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-runtime-retry-repair-"));
+    const runtime = new ScriptedRuntime([
+      { kind: "text", text: plainJsonOutput({ status: "completed" }) },
+      { kind: "throw", message: "queue rejected repair turn" },
+      { kind: "text", text: plainJsonOutput(baseOutput({ summary: "repaired" })) }
+    ]);
+    setAgentRuntimeFactoryForTests(() => runtime);
+    const spec = simpleTaskSpec(cwd, { maxAgents: 3 });
+    const prepared = await prepareRun(spec, { cwd, input: { cwd } });
+
+    const index = await startPreparedRun(cwd, prepared);
+
+    expect(index.status).toBe("completed");
+    expect(index.agentUsage.actual).toBe(3);
+    expect(index.agentUsage.repairCalls).toBe(2);
+    expect(index.attempts["task:repair-1"]).toMatchObject({
+      status: "failed",
+      runtimeErrorCode: RuntimeErrorCodes.AGENT_RUNTIME_ERROR
+    });
+    expect(index.attempts["task:repair-1-runtime-retry-1"]).toMatchObject({
+      status: "completed",
+      runtimeRetryOf: "task:repair-1"
+    });
+  });
+
+  it("retries failed retryable turns but not non-retryable failed turns", async () => {
+    const retryCwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-runtime-retry-failed-"));
+    const retryRuntime = new ScriptedRuntime([
+      { kind: "failed", message: "queue rejected prompt", errorCode: "ACP_TURN_FAILED", retryable: true },
+      { kind: "text", text: plainJsonOutput(baseOutput({ summary: "retried failed status" })) }
+    ]);
+    setAgentRuntimeFactoryForTests(() => retryRuntime);
+    const retrySpec = simpleTaskSpec(retryCwd, { maxAgents: 2 });
+    const retryPrepared = await prepareRun(retrySpec, { cwd: retryCwd, input: { cwd: retryCwd } });
+
+    const retried = await startPreparedRun(retryCwd, retryPrepared);
+
+    expect(retried.status).toBe("completed");
+    expect(retryRuntime.requests).toHaveLength(2);
+
+    const blockedCwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-runtime-no-retry-failed-"));
+    const blockedRuntime = new ScriptedRuntime([
+      { kind: "failed", message: "permission denied", errorCode: "PERMISSION_DENIED", retryable: false },
+      { kind: "text", text: plainJsonOutput(baseOutput({ summary: "should not run" })) }
+    ]);
+    setAgentRuntimeFactoryForTests(() => blockedRuntime);
+    const blockedSpec = simpleTaskSpec(blockedCwd, { maxAgents: 2 });
+    const blockedPrepared = await prepareRun(blockedSpec, { cwd: blockedCwd, input: { cwd: blockedCwd } });
+
+    const blocked = await startPreparedRun(blockedCwd, blockedPrepared);
+
+    expect(blocked.status).toBe("blocked");
+    expect(blocked.stages.task?.blockedReason).toBe("AGENT_TURN_FAILED");
+    expect(blockedRuntime.requests).toHaveLength(1);
+  });
+
+  it("blocks non-fanout stages with AGENT_RUNTIME_ERROR after retry exhaustion", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-runtime-retry-exhausted-"));
+    const runtime = new ScriptedRuntime([
+      { kind: "throw", message: "transport reset" },
+      { kind: "throw", message: "transport reset again" }
+    ]);
+    setAgentRuntimeFactoryForTests(() => runtime);
+    const spec = simpleTaskSpec(cwd, { maxAgents: 2 });
+    const prepared = await prepareRun(spec, { cwd, input: { cwd } });
+
+    const index = await startPreparedRun(cwd, prepared);
+    const report = await buildRunReportView(cwd, spec, index, { mode: "snapshot" });
+
+    expect(index.status).toBe("blocked");
+    expect(index.stages.task?.blockedReason).toBe(RuntimeErrorCodes.AGENT_RUNTIME_ERROR);
+    expect(index.attempts["task:attempt-1-runtime-retry-1"]).toMatchObject({
+      status: "failed",
+      runtimeRetryOf: "task:attempt-1",
+      runtimeRetryOrdinal: 1
+    });
+    expect(report.diagnostics).toContainEqual(expect.objectContaining({
+      code: RuntimeErrorCodes.AGENT_RUNTIME_ERROR,
+      stageId: "task"
+    }));
+  });
+
+  it("retries stale non-fanout running stages and blocks after stale retry exhaustion", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-runtime-stale-stage-"));
+    setAgentRuntimeFactoryForTests(() => new StaticRuntime());
+    const spec = simpleTaskSpec(cwd, { maxAgents: 2 });
+    const prepared = await prepareRun(spec, { cwd, input: { cwd } });
+    const staleStartedAt = new Date(Date.now() - 60_000).toISOString();
+    await writeRunIndex(cwd, {
+      ...prepared.index,
+      status: "running",
+      stages: {
+        ...prepared.index.stages,
+        task: {
+          stageId: "task",
+          status: "running",
+          attempts: ["task:attempt-1"],
+          startedAt: staleStartedAt
+        }
+      },
+      attempts: {
+        "task:attempt-1": {
+          id: "task:attempt-1",
+          stageId: "task",
+          kind: "attempt",
+          status: "running",
+          path: path.join("attempts", "task", "attempt-1"),
+          startedAt: staleStartedAt,
+          requestId: "task:attempt-1"
+        }
+      }
+    });
+
+    const recovered = await syncRun(cwd, prepared.logicalRunId);
+
+    expect(recovered.status).toBe("completed");
+    expect(recovered.attempts["task:attempt-1"]).toMatchObject({
+      status: "failed",
+      runtimeErrorCode: RuntimeErrorCodes.AGENT_RUNTIME_ERROR
+    });
+    expect(recovered.attempts["task:attempt-1-runtime-retry-1"]).toMatchObject({
+      status: "completed",
+      runtimeRetryOf: "task:attempt-1"
+    });
+
+    const exhaustedCwd = await fs.mkdtemp(path.join(os.tmpdir(), "acpx-runtime-stale-stage-exhausted-"));
+    const exhaustedPrepared = await prepareRun(spec, { cwd: exhaustedCwd, input: { cwd: exhaustedCwd } });
+    await writeRunIndex(exhaustedCwd, {
+      ...exhaustedPrepared.index,
+      status: "running",
+      stages: {
+        ...exhaustedPrepared.index.stages,
+        task: {
+          stageId: "task",
+          status: "running",
+          attempts: ["task:attempt-1", "task:attempt-1-runtime-retry-1"],
+          startedAt: staleStartedAt,
+          runtimeRetryOf: "task:attempt-1",
+          runtimeRetryOrdinal: 1
+        }
+      },
+      attempts: {
+        "task:attempt-1": {
+          id: "task:attempt-1",
+          stageId: "task",
+          kind: "attempt",
+          status: "failed",
+          path: path.join("attempts", "task", "attempt-1"),
+          startedAt: staleStartedAt,
+          endedAt: staleStartedAt,
+          runtimeErrorCode: RuntimeErrorCodes.AGENT_RUNTIME_ERROR
+        },
+        "task:attempt-1-runtime-retry-1": {
+          id: "task:attempt-1-runtime-retry-1",
+          stageId: "task",
+          kind: "attempt",
+          status: "running",
+          path: path.join("attempts", "task", "attempt-1-runtime-retry-1"),
+          startedAt: staleStartedAt,
+          requestId: "task:attempt-1-runtime-retry-1",
+          runtimeRetryOf: "task:attempt-1",
+          runtimeRetryOrdinal: 1
+        }
+      }
+    });
+
+    const exhausted = await syncRun(exhaustedCwd, exhaustedPrepared.logicalRunId, { startPending: false });
+
+    expect(exhausted.status).toBe("blocked");
+    expect(exhausted.stages.task?.blockedReason).toBe(RuntimeErrorCodes.AGENT_RUNTIME_ERROR);
+    expect(exhausted.attempts["task:attempt-1-runtime-retry-1"]).toMatchObject({
+      status: "failed",
+      runtimeErrorCode: RuntimeErrorCodes.AGENT_RUNTIME_ERROR
+    });
   });
 
   it("preserves cancelled turn diagnostics in output and attempt index", async () => {
@@ -531,6 +806,111 @@ function budgetSpec(cwd: string): WorkflowSpec {
       { id: "validate", kind: "agentTask", role: "worker", dependsOn: ["plan"], prompt: "Validate" }
     ]
   });
+}
+
+function simpleTaskSpec(cwd: string, limits: { maxAgents?: number } = {}): WorkflowSpec {
+  return WorkflowSpecSchema.parse({
+    schemaVersion: "acpx-orchestrator.workflow/v1",
+    name: "simple-task",
+    root: "task",
+    inputs: { cwd: { type: "path", default: cwd } },
+    roles: {
+      worker: { category: "coordination", agent: "fake", mode: "readOnly" }
+    },
+    limits: { maxAgents: limits.maxAgents ?? 1, maxConcurrency: 1, maxFanoutItems: 1, maxFixRounds: 0, stageTimeoutMinutes: 1 },
+    stages: [{ id: "task", kind: "agentTask", role: "worker", prompt: "Do work" }]
+  });
+}
+
+function fixLoopOnlySpec(cwd: string, limits: { maxAgents?: number } = {}): WorkflowSpec {
+  return WorkflowSpecSchema.parse({
+    schemaVersion: "acpx-orchestrator.workflow/v1",
+    name: "fix-loop-only",
+    root: "quality_loop",
+    inputs: { cwd: { type: "path", default: cwd } },
+    roles: {
+      validator: { category: "validation", agent: "fake", mode: "readOnly" },
+      implementer: { category: "implementation", agent: "fake", mode: "edit" }
+    },
+    limits: { maxAgents: limits.maxAgents ?? 2, maxConcurrency: 1, maxFanoutItems: 1, maxFixRounds: 2, stageTimeoutMinutes: 1 },
+    stages: [{
+      id: "quality_loop",
+      kind: "fixLoop",
+      maxRounds: 2,
+      validator: { role: "validator", prompt: "Validate" },
+      fixer: { role: "implementer", prompt: "Fix" },
+      routingPolicy: { fixOn: ["P0", "P1"], ignoreForRouting: ["P2", "P3"], unknown: "blocked" },
+      onUnknown: "blocked",
+      onExhausted: "blocked"
+    }]
+  });
+}
+
+type RuntimeStep =
+  | { kind: "text"; text: string }
+  | { kind: "throw"; message: string; errorCode?: string }
+  | { kind: "failed"; message: string; errorCode?: string; errorDetailCode?: string; retryable?: boolean };
+
+class ScriptedRuntime implements OrchestratorAgentRuntime {
+  readonly requests: AgentTurnRequest[] = [];
+  private index = 0;
+
+  constructor(private readonly steps: RuntimeStep[]) {}
+
+  async runTurn(input: AgentTurnRequest, onEvent?: (event: AcpRuntimeEvent) => Promise<void> | void): Promise<AgentTurnResult> {
+    this.requests.push(input);
+    const step = this.steps[this.index] ?? this.steps.at(-1) ?? { kind: "text", text: plainJsonOutput(baseOutput()) };
+    this.index += 1;
+    if (step.kind === "throw") {
+      const error = new Error(step.message) as Error & { code?: string };
+      if (step.errorCode) error.code = step.errorCode;
+      throw error;
+    }
+    if (step.kind === "failed") {
+      return {
+        handle: fakeHandle(input),
+        rawText: "",
+        events: [],
+        status: "failed",
+        error: step.message,
+        errorCode: step.errorCode,
+        errorDetailCode: step.errorDetailCode,
+        retryable: step.retryable
+      };
+    }
+    const event: AcpRuntimeEvent = { type: "text_delta", text: step.text, stream: "output" };
+    await onEvent?.(event);
+    return {
+      handle: fakeHandle(input),
+      rawText: step.text,
+      events: [event],
+      status: "completed"
+    };
+  }
+}
+
+class TransientFanoutRuntime implements OrchestratorAgentRuntime {
+  readonly requests: AgentTurnRequest[] = [];
+  private readonly failures = new Set<string>();
+
+  constructor(private readonly failingItemId: string) {}
+
+  async runTurn(input: AgentTurnRequest, onEvent?: (event: AcpRuntimeEvent) => Promise<void> | void): Promise<AgentTurnResult> {
+    this.requests.push(input);
+    if (input.sessionKey.endsWith(`item:${this.failingItemId}`) && !this.failures.has(input.sessionKey)) {
+      this.failures.add(input.sessionKey);
+      throw new Error("queue rejected item turn");
+    }
+    const rawText = plainJsonOutput(baseOutput({ summary: input.sessionKey }));
+    const event: AcpRuntimeEvent = { type: "text_delta", text: rawText, stream: "output" };
+    await onEvent?.(event);
+    return {
+      handle: fakeHandle(input),
+      rawText,
+      events: [event],
+      status: "completed"
+    };
+  }
 }
 
 class SelectiveFanoutRuntime implements OrchestratorAgentRuntime {
