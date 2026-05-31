@@ -46,7 +46,7 @@ export function getOutputContract(name: OutputContractName, options: OutputContr
 export function contractFooterText(name: OutputContractName, schemaForPrompt = schemaDescriptor(name), options: OutputContractOptions = {}): string {
   return [
     "Workflow stage output contract:",
-    "- End the response with exactly one JSON object and nothing after it.",
+    "- End the response with exactly one valid, parseable JSON object that satisfies the schema.",
     "- Do not wrap the final JSON object in Markdown code fences.",
     "- Required schema:",
     "```json",

@@ -14,7 +14,8 @@ describe("compileExecutionPlan", () => {
     expect(plan.stages.map((stage) => stage.id)).toEqual(["plan", "implement", "validate", "summarize"]);
     expect(JSON.stringify(plan)).not.toContain("defineFlow");
     expect(JSON.stringify(plan)).not.toContain("workflow.flow.ts");
-    expect(plan.prompts.plan.footer).toContain("End the response with exactly one JSON object and nothing after it.");
+    expect(plan.prompts.plan.footer).toContain("End the response with exactly one valid, parseable JSON object that satisfies the schema.");
+    expect(plan.prompts.plan.footer).toContain("Do not wrap the final JSON object in Markdown code fences.");
     expect(plan.prompts.plan.footer).not.toContain("fenced JSON block tagged workflow-output");
     expect(plan.contracts.implement).toMatchObject({ name: "implementation" });
     expect(plan.contracts.validate).toMatchObject({ name: "validation" });

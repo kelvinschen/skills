@@ -63,8 +63,8 @@ stage id, and authoring stage kinds:
 Prompt text is freeform, but variables are explicit and interpolated as
 `${variableName}`. Agent outputs should end with one plain JSON object; the
 parser selects the last balanced JSON object and tolerates non-JSON tail text.
-Markdown code fences are not part of the output protocol. Zod-backed contracts
-validate outputs, deterministic
+Markdown code fences are tolerated by the parser but not required. Zod-backed
+contracts validate outputs, deterministic
 `checks[].result -> checks[].status` normalization is allowed, and one
 schema-aware repair turn may run in the same session.
 

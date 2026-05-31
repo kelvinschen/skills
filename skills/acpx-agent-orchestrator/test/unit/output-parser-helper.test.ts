@@ -259,6 +259,7 @@ describe("runtime output parser", () => {
     expect(prompt).toContain("Minimal valid example");
     expect(prompt).toContain("/status");
     expect(prompt).toContain("checks[].result");
-    expect(prompt).toContain("End with exactly one JSON object and nothing after it");
+    expect(prompt).toContain("End with exactly one valid, parseable JSON object that satisfies the schema.");
+    expect(prompt).toContain("Do not wrap the final JSON object in Markdown code fences.");
   });
 });
