@@ -47,7 +47,7 @@ export function contractFooterText(name: OutputContractName, schemaForPrompt = s
   return [
     "Workflow stage output contract:",
     "- End the response with exactly one valid, parseable JSON object that satisfies the schema.",
-    "- Do not wrap the final JSON object in Markdown code fences.",
+    "- Do not wrap the final JSON object in Markdown code fences. Do not use ```json.",
     "- Required schema:",
     "```json",
     JSON.stringify(schemaForPrompt, null, 2),

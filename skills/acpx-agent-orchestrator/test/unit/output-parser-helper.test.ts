@@ -260,6 +260,6 @@ describe("runtime output parser", () => {
     expect(prompt).toContain("/status");
     expect(prompt).toContain("checks[].result");
     expect(prompt).toContain("End with exactly one valid, parseable JSON object that satisfies the schema.");
-    expect(prompt).toContain("Do not wrap the final JSON object in Markdown code fences.");
+    expect(prompt).toContain("Do not wrap the final JSON object in Markdown code fences. Do not use ```json.");
   });
 });

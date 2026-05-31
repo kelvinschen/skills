@@ -23,7 +23,7 @@ export function formatRepairPrompt(input: {
     "",
     "Do not redo task work. Do not edit files. Do not invent command results. Do not change factual content except to convert it into the required schema.",
     "End with exactly one valid, parseable JSON object that satisfies the schema.",
-    "Do not wrap the final JSON object in Markdown code fences.",
+    "Do not wrap the final JSON object in Markdown code fences. Do not use ```json.",
     "",
     `Contract: ${input.contractName}`,
     "Canonical schema:",

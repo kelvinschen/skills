@@ -94,5 +94,5 @@ ${JSON.stringify(input.events, null, 2)}
 
 Diagnose why the run is blocked and recommend the smallest safe recovery plan. Do not edit files. Do not rerun prior edit work.
 
-End the response with exactly one valid, parseable JSON object matching the diagnostic contract. Do not wrap the final JSON object in Markdown code fences.`;
+End the response with exactly one valid, parseable JSON object matching the diagnostic contract. Do not wrap the final JSON object in Markdown code fences. Do not use \`\`\`json.`;
 }
