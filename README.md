@@ -4,6 +4,16 @@ A collection of automation skills for web-based workflows.
 
 ## Skills Overview
 
+### grill-with-tree
+
+A structured decision-grilling skill for plans, designs, and domain models.
+
+**Purpose**: Builds a visible decision tree, batches independent high-risk questions, recommends defaults, records downstream effects, and keeps glossary and ADR documentation aligned.
+
+**Demo**: [English acpus workflow install decision log](https://kelvinschen.github.io/skills/)
+
+---
+
 ### agent-browser-automation-creator
 
 A **meta-skill** that creates new web automation skills.

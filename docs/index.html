@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An English decision-log demo produced with the Grill with Tree skill.">
+  <title>Decision Log — acpus workflow install</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;1,14..32,400&family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --paper: #faf9f6; --ink: #1f1f1f; --graphite: #5a5a5a; --slate: #dcdad5;
+      --signal: #b84545; --frost: #fff; --fog: #f2f0ec; --warn: #d4a843;
+      --resolved: #5a8f6b; --blue: #4a6fa5;
+    }
+    html { font-size: 17px; -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
+    body {
+      min-height: 100vh; background: var(--paper); color: var(--ink);
+      font-family: Inter, system-ui, -apple-system, sans-serif; line-height: 1.65;
+    }
+    code { font-family: "JetBrains Mono", monospace; font-size: 0.92em; }
+    .hero { padding: 5rem 1.5rem 3rem; border-bottom: 1px solid var(--slate); text-align: center; }
+    .hero-eyebrow {
+      margin-bottom: 1rem; color: var(--signal); font-family: "JetBrains Mono", monospace;
+      font-size: 0.75rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    .hero h1 {
+      max-width: 720px; margin: 0 auto 0.75rem; font-family: "DM Serif Display", Georgia, serif;
+      font-size: 2.75rem; font-weight: 400; letter-spacing: -0.015em; line-height: 1.15;
+    }
+    .hero h1 em { color: var(--signal); font-style: italic; }
+    .hero-sub { max-width: 570px; margin: 0 auto; color: var(--graphite); font-size: 0.95rem; }
+    .hero-meta {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 2rem; margin-top: 1.5rem;
+      color: var(--graphite); font-family: "JetBrains Mono", monospace; font-size: 0.72rem;
+    }
+    .hero-meta span { display: flex; align-items: center; gap: 0.35rem; }
+    .hero-meta .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--signal); }
+    .jump-nav {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 0.75rem 1.25rem;
+      padding: 0.8rem 1.5rem; border-bottom: 1px solid var(--slate);
+      background: rgb(250 249 246 / 94%); font-family: "JetBrains Mono", monospace; font-size: 0.68rem;
+    }
+    .jump-nav a { color: var(--graphite); text-decoration: none; }
+    .jump-nav a:hover, .jump-nav a:focus-visible {
+      color: var(--signal); text-decoration: underline; text-underline-offset: 0.25rem;
+    }
+    .container { max-width: 1000px; margin: 0 auto; padding: 0 1.5rem; }
+    .section { padding: 3.5rem 0; scroll-margin-top: 1rem; }
+    .section + .section { border-top: 1px solid var(--slate); }
+    .section-header { display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 2rem; }
+    .section-num {
+      flex-shrink: 0; color: var(--graphite); font-family: "JetBrains Mono", monospace;
+      font-size: 0.7rem; font-weight: 500; letter-spacing: 0.04em;
+    }
+    .section-title {
+      font-family: "DM Serif Display", Georgia, serif; font-size: 1.5rem;
+      font-weight: 400; letter-spacing: -0.01em; line-height: 1.2;
+    }
+    .section-desc {
+      max-width: 650px; margin-bottom: 2rem; color: var(--graphite);
+      font-size: 0.9rem; line-height: 1.65;
+    }
+    .pack {
+      overflow: hidden; margin-bottom: 2.5rem; border: 1px solid var(--slate);
+      border-radius: 8px; background: var(--frost);
+    }
+    .pack-header {
+      display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+      gap: 1rem; padding: 1rem 1.5rem; border-bottom: 1px solid var(--slate); background: var(--fog);
+    }
+    .pack-header h3 {
+      color: var(--ink); font-family: "DM Serif Display", Georgia, serif;
+      font-size: 1.15rem; font-weight: 400; letter-spacing: -0.005em;
+    }
+    .pack-meta { color: var(--graphite); font-family: "JetBrains Mono", monospace; font-size: 0.68rem; }
+    .table-scroll { overflow-x: auto; }
+    .pack-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .pack-table thead th {
+      padding: 0.6rem 1rem; border-bottom: 1.5px solid var(--slate); color: var(--graphite);
+      font-family: "JetBrains Mono", monospace; font-size: 0.65rem; font-weight: 500;
+      letter-spacing: 0.03em; text-align: left; text-transform: uppercase; white-space: nowrap;
+    }
+    .pack-table tbody td {
+      padding: 0.75rem 1rem; border-bottom: 1px solid var(--slate); line-height: 1.55; vertical-align: top;
+    }
+    .pack-table tbody tr:last-child td { border-bottom: 0; }
+    .node-col {
+      min-width: 3.5rem; color: var(--signal); font-family: "JetBrains Mono", monospace;
+      font-size: 0.72rem; font-weight: 500; white-space: nowrap;
+    }
+    .question-col { min-width: 10rem; }
+    .question-col strong { color: var(--ink); font-weight: 600; }
+    .options-col { min-width: 13rem; font-size: 0.8rem; }
+    .rec-col { min-width: 9rem; font-size: 0.8rem; }
+    .why-col { min-width: 10rem; color: var(--graphite); font-size: 0.78rem; }
+    .impact-col { min-width: 11rem; color: var(--graphite); font-size: 0.78rem; }
+    .option {
+      display: grid; grid-template-columns: 1.5rem 1fr; gap: 0.15rem; margin-bottom: 0.6rem;
+    }
+    .option:last-child { margin-bottom: 0; }
+    .opt-label {
+      color: var(--blue); font-family: "JetBrains Mono", monospace; font-size: 0.7rem; font-weight: 500;
+    }
+    .rec-label {
+      color: var(--signal); font-family: "JetBrains Mono", monospace; font-size: 0.72rem; font-weight: 600;
+    }
+    .rec-reason { margin-top: 0.15rem; color: var(--graphite); font-size: 0.78rem; }
+    .impact-item { margin-bottom: 0.35rem; padding-left: 0.6rem; border-left: 2px solid var(--slate); }
+    .impact-item:nth-child(3n + 1) { border-left-color: var(--blue); }
+    .impact-item:nth-child(3n + 2) { border-left-color: var(--signal); }
+    .impact-item:nth-child(3n + 3) { border-left-color: var(--resolved); }
+    .prio {
+      display: inline-block; padding: 0.1em 0.4em; border-radius: 3px;
+      font-family: "JetBrains Mono", monospace; font-size: 0.6rem; font-weight: 600; letter-spacing: 0.04em;
+    }
+    .p0 { background: #f2dcdc; color: var(--signal); }
+    .p1 { background: #f2ecd4; color: #8b6f1e; }
+    .p2 { background: var(--slate); color: var(--graphite); }
+    .pack-resolution {
+      padding: 0.75rem 1.5rem; border-top: 1px solid var(--slate);
+      background: #f8fcf8; color: var(--graphite); font-size: 0.82rem;
+    }
+    .pack-resolution strong { color: var(--resolved); }
+    .superseded { color: var(--graphite); text-decoration: line-through; }
+    .tree { position: relative; padding-left: 2.5rem; }
+    .tree::before {
+      position: absolute; top: 0; bottom: 0; left: 0.85rem; width: 1px;
+      background: var(--slate); content: "";
+    }
+    .tree-children { margin-left: 1.25rem; }
+    .tree-node {
+      position: relative; margin-left: -0.25rem; padding: 0.65rem 0.25rem 0.65rem 1.75rem;
+      border-radius: 4px; transition: background 0.2s;
+    }
+    .tree-node::before {
+      position: absolute; z-index: 1; top: 1rem; left: -1.65rem; width: 10px; height: 10px;
+      border: 2px solid var(--paper); border-radius: 50%; background: var(--slate);
+      content: ""; transition: background 0.2s, transform 0.2s;
+    }
+    .tree-node.resolved::before { background: var(--resolved); }
+    .tree-node.decision::before { background: var(--signal); }
+    .tree-node.risk::before { background: var(--warn); }
+    .tree-node.deferred::before { border: 1.5px dashed var(--graphite); background: transparent; }
+    .tree-node:hover { background: var(--fog); }
+    .tree-node:hover::before { transform: scale(1.3); }
+    .tree-node-id {
+      margin-bottom: 0.1rem; color: var(--signal); font-family: "JetBrains Mono", monospace;
+      font-size: 0.7rem; font-weight: 500; letter-spacing: 0.02em;
+    }
+    .kind {
+      margin-left: 0.35rem; padding: 0.1em 0.4em; border-radius: 3px; background: var(--slate);
+      color: var(--graphite); font-size: 0.65rem; font-weight: 400; letter-spacing: 0.05em; text-transform: uppercase;
+    }
+    .decision-tag { background: #f2dcdc; color: var(--signal); }
+    .risk-tag { background: #f2ecd4; color: #8b6f1e; }
+    .resolved-tag { background: #dce8de; color: var(--resolved); }
+    .deferred-tag { background: var(--slate); color: var(--graphite); }
+    .tree-node-title { margin-bottom: 0.1rem; color: var(--ink); font-size: 0.9rem; font-weight: 600; }
+    .tree-node-choice {
+      color: var(--graphite); font-family: "JetBrains Mono", monospace; font-size: 0.7rem;
+    }
+    .tree-node-choice strong { color: var(--ink); font-weight: 500; }
+    .tree-node-detail {
+      max-width: 620px; margin-top: 0.2rem; color: var(--graphite); font-size: 0.8rem; line-height: 1.5;
+    }
+    .cmd-block {
+      overflow-x: auto; padding: 1.5rem; border: 1px solid var(--slate); border-radius: 6px;
+      background: var(--frost); color: var(--ink); font-family: "JetBrains Mono", monospace;
+      font-size: 0.8rem; line-height: 1.7; white-space: nowrap;
+    }
+    .cmd-block .kw { color: var(--signal); font-weight: 500; }
+    .cmd-block .opt { color: var(--graphite); }
+    .cmd-block .cmt { color: #8b8b8b; font-style: italic; }
+    .process-copy { max-width: 650px; color: var(--graphite); font-size: 0.9rem; line-height: 1.75; }
+    .footer {
+      padding: 3rem 1.5rem; border-top: 1px solid var(--slate); color: var(--graphite);
+      font-family: "JetBrains Mono", monospace; font-size: 0.7rem; text-align: center;
+    }
+    @media (max-width: 700px) {
+      html { font-size: 16px; }
+      .hero { padding-top: 3.5rem; }
+      .hero h1 { font-size: 2rem; }
+      .hero-meta { flex-direction: column; align-items: center; gap: 0.5rem; }
+      .jump-nav { justify-content: flex-start; overflow-x: auto; flex-wrap: nowrap; }
+      .tree { padding-left: 2rem; }
+      .tree::before { left: 0.7rem; }
+      .tree-node { padding-left: 1.25rem; }
+      .tree-node::before { left: -1.45rem; width: 8px; height: 8px; }
+      .pack-table { font-size: 0.76rem; }
+      .pack-table thead th, .pack-table tbody td { padding: 0.5rem 0.65rem; }
+    }
+    @media print {
+      .jump-nav { display: none; }
+      .pack { break-inside: avoid; }
+      .section { padding: 2rem 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .tree-node, .tree-node::before { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-eyebrow">Decision Log</div>
+    <h1>acpus <em>workflow install</em></h1>
+    <p class="hero-sub">
+      A structured exploration of CLI command design, documented with the Grill with Tree method.
+      Four decision packs record 19 nodes, their options, recommendations, priority rationale, and downstream effects.
+    </p>
+    <div class="hero-meta">
+      <span><span class="dot" aria-hidden="true"></span>2026-07-13</span>
+      <span>Acpus Project</span><span>4 Decision Packs</span><span>19 Nodes</span><span>Grill with Tree</span>
+    </div>
+  </header>
+  <nav class="jump-nav" aria-label="Page sections">
+    <a href="#decision-packs">§1 Decision Packs</a>
+    <a href="#decision-tree">§2 Final Decision Tree</a>
+    <a href="#command-signature">§3 Command Signature</a>
+    <a href="#process">§4 Process</a>
+  </nav>
+  <main>
+    <section class="section" id="decision-packs">
+      <div class="container">
+        <div class="section-header"><span class="section-num">§1</span><h2 class="section-title">Decision Packs</h2></div>
+        <p class="section-desc">
+          Grill with Tree decomposes a target into decision, term, and risk nodes, ranks them by priority,
+          and presents orthogonal questions in batches. Every option names the branch it unlocks or prunes.
+          The four complete packs from this design session follow.
+        </p>
+        <div id="packs"></div>
+      </div>
+    </section>
+    <section class="section" id="decision-tree">
+      <div class="container">
+        <div class="section-header"><span class="section-num">§2</span><h2 class="section-title">Final Decision Tree</h2></div>
+        <div class="tree">
+          <article class="tree-node decision resolved">
+            <div class="tree-node-id">R0 <span class="kind decision-tag">Root</span></div>
+            <h3 class="tree-node-title">Add workflow installation to acpus</h3>
+            <p class="tree-node-detail">Accept remote URLs and local files, then install a workflow into the project or global catalog.</p>
+          </article>
+          <div class="tree-children" id="tree-nodes"></div>
+        </div>
+      </div>
+    </section>
+    <section class="section" id="command-signature">
+      <div class="container">
+        <div class="section-header"><span class="section-num">§3</span><h2 class="section-title">Command Signature</h2></div>
+        <div class="cmd-block" role="region" aria-label="Command signature" tabindex="0">
+          <span class="kw">acpus workflow install</span> &lt;source&gt; [options]<br><br>
+          <span class="cmt"># source: local directory | .tar/.tar.gz/.tar.xz/.zip archive | HTTP(S) URL</span><br>
+          <span class="cmt"># options:</span><br>
+          <span class="opt">&nbsp;&nbsp;--project</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="cmt">Install into the project catalog (default)</span><br>
+          <span class="opt">&nbsp;&nbsp;--global</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="cmt">Install into the global catalog</span><br>
+          <span class="opt">&nbsp;&nbsp;--name &lt;name&gt;</span>&nbsp;&nbsp;&nbsp;&nbsp; <span class="cmt">Set the catalog entry name (inferred from source by default)</span><br>
+          <span class="opt">&nbsp;&nbsp;--force</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="cmt">Overwrite an existing entry with the same name</span><br>
+          <span class="opt">&nbsp;&nbsp;--rename &lt;name&gt;</span>&nbsp;&nbsp; <span class="cmt">Install under a different name when resolving a conflict</span><br>
+          <span class="opt">&nbsp;&nbsp;--skip-check</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="cmt">Skip workflow check validation</span><br>
+          <span class="opt">&nbsp;&nbsp;--type &lt;type&gt;</span>&nbsp;&nbsp;&nbsp;&nbsp; <span class="cmt">Set source type explicitly: directory|tar|zip|url</span><br>
+          <span class="opt">&nbsp;&nbsp;--dry-run</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="cmt">Preview the operation without installing</span>
+        </div>
+      </div>
+    </section>
+    <section class="section" id="process">
+      <div class="container">
+        <div class="section-header"><span class="section-num">§4</span><h2 class="section-title">Process</h2></div>
+        <p class="process-copy">
+          This decision log was produced with <strong>Grill with Tree</strong>, a structured design-exploration method.
+          Each session decomposes its target into decisions, terms, assumptions, risks, and scenarios; ranks them as
+          P0 blockers, P1 high-risk choices, P2 normal choices, or P3 cleanup; and asks the decision maker batches of
+          independent questions. Each option exposes its downstream effects. Chosen branches expand into new children,
+          rejected branches are pruned, and the process continues until every P0/P1 node is resolved, defaulted, or explicitly deferred.
+        </p>
+      </div>
+    </section>
+  </main>
+  <footer class="footer">Acpus Decision Log · Generated 2026-07-13 · Grill with Tree</footer>
+  <script>
+    const packs = [
+      {
+        title: "Decision Pack 1 — Core Architecture", meta: "4 nodes · P0–P1",
+        resolution: "<strong>User choice: defaults</strong> — accepted every recommendation: D1=A, D2=B, D4=C, D5=B.",
+        nodes: [
+          {
+            id: "D1", priority: "P0",
+            question: "<strong>Command placement and naming</strong> — Which parent command should own the new command?",
+            options: [
+              ["A", "<code>acpus workflow install</code> — a workflow subcommand"],
+              ["B", "<code>acpus install</code> — a top-level command"],
+              ["C", "<code>acpus catalog add</code> — introduce a catalog parent command"]
+            ],
+            rec: ["A", "Aligns with existing check/run/viz commands; catalog behavior already belongs under workflow."],
+            why: "P0: Sets the public CLI architecture. The roadmap explicitly rejects a standalone <code>acpus catalog</code> namespace, so the wrong choice conflicts with an established direction.",
+            impacts: [
+              "A → aligns with check/run/viz and reuses catalog semantics",
+              "B → adds a top-level namespace and makes catalog a separate concept",
+              "C → conflicts with an existing design decision"
+            ]
+          },
+          {
+            id: "D2", priority: "P0",
+            question: "<strong>Installation source types</strong> — Which source formats should be supported?",
+            options: [["A", "Local directories plus tar/zip files"], ["B", "A plus HTTP(S) URLs"], ["C", "B plus Git URLs"]],
+            rec: ["B", "Covers the roadmap's remote tar/zip and local requirements; Git URLs can wait."],
+            why: "P0: Defines the implementation boundary. HTTP downloads cover the common remote case, while Git URLs introduce a separate integration surface.",
+            impacts: ["A → simplest path, no network dependency", "B → requires downloads and temporary-file management", "C → requires Git integration and substantially more complexity"]
+          },
+          {
+            id: "D4", priority: "P1",
+            question: "<strong>Name-conflict policy</strong> — What happens when the target catalog already contains the same entry name?",
+            options: [
+              ["A", "Reject by default; <code>--force</code> overwrites"],
+              ["B", "Reject by default; <code>--rename &lt;name&gt;</code> renames"],
+              ["C", "Support both"]
+            ],
+            rec: ["C", "Overwrite and rename are both valid needs; <code>--force</code> is conventional and <code>--rename</code> is the safe alternative."],
+            why: "P1: Affects both safety and usability, and is difficult to change later. Rejecting by default is the safety baseline, but overwrite and rename serve different workflows.",
+            impacts: ["A → simplest implementation", "B → avoids data loss", "C → most flexible, with modest extra complexity"]
+          },
+          {
+            id: "D5", priority: "P1",
+            question: "<strong>Installed-content validation</strong> — How should content be validated before installation?",
+            options: [
+              ["A", "Check structure only; <code>workflow.ts</code> must exist"],
+              ["B", "Check structure and run <code>acpus workflow check</code>"],
+              ["C", "Check structure, run check, and validate the IR"]
+            ],
+            rec: ["B", "Structure is mandatory, and workflow check catches type errors without the environment sensitivity of full validation."],
+            why: "P1: Sets the quality gate. A weak gate installs broken workflows; an overly strict gate rejects valid content because of local environment differences.",
+            impacts: ["A → fastest, but may install unusable content", "B → balances quality and speed", "C → strictest, but may produce environment-specific false rejections"]
+          }
+        ]
+      },
+      {
+        title: "Decision Pack 2 — Implementation Details", meta: "6 nodes · P1–P2",
+        resolution: "<strong>User choice: R8=A; defaults for the rest</strong> — D6=C, D10=B, D11=C, D12=A, <span class=\"superseded\">R8=B</span> R8=A, R9=B. The user judged a total-size limit sufficient protection against archive bombs and avoided file-counting complexity.",
+        nodes: [
+          {
+            id: "D6", priority: "P2",
+            question: "<strong>Source-format inference</strong> — How should the CLI distinguish a local directory, archive, or URL?",
+            options: [
+              ["A", "Infer automatically from file extension and URL scheme"],
+              ["B", "Require an explicit <code>--type</code> option"],
+              ["C", "Infer automatically, with <code>--type</code> as an override"]
+            ],
+            rec: ["C", "Inference covers almost every case; <code>--type</code> remains an escape hatch."],
+            why: "P2: Shapes CLI ergonomics. Inference keeps the common path configuration-free while an override handles unusual inputs.",
+            impacts: ["A → simple, but has no override", "B → explicit on every invocation and needlessly verbose", "C → automatic common path with a manual fallback"]
+          },
+          {
+            id: "D10", priority: "P1",
+            question: "<strong>Temporary directory for remote downloads</strong> — Where should downloads live, and when are they removed?",
+            options: [
+              ["A", "System <code>/tmp</code>; delete after installation"],
+              ["B", "<code>.acpus/.local/tmp/</code>; delete after installation"],
+              ["C", "Keep the download in memory and never extract to disk"]
+            ],
+            rec: ["B", "Keeps temporary content inside the workspace for failure diagnosis and avoids cross-filesystem renames."],
+            why: "P1: Affects disk usage, security isolation, and atomicity. The chosen path determines whether the final rename can remain on one filesystem.",
+            impacts: ["A → simplest, but may cross filesystems", "B → isolated and on the same filesystem", "C → constrained by memory"]
+          },
+          {
+            id: "D11", priority: "P1",
+            question: "<strong>Archive-root inference</strong> — How should the installer handle one extra top-level directory?",
+            options: [
+              ["A", "Require the workflow package at the archive root"],
+              ["B", "Enter the root's only child directory automatically"],
+              ["C", "Support both layouts"]
+            ],
+            rec: ["C", "Both layouts are common; single-child descent is a user-friendly fallback."],
+            why: "P1: Determines packaging ergonomics. Users may archive the workflow directory itself or archive its contents.",
+            impacts: ["A → strict; users must package precisely", "B → forgiving, but may infer incorrectly", "C → supports both common layouts"]
+          },
+          {
+            id: "D12", priority: "P1",
+            question: "<strong><code>--rename</code> validation</strong> — What constraints apply to the new name?",
+            options: [["A", "Require <code>[a-z0-9][a-z0-9-]*</code>"], ["B", "Accept any name"], ["C", "Apply the pattern but only warn the user"]],
+            rec: ["A", "Matches catalog naming rules and prevents entries that cannot be referenced later."],
+            why: "P1: Determines whether a renamed entry remains usable. Without validation, the installer can create an unreachable entry.",
+            impacts: ["A → guarantees catalog consistency", "B → may create unusable entries", "C → flexible, but relies on user discipline"]
+          },
+          {
+            id: "R8", priority: "P1",
+            question: "<strong>Archive-bomb protection</strong> — How should malicious archives be prevented from exhausting resources?",
+            options: [["A", "Check total expanded size before extraction"], ["B", "Check both file count and total expanded size"], ["C", "Perform no preflight check"]],
+            rec: ["B", "File-count limits constrain many-tiny-file attacks; size limits constrain volume."],
+            why: "P1: Security risk. A malicious archive can contain either an enormous file or a huge number of small files.",
+            impacts: ["A → partial protection", "B → broader protection", "C → no protection"]
+          },
+          {
+            id: "R9", priority: "P1",
+            question: "<strong>Global-catalog cache invalidation</strong> — What happens to an existing cached digest after installation?",
+            options: [["A", "Do nothing; the user clears it manually"], ["B", "Automatically clear the installed entry's cache"], ["C", "Prompt the user to clear it"]],
+            rec: ["B", "Automatic invalidation prevents silent execution of a stale workflow."],
+            why: "P1: Determines consistency for global workflows. A stale digest can cause the old version to run after a successful install.",
+            impacts: ["A → stale cache remains possible", "B → restores consistency automatically", "C → depends on user action"]
+          }
+        ]
+      },
+      {
+        title: "Decision Pack 3 — Finishing Details", meta: "4 nodes · P2",
+        resolution: "<strong>User choice: defaults</strong> — accepted every recommendation: D14=A, D15=B, D16=A, D13=B.",
+        nodes: [
+          {
+            id: "D14", priority: "P2",
+            question: "<strong><code>--type</code> values</strong> — Which explicit source types should the option expose?",
+            options: [
+              ["A", "<code>directory</code> / <code>tar</code> / <code>zip</code> / <code>url</code>"],
+              ["B", "Distinguish <code>tar.gz</code>, <code>tar.xz</code>, and other variants"],
+              ["C", "Call every compressed format <code>archive</code>"]
+            ],
+            rec: ["A", "Four values cover the source families; compression details can still be inferred from the extension."],
+            why: "P2: Keeps the interface simple without losing useful control. Compression variants need not become user-facing concepts.",
+            impacts: ["A → simple and explicit", "B → exposes needless detail", "C → discards useful format information"]
+          },
+          {
+            id: "D15", priority: "P2",
+            question: "<strong>Download progress</strong> — Should remote downloads show progress?",
+            options: [["A", "No feedback"], ["B", "Spinner"], ["C", "Progress bar"]],
+            rec: ["B", "A spinner is enough because workflow archives are usually small."],
+            why: "P2: User experience. Interactive sessions get visible feedback; non-interactive sessions can emit one status line.",
+            impacts: ["A → silent and confusing", "B → sufficient and consistent with the CLI", "C → over-engineered for typical payloads"]
+          },
+          {
+            id: "D16", priority: "P2",
+            question: "<strong><code>--dry-run</code> support</strong> — Should install support the same preview mode as skill install?",
+            options: [["A", "Yes"], ["B", "No"]],
+            rec: ["A", "Matches skill install and gives a safe preview for a mutating operation."],
+            why: "P2: Consistency with existing CLI behavior. Skill install already establishes the dry-run convention.",
+            impacts: ["A → consistent and previewable", "B → inconsistent and lacks a safety preview"]
+          },
+          {
+            id: "D13", priority: "P2",
+            question: "<strong>Installation-result JSON</strong> — Which fields should the command return?",
+            options: [["A", "Minimal: <code>{ name, scope, entryPath, source }</code>"], ["B", "Include validation output: <code>{ ..., checkResult }</code>"]],
+            rec: ["B", "Because D5 runs workflow check, returning its result helps users diagnose failures."],
+            why: "P2: Defines the machine-readable output contract. Validation details provide direct troubleshooting value.",
+            impacts: ["A → minimal, but loses useful evidence", "B → exposes check output for diagnosis"]
+          }
+        ]
+      },
+      {
+        title: "Decision Pack 4 — Boundary Scenarios", meta: "3 nodes · P1–P2",
+        resolution: "<strong>User choice: defaults</strong> — accepted every recommendation: S17=C, S18=A, S19=A.",
+        nodes: [
+          {
+            id: "S17", priority: "P1",
+            question: "<strong>Check failure from external imports</strong> — Should a workflow install if unresolved external dependencies make check fail?",
+            options: [
+              ["A", "Strict: reject whenever check fails"],
+              ["B", "Permissive: warn and install anyway"],
+              ["C", "Strict by default, with <code>--skip-check</code> as an escape hatch"]
+            ],
+            rec: ["C", "Preserves a safe default while allowing workflows whose external environment is not configured yet."],
+            why: "P1: Users may install before configuring dependencies. A strict default protects quality; an explicit bypass handles exceptional cases.",
+            impacts: ["A → safe, but can reject valid incomplete setups", "B → flexible, but may install broken workflows", "C → safe default plus an explicit escape hatch"]
+          },
+          {
+            id: "S18", priority: "P1",
+            question: "<strong>Archive with multiple workflows</strong> — What happens when one archive contains several workflows?",
+            options: [["A", "Reject it; installation is one-to-one"], ["B", "Install the first workflow found"], ["C", "Prompt the user to choose"], ["D", "Install all workflows"]],
+            rec: ["A", "Install is a single-item operation; multiple workflows should require multiple invocations."],
+            why: "P1: Users may accidentally package an entire catalog. The command needs an unambiguous unit of work.",
+            impacts: ["A → clear, single-install semantics", "B → can silently install the wrong workflow", "C → introduces interactive complexity", "D → changes the operation into a batch installer"]
+          },
+          {
+            id: "S19", priority: "P2",
+            question: "<strong>Retry on URL download failure</strong> — How should network errors, 404s, and timeouts be retried?",
+            options: [["A", "Do not retry"], ["B", "Retry once automatically"], ["C", "Retry three times with exponential backoff"]],
+            rec: ["A", "Matches other CLI commands: report the failure directly instead of adding hidden retry behavior."],
+            why: "P2: Follows the project's no-safety-theater rule. A CLI should not introduce implicit retries without evidence that they help.",
+            impacts: ["A → simple and consistent", "B → adds unnecessary behavior", "C → over-engineered for this command"]
+          }
+        ]
+      }
+    ];
+
+    const treeNodes = [
+      ["D1", "resolved", "Resolved", "Command placement and naming", "Choice <strong>A</strong>: <code>acpus workflow install</code>"],
+      ["D2", "resolved", "Resolved", "Installation source types", "Choice <strong>B</strong>: local directory + tar/zip archive + HTTP(S) URL"],
+      ["D3", "resolved", "Inferred", "Installation target scope", "Reuse <strong>--project / --global</strong>; project is the default"],
+      ["D4", "resolved", "Resolved", "Name-conflict policy", "Choice <strong>C</strong>: reject by default + <code>--force</code> overwrite + <code>--rename</code>"],
+      ["D5", "resolved", "Resolved", "Installed-content validation", "Choice <strong>B</strong>: structural check + workflow check"],
+      ["D6", "resolved", "Resolved", "Source-format inference", "Choice <strong>C</strong>: automatic inference + <code>--type</code> override"],
+      ["D7", "deferred", "Deferred", "workflow uninstall command", "Deferred to a later release. Catalog directories can be removed manually for now."],
+      ["R8", "risk", "Risk", "Archive security", "Choice <strong>A</strong>: check total expanded size only"],
+      ["R9", "risk", "Risk", "Global-catalog cache invalidation", "Choice <strong>B</strong>: automatically clear the installed entry's cache"],
+      ["D10", "resolved", "Resolved", "Temporary directory for remote downloads", "Choice <strong>B</strong>: <code>.acpus/.local/tmp/</code>"],
+      ["D11", "resolved", "Resolved", "Archive-root inference", "Choice <strong>C</strong>: support both root layouts"],
+      ["D12", "resolved", "Resolved", "<code>--rename</code> validation", "Choice <strong>A</strong>: require <code>[a-z0-9][a-z0-9-]*</code>"],
+      ["D13", "resolved", "Resolved", "Installation-result JSON", "Choice <strong>B</strong>: include validation output"],
+      ["D14", "resolved", "Resolved", "<code>--type</code> values", "Choice <strong>A</strong>: <code>directory</code> / <code>tar</code> / <code>zip</code> / <code>url</code>"],
+      ["D15", "resolved", "Resolved", "Download progress", "Choice <strong>B</strong>: spinner"],
+      ["D16", "resolved", "Resolved", "<code>--dry-run</code> support", "Choice <strong>A</strong>: supported"],
+      ["S17", "resolved", "Scenario", "Behavior when external dependencies make check fail", "Choice <strong>C</strong>: <code>--skip-check</code> escape hatch"],
+      ["S18", "resolved", "Scenario", "Archive contains multiple workflows", "Choice <strong>A</strong>: reject; one workflow per install"],
+      ["S19", "resolved", "Scenario", "URL download retry policy", "Choice <strong>A</strong>: no retry; report the error"]
+    ];
+
+    function renderPacks() {
+      document.getElementById("packs").innerHTML = packs.map(function (pack) {
+        const rows = pack.nodes.map(function (node) {
+          const options = node.options.map(function (option) {
+            return '<div class="option"><span class="opt-label">' + option[0] + '</span><span>' + option[1] + '</span></div>';
+          }).join("");
+          const impacts = node.impacts.map(function (impact) {
+            return '<div class="impact-item">' + impact + '</div>';
+          }).join("");
+          return '<tr>' +
+            '<td class="node-col">' + node.id + ' <span class="prio ' + node.priority.toLowerCase() + '">' + node.priority + '</span></td>' +
+            '<td class="question-col">' + node.question + '</td>' +
+            '<td class="options-col">' + options + '</td>' +
+            '<td class="rec-col"><span class="rec-label">' + node.rec[0] + '</span><div class="rec-reason">' + node.rec[1] + '</div></td>' +
+            '<td class="why-col">' + node.why + '</td><td class="impact-col">' + impacts + '</td></tr>';
+        }).join("");
+        return '<article class="pack"><header class="pack-header"><h3>' + pack.title + '</h3><span class="pack-meta">' + pack.meta + '</span></header>' +
+          '<div class="table-scroll" role="region" aria-label="' + pack.title + '" tabindex="0">' +
+          '<table class="pack-table"><thead><tr><th>Node</th><th>Question</th><th>Options</th><th>Recommended</th><th>Why it matters</th><th>Downstream impact</th></tr></thead><tbody>' +
+          rows + '</tbody></table></div><div class="pack-resolution">→ ' + pack.resolution + '</div></article>';
+      }).join("");
+    }
+
+    function renderTree() {
+      document.getElementById("tree-nodes").innerHTML = treeNodes.map(function (node) {
+        const tagClass = node[1] === "risk" ? "risk-tag" : node[1] === "deferred" ? "deferred-tag" : "resolved-tag";
+        const contentClass = node[1] === "deferred" ? "tree-node-detail" : "tree-node-choice";
+        return '<article class="tree-node ' + node[1] + '"><div class="tree-node-id">' + node[0] +
+          ' <span class="kind ' + tagClass + '">' + node[2] + '</span></div><h3 class="tree-node-title">' +
+          node[3] + '</h3><div class="' + contentClass + '">' + node[4] + '</div></article>';
+      }).join("");
+    }
+
+    renderPacks();
+    renderTree();
+  </script>
+</body>
+</html>
