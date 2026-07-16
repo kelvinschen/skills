@@ -10,7 +10,7 @@ A structured decision-grilling skill for plans, designs, and domain models.
 
 **Purpose**: Builds a visible decision tree, batches independent high-risk questions, recommends defaults, records downstream effects, and keeps glossary and ADR documentation aligned.
 
-**Demo**: [English acpus workflow install decision log](https://kelvinschen.github.io/skills/)
+**Demo**: [English acpus workflow install decision log](https://kelvinschen.github.io/skills/grill-with-tree/)
 
 ---
 
