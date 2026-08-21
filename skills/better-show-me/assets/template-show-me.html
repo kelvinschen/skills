@@ -435,28 +435,23 @@
 
         <!-- 消息 1: Client -> Gateway (HTTPS) -->
         <line x1="160" y1="105" x2="416" y2="105" stroke="#275296" stroke-width="1.2" marker-end="url(#arrow-seq-link)"/>
-        <rect x="235" y="91" width="106" height="14" rx="2" fill="#f4f5f7"/>
-        <text x="288" y="102" fill="#275296" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">POST /api/orders</text>
+        <text x="288" y="99" fill="#275296" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">POST /api/orders</text>
 
         <!-- 消息 2: Gateway -> Service (gRPC) -->
         <line x1="424" y1="135" x2="676" y2="135" stroke="#374151" stroke-width="1.2" marker-end="url(#arrow-seq)"/>
-        <rect x="495" y="121" width="110" height="14" rx="2" fill="#f4f5f7"/>
-        <text x="550" y="132" fill="#374151" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">RPC SubmitOrder</text>
+        <text x="550" y="129" fill="#374151" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">RPC SubmitOrder</text>
 
         <!-- 消息 3: Service -> Event Queue (Async Lock) -->
         <line x1="684" y1="165" x2="860" y2="165" stroke="#374151" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrow-seq)"/>
-        <rect x="720" y="151" width="104" height="14" rx="2" fill="#f4f5f7"/>
-        <text x="772" y="162" fill="#374151" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">Publish LockEvent</text>
+        <text x="772" y="159" fill="#374151" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">Publish LockEvent</text>
 
         <!-- 消息 4: Service -> Gateway (Return DTO) -->
         <line x1="676" y1="205" x2="424" y2="205" stroke="#374151" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrow-seq)"/>
-        <rect x="500" y="191" width="100" height="14" rx="2" fill="#f4f5f7"/>
-        <text x="550" y="202" fill="#374151" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">OrderCreated (DTO)</text>
+        <text x="550" y="199" fill="#374151" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">OrderCreated (DTO)</text>
 
         <!-- 消息 5: Gateway -> Client (201 Created - 核心成功响应) -->
         <line x1="416" y1="235" x2="160" y2="235" stroke="#d9531e" stroke-width="1.4" marker-end="url(#arrow-seq-accent)"/>
-        <rect x="232" y="221" width="112" height="14" rx="2" fill="#f4f5f7"/>
-        <text x="288" y="232" fill="#d9531e" font-size="9" font-weight="600" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">201 Created (Token)</text>
+        <text x="288" y="229" fill="#d9531e" font-size="9" font-weight="600" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">201 Created (Token)</text>
 
         <!-- 参与者表头 (Actors) -->
         <rect x="90" y="25" width="140" height="40" rx="4" fill="#ffffff" stroke="#1d2129" stroke-width="1"/>
