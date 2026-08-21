@@ -7,7 +7,7 @@
 - **形状决定语义（Shape carries type）**：
   - **起止点**：椭圆 `<rect rx="20">`，填充 `#ffffff`，描边 `var(--color-ink)`。
   - **处理步骤 / 动作**：矩形 `<rect rx="6">`，填充 `#ffffff`，描边 `var(--color-ink)`。
-  - **决策分支**：菱形 `<polygon>`（4 个顶点），内部文字使用 `Geist / Noto Sans` 11~12px 600。
+  - **决策分支**：菱形 `<polygon>`（4 个顶点），内部文字使用 `JetBrains Mono` 11~12px 600。
   - **汇聚点**：实心圆点 `<circle r="4" fill="var(--color-ink)"/>`，用于多个分支重新汇合。
 - **流向与布局**：
   - 主流向为从上到下（Top → Down）。

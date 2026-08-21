@@ -4,44 +4,77 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>[主题名称] · Show Me</title>
-  <!-- 引入字体：LXGW WenKai (中文) + Noto Sans (英文) + JetBrains Mono (代码/等宽) -->
+
+  <!-- 
+    ── 视觉与排版规范 (Design System & Typography) ───────────────────
+    1. 字体层级：
+       - 自然语言（标题/正文/卡片）：统一采用 LXGW WenKai (霞鹜文楷) (标题字距收紧 -0.02em，行高 1.15~1.25；正文行高 1.55~1.6)
+       - 代码块：采用 JetBrains Mono；标题、正文、卡片及所有图表内文字：统一采用 LXGW WenKai (Tag 全大写并放宽字距 0.12~0.18em)
+    2. 色彩与材质：
+       - 纸张底色：paper (#f5f5f5 主背景)、paper-card (#ffffff 卡片)、paper-code (#f0f1f3 代码底色)
+       - 墨色线条：ink (#2d3142 正文/主框)、muted (#4f5d75 次要/连线)、soft (#7a8399 弱化说明)
+       - 焦点克制：accent (#eb6c36 珊瑚橙，全图严格限制 1~2 处强调)
+       - 状态色彩：diff-add (#1e7e34)、diff-del (#c82333)、warn (#b86a04)、link (#2e5aa8)
+    3. 语义微着色体系 (Micro-Syntax Tokens - 纯 inline 渲染，严禁破坏等宽对齐与行流)：
+       - 控制流关键字 (.token-kw)：墨水蓝加粗 (#2e5aa8)，用于 on, if, return, async 等
+       - 函数与动作 (.token-fn)：深墨色加粗 (#1d212f)，用于核心方法与调用
+       - UI 组件与标签 (.token-tag)：科技蓝 (#2e5aa8)，用于 <SessionPage>、目录名等
+       - 参数与属性 (.token-param)：柔和蓝灰 (#6272a4)，用于 payload, timeout=3s
+       - 文件路径归属 (.token-path)：柔灰小字 (#7a8399)，用于 (src/routes/page.tsx)
+       - 树状连接符 (.token-branch)：柔和中灰 (#7a8399)，用于 ├──, └──, │
+       - 业务注释说明 (.token-comment)：柔灰斜体 (#7a8399)
+       - 核心焦点强调 (.token-focal)：珊瑚橙加粗字体 (#eb6c36)，纯字体着色，无背景色
+    4. 核心主视觉形态库 (按具体场景选取 1~2 种最匹配形态填充，避免堆砌)：
+       - 形态 A (调用树 Runtime Flow)：运行时调用栈与嵌套（推荐使用 ├──、└──、│ 树状层级符号清晰指示父子关系）
+       - 形态 B (伪代码 Logic Flow)：算法步骤、状态拦截与分支判定
+       - 形态 C (组件树 Component Tree)：UI 组件层级、文件路径与核心 Hook/状态
+       - 形态 D (文件树 File Tree)：浅层模块分工与目录边界职责
+       - 形态 E (增量 Diff Evolution)：架构演进与局部代码变更对比
+    5. 辅助图表选型指南 (按需选配 0~2 张，按核心矛盾精准选型)：
+       - 选项 1 (时序图 Sequence Flow)：多实体协议交互、鉴权请求、异步分发往返
+       - 选项 2 (架构拓扑 Architecture Zone)：分层边界、跨端宿主隔离、服务调用拓扑
+       - 选项 3 (状态机 State Machine)：有限状态流转、生命周期管理 (见 references/type-state.md)
+       - 选项 4 (无图模式 Zero-Diagram)：纯代码重构无需强行配图，留白给代码块
+  -->
+
+  <!-- 引入字体：LXGW WenKai (正文/标题/图表) + JetBrains Mono (代码块/等宽) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.1.0/style.css" />
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      /* ── 核心色板 (Design Tokens) ────────────────────────────────── */
-      --color-paper:       #f5f5f5;              /* 主背景色 (Warm White-Smoke) */
+      /* 核心色板 */
+      --color-paper:       #f5f5f5;              /* 主背景色 */
       --color-paper-card:  #ffffff;              /* 卡片背景 */
-      --color-paper-code:  #f0f1f3;              /* 代码/树形背景 */
-      --color-ink:         #2d3142;              /* 正文/主文字 (非纯黑 Jet-Black) */
-      --color-muted:       #4f5d75;              /* 次要文字 / 默认连线 (Blue-Slate) */
-      --color-soft:        #7a8399;              /* 辅助说明 / 边框标签 */
-      --color-rule:        rgba(45, 49, 66, 0.12); /* 细边框 / 分界线 */
-      --color-rule-solid:  rgba(79, 93, 117, 0.25);/* 实体分界线 */
+      --color-paper-code:  #f0f1f3;              /* 代码背景 */
+      --color-ink:         #2d3142;              /* 正文/主边框 */
+      --color-muted:       #4f5d75;              /* 次要文字/默认连线 */
+      --color-soft:        #7a8399;              /* 辅助说明 */
+      --color-rule:        rgba(45, 49, 66, 0.12); /* 细边框 */
+      --color-rule-solid:  rgba(79, 93, 117, 0.25);
 
       /* 焦点与强调 */
-      --color-accent:      #eb6c36;              /* 焦点强调色 (Atomic Tangerine) */
-      --color-accent-tint: rgba(235, 108, 54, 0.08); /* 焦点浅色背景 */
-      --color-link:        #2e5aa8;              /* API / HTTP / 外部调用 */
+      --color-accent:      #eb6c36;              /* 焦点强调色 (珊瑚橙) */
+      --color-accent-tint: rgba(235, 108, 54, 0.08);
+      --color-link:        #2e5aa8;
 
-      /* 语义状态与对比色 */
+      /* 语义状态 */
       --color-success-text: #1e7e34;
-      --color-success-bg:   rgba(40, 167, 69, 0.10);
+      --color-success-bg:   rgba(40, 167, 69, 0.12);
       --color-danger-text:  #c82333;
-      --color-danger-bg:    rgba(220, 53, 69, 0.10);
+      --color-danger-bg:    rgba(220, 53, 69, 0.12);
       --color-warn-text:    #b86a04;
       --color-warn-bg:      rgba(217, 130, 43, 0.10);
 
-      /* ── 字体规范 (Typography) ────────────────────────────────── */
-      --font-chinese: 'LXGW WenKai', 'Noto Sans SC', sans-serif;
-      --font-english: 'Noto Sans', system-ui, sans-serif;
-      --font-body:    'Noto Sans', 'LXGW WenKai', 'Noto Sans SC', system-ui, sans-serif;
-      --font-display: 'LXGW WenKai', 'Noto Sans SC', serif;
+      /* 字体规范 */
+      --font-chinese: 'LXGW WenKai', sans-serif;
+      --font-english: 'LXGW WenKai', sans-serif;
+      --font-body:    'LXGW WenKai', sans-serif;
+      --font-display: 'LXGW WenKai', serif;
       --font-mono:    'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
     }
 
@@ -80,15 +113,31 @@
       font-family: var(--font-chinese);
       font-size: 1.05rem;
       color: var(--color-muted);
-      max-width: 65ch;
+      max-width: 70ch;
     }
 
-    /* ── Grid 布局 ───────────────────────────────────────────────── */
-    .grid-2 {
+    /* ── 灵活布局系统 (Modular Layouts) ─────────────────────────── */
+    .layout-stack  { display: flex; flex-direction: column; gap: 1.25rem; margin-bottom: 1.5rem; }
+    .layout-grid-2, .grid-2 {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
       gap: 1.25rem;
       margin-bottom: 1.5rem;
+    }
+    .layout-grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* 全宽卡片容器（优先推荐：保证长文本与深度调用链无横向溢出） */
+    .card-full {
+      background: var(--color-paper-card);
+      border: 1px solid var(--color-rule);
+      border-radius: 6px;
+      padding: 1.25rem;
+      width: 100%;
     }
 
     .section-card {
@@ -123,38 +172,56 @@
     .badge-accent { background: var(--color-accent-tint); color: var(--color-accent); border: 1px solid rgba(235, 108, 54, 0.3); }
     .badge-muted  { background: rgba(79, 93, 117, 0.1); color: var(--color-muted); border: 1px solid var(--color-rule); }
 
-    /* ── 代码与形态展示容器 (Code Shapes) ────────────────────────── */
+    /* ── 代码与形态展示容器 (Code Shapes & Preformatted Alignment) ─ */
     pre.code-shape {
       font-family: var(--font-mono);
       font-size: 0.82rem;
-      line-height: 1.55;
+      line-height: 1.45;
       background: var(--color-paper-code);
       border: 1px solid var(--color-rule);
       border-radius: 4px;
-      padding: 1rem;
+      padding: 0.85rem 1.15rem;
       overflow-x: auto;
       color: var(--color-ink);
       tab-size: 2;
     }
+    pre.code-shape.code-full {
+      font-size: 0.84rem;
+      line-height: 1.48;
+    }
 
-    /* 语法与差异标注 */
+    /* ── 纯 inline 语义微着色体系 (纯字体着色，无背景色，严格保持等宽对齐) ─────── */
+    .token-kw      { color: #2e5aa8; font-weight: 600; }          /* 控制流关键字 (on, if, return, async) */
+    .token-fn      { color: #1d212f; font-weight: 600; }          /* 核心方法与动作名 */
+    .token-tag     { color: #2e5aa8; font-weight: 600; }          /* UI 组件标签 (<SessionPage>) */
+    .token-path    { color: var(--color-soft); font-size: 0.9em; }/* 文件路径归属 */
+    .token-param   { color: #6272a4; }                            /* 参数/属性 (skuId, payload) */
+    .token-branch  { color: var(--color-muted); }                 /* 树状连接符 (├──, └──, │) */
+    .token-comment { color: var(--color-soft); font-style: italic; } /* 注释说明 */
+    .token-focal   { color: var(--color-accent); font-weight: 700; } /* 核心焦点 (纯字体珊瑚橙加粗) */
+
+    /* ── 差异演进标注 (Diff Tokens - 带微背景色与 0.5em 舒适行间距) ── */
     .diff-add {
       background: var(--color-success-bg);
       color: var(--color-success-text);
-      display: block;
-      margin: 0 -1rem;
-      padding: 0 1rem;
+      display: inline-block;
+      width: 100%;
+      box-sizing: border-box;
+      margin: 0.25em 0;
+      padding: 0.15em 0.5rem;
+      border-radius: 3px;
     }
     .diff-del {
       background: var(--color-danger-bg);
       color: var(--color-danger-text);
-      display: block;
-      margin: 0 -1rem;
-      padding: 0 1rem;
+      display: inline-block;
+      width: 100%;
+      box-sizing: border-box;
+      margin: 0.25em 0;
+      padding: 0.15em 0.5rem;
+      border-radius: 3px;
       text-decoration: line-through;
     }
-    .code-comment { color: var(--color-soft); font-style: italic; }
-    .code-focal   { color: var(--color-accent); font-weight: 600; }
 
     /* ── 辅助图表容器 (Diagram Container - 配角) ─────────────────── */
     .diagram-wrap {
@@ -164,6 +231,12 @@
       padding: 1.25rem;
       margin-bottom: 1.5rem;
       overflow-x: auto;
+    }
+    .diagram-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 1.5rem;
     }
     svg { width: 100%; min-width: 800px; display: block; }
 
@@ -237,46 +310,176 @@
       <p class="subtitle">[用一两句凝练的中文说明本页面的核心设计结论或调用演进]</p>
     </header>
 
-    <!-- 1. 核心代码结构 / 调用流 / 变化对比 (主视觉) -->
-    <div class="grid-2">
-      <!-- 视具体场景选择：组件树 / 调用树 / 文件结构 -->
-      <div class="section-card">
+    <!-- 
+      ── 核心主视觉模块示例库 (按需选用 1~2 种最匹配的形态) ───────────────
+      Agent 可根据主题从以下形态中选取并组装入 .layout-stack 或 .layout-grid-2 中：
+      1. 运行时调用树 (Runtime Flow)：展现执行先后与调用链
+      2. 业务算法伪代码 (Logic Flow)：展现状态拦截与计算分支
+      3. UI 组件树与状态 (Component Tree)：展现组件层级、文件归属与 Hooks
+      4. 模块职责文件树 (File Tree)：展现浅层目录边界与单行职责
+      5. 增量演进对比 (Evolution Diff)：展现重构变更点 (+ / -)
+    -->
+
+    <div class="layout-stack">
+
+      <!-- 示例形态 1：运行时主调用树 (使用 ├──、└── 树形分支符号清晰呈现父子层级) -->
+      <div class="card-full">
         <div class="section-title">
-          <span>调用流 / 组件树</span>
+          <span>运行时主调用链 (调用树)</span>
           <span class="badge badge-accent">Runtime Flow</span>
         </div>
-        <pre class="code-shape">
-submitOrder(payload)
-  validateInventory(cart.items)
-    <span class="code-focal">acquireStockLock</span>(skuId)      <span class="code-comment"># 关键防超卖锁</span>
-  createPaymentSession(orderId)
-  notifyUser(session.id)</pre>
+        <pre class="code-shape code-full"><span class="token-fn">submitOrder</span>(<span class="token-param">payload</span>)
+<span class="token-branch">├── </span><span class="token-fn">validateInventory</span>(<span class="token-param">cart.items</span>)
+<span class="token-branch">│   └── </span><span class="token-focal">acquireStockLock</span>(<span class="token-param">skuId</span>)      <span class="token-comment"># 关键防超卖分布式锁</span>
+<span class="token-branch">├── </span><span class="token-fn">createPaymentSession</span>(<span class="token-param">orderId</span>)
+<span class="token-branch">│   └── </span><span class="token-fn">dispatchPaymentEvent</span>(<span class="token-param">session.id</span>)
+<span class="token-branch">└── </span><span class="token-fn">notifyUser</span>(<span class="token-param">session.id</span>)</pre>
       </div>
 
-      <!-- 变更 Diff / 伪代码 -->
-      <div class="section-card">
+      <!-- 示例形态 2：业务算法伪代码 (展示分支判定与拦截) -->
+      <div class="card-full">
         <div class="section-title">
-          <span>重构 Diff 对比</span>
+          <span>核心决策与缓存拦截逻辑</span>
+          <span class="badge badge-accent">Logic Flow</span>
+        </div>
+        <pre class="code-shape code-full"><span class="token-kw">on</span>(<span class="token-fn">SaveDocument</span>)
+  <span class="token-kw">if</span> content is unchanged
+    <span class="token-kw">return</span> cachedResult
+  <span class="token-fn">acquireLock</span>(<span class="token-param">docId</span>, <span class="token-param">timeout=3s</span>)
+  <span class="token-fn">writeStorage</span>(<span class="token-param">newContent</span>)
+  <span class="token-fn">invalidateCache</span>([<span class="token-param">summaryKey</span>, <span class="token-param">detailKey</span>])
+  <span class="token-focal">broadcastChangeEvent</span>(<span class="token-param">docId</span>, <span class="token-param">version</span>)  <span class="token-comment"># 触发多端协同同步</span>
+  <span class="token-kw">return</span> freshResult</pre>
+      </div>
+
+      <!-- 示例形态 3：UI 组件树与状态边界 -->
+      <div class="card-full">
+        <div class="section-title">
+          <span>UI 结构与状态边界 (组件树)</span>
+          <span class="badge badge-accent">Component Tree</span>
+        </div>
+        <pre class="code-shape code-full">&lt;<span class="token-tag">SessionPage</span>&gt; <span class="token-path">(src/routes/session.tsx)</span>
+  <span class="token-kw">useSessionEvents</span>(<span class="token-param">sessionId</span>)            <span class="token-comment"># 订阅 SSE 实时流事件</span>
+  &lt;<span class="token-tag">SessionToolbar</span>&gt;
+    &lt;<span class="token-tag">SearchInput</span> /&gt;
+    &lt;<span class="token-focal">RunSkillButton</span> <span class="token-param">onClick</span>=handleRun /&gt;   <span class="token-comment"># 触发 Agent 执行</span>
+  &lt;<span class="token-tag">SessionTimeline</span>&gt;
+    &lt;<span class="token-tag">TimelineFilter</span> <span class="token-param">activeTab</span>="all" /&gt;
+    &lt;<span class="token-tag">SkillResultCard</span> <span class="token-param">status</span>="streaming" /&gt;</pre>
+      </div>
+
+      <!-- 示例形态 4：模块职责与浅层文件树 -->
+      <div class="card-full">
+        <div class="section-title">
+          <span>模块职责与核心文件边界</span>
+          <span class="badge badge-muted">Module Boundary</span>
+        </div>
+        <pre class="code-shape code-full">src/
+<span class="token-branch">├── </span><span class="token-tag">commands/</span>       <span class="token-comment"># 解析并分发用户指令与 CLI 入口</span>
+<span class="token-branch">├── </span><span class="token-tag">sessions/</span>       <span class="token-comment"># 会话状态机与持久化生命周期管理</span>
+<span class="token-branch">├── </span><span class="token-tag">cards/</span>          <span class="token-comment"># 业务卡片 DTO 转换与渲染模型</span>
+<span class="token-branch">│   └── </span><span class="token-focal">card_63/</span>    <span class="token-comment"># Card63 视频卡片领域模型与埋点</span>
+<span class="token-branch">└── </span><span class="token-tag">transport/</span>      <span class="token-comment"># 底层 SSE 流式长连接与 RPC 通信</span></pre>
+      </div>
+
+      <!-- 示例形态 5：重构增量演进 (Diff 模式) -->
+      <div class="card-full">
+        <div class="section-title">
+          <span>重构增量演进 (Diff)</span>
           <span class="badge badge-muted">Evolution</span>
         </div>
-        <pre class="code-shape">
- <span class="code-comment"># 订单处理拦截流</span>
- on(OrderSubmit)
+        <pre class="code-shape code-full"><span class="token-comment"># 订单处理流演进</span>
+<span class="token-kw">on</span>(<span class="token-fn">OrderSubmit</span>)
 <span class="diff-del">-  executePaymentSync()</span>
 <span class="diff-add">+  if (isRateLimited(userId)) return dropRequest()</span>
 <span class="diff-add">+  createPendingOrder()</span>
 <span class="diff-add">+  dispatchToAsyncQueue(orderId)</span></pre>
       </div>
+
     </div>
 
-    <!-- 2. 辅助架构图表 (Inline SVG - 拓扑/时序/状态辅助) -->
+    <!-- 
+      ── 场景化辅助图表库 (按需选配 0~2 张，以下提供两类最高频的图表范例) ─────────
+      - 范例 A：多实体时序交互图 (Sequence Flow) ── 协议交互、鉴权请求、异步分发往返
+      - 范例 B：分层架构与边界拓扑 (Architecture Zone) ── 模块分工、跨端宿主隔离、服务边界
+      - 其它类型 (状态机/数据流/表结构) 参见 references/type-*.md，纯代码重构可移除图表
+    -->
+
+    <!-- 辅助图表范例 A：多实体时序交互图 (Sequence Flow - 高频) -->
     <div class="diagram-wrap">
       <div class="section-title" style="border:none; margin-bottom: 0.5rem;">
-        <span>系统交互与边界拓扑 (辅助图解)</span>
+        <span>请求处理与服务编排时序 (Sequence Flow 范例)</span>
       </div>
-      <svg viewBox="0 0 960 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="show-me-diag-title show-me-diag-desc">
-        <title id="show-me-diag-title">系统交互与边界拓扑</title>
-        <desc id="show-me-diag-desc">展示客户端与后端核心服务的交互与调用流程</desc>
+      <svg viewBox="0 0 960 300" xmlns="http://www.w3.org/2000/svg" role="img"
+        aria-labelledby="seq-diag-title seq-diag-desc">
+        <title id="seq-diag-title">请求处理与服务编排时序图</title>
+        <desc id="seq-diag-desc">展示客户端发起请求后在网关、订单服务与事件中枢之间的时序往返流转</desc>
+        <defs>
+          <marker id="arrow-seq" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+          <marker id="arrow-seq-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/></marker>
+          <marker id="arrow-seq-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+        </defs>
+        <rect width="100%" height="100%" fill="#f5f5f5" rx="6"/>
+
+        <!-- 参与者生命线 (Lifelines) -->
+        <line x1="160" y1="70" x2="160" y2="270" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="420" y1="70" x2="420" y2="270" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="680" y1="70" x2="680" y2="270" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="860" y1="70" x2="860" y2="270" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+
+        <!-- 激活条 (Activation Bars) -->
+        <rect x="416" y="105" width="8" height="130" fill="rgba(45,49,66,0.06)" stroke="#4f5d75" stroke-width="0.8" rx="2"/>
+        <rect x="676" y="135" width="8" height="70" fill="rgba(45,49,66,0.06)" stroke="#4f5d75" stroke-width="0.8" rx="2"/>
+
+        <!-- 消息 1: Client -> Gateway (HTTPS) -->
+        <line x1="160" y1="105" x2="416" y2="105" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arrow-seq-link)"/>
+        <rect x="235" y="91" width="106" height="14" rx="2" fill="#f5f5f5"/>
+        <text x="288" y="102" fill="#2e5aa8" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">POST /api/orders</text>
+
+        <!-- 消息 2: Gateway -> Service (gRPC) -->
+        <line x1="424" y1="135" x2="676" y2="135" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow-seq)"/>
+        <rect x="495" y="121" width="110" height="14" rx="2" fill="#f5f5f5"/>
+        <text x="550" y="132" fill="#4f5d75" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">RPC SubmitOrder</text>
+
+        <!-- 消息 3: Service -> Event Queue (Async Lock) -->
+        <line x1="684" y1="165" x2="860" y2="165" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrow-seq)"/>
+        <rect x="720" y="151" width="104" height="14" rx="2" fill="#f5f5f5"/>
+        <text x="772" y="162" fill="#4f5d75" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">Publish LockEvent</text>
+
+        <!-- 消息 4: Service -> Gateway (Return DTO) -->
+        <line x1="676" y1="205" x2="424" y2="205" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrow-seq)"/>
+        <rect x="500" y="191" width="100" height="14" rx="2" fill="#f5f5f5"/>
+        <text x="550" y="202" fill="#4f5d75" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">OrderCreated (DTO)</text>
+
+        <!-- 消息 5: Gateway -> Client (201 Created - 核心成功响应) -->
+        <line x1="416" y1="235" x2="160" y2="235" stroke="#eb6c36" stroke-width="1.4" marker-end="url(#arrow-seq-accent)"/>
+        <rect x="232" y="221" width="112" height="14" rx="2" fill="#f5f5f5"/>
+        <text x="288" y="232" fill="#eb6c36" font-size="9" font-weight="600" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">201 Created (Token)</text>
+
+        <!-- 参与者表头 (Actors) -->
+        <rect x="90" y="25" width="140" height="40" rx="4" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="160" y="50" fill="#2d3142" font-size="12" font-weight="600" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">Client App</text>
+
+        <rect x="350" y="25" width="140" height="40" rx="4" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="420" y="50" fill="#2d3142" font-size="12" font-weight="600" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">API Gateway</text>
+
+        <rect x="610" y="25" width="140" height="40" rx="4" fill="#ffffff" stroke="#eb6c36" stroke-width="1.2"/>
+        <text x="680" y="50" fill="#2d3142" font-size="12" font-weight="600" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">Order Service</text>
+
+        <rect x="790" y="25" width="140" height="40" rx="4" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="860" y="50" fill="#2d3142" font-size="12" font-weight="600" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">Event Broker</text>
+      </svg>
+    </div>
+
+    <!-- 辅助图表范例 B：分层架构与边界拓扑 (Architecture Zone - 高频) -->
+    <div class="diagram-wrap">
+      <div class="section-title" style="border:none; margin-bottom: 0.5rem;">
+        <span>系统交互与边界拓扑 (Architecture Topology 范例)</span>
+      </div>
+      <svg viewBox="0 0 960 260" xmlns="http://www.w3.org/2000/svg" role="img"
+        aria-labelledby="arch-diag-title arch-diag-desc">
+        <title id="arch-diag-title">系统交互与边界拓扑图</title>
+        <desc id="arch-diag-desc">展示客户端与后端核心服务的交互与调用流程</desc>
         <defs>
           <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
           <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/></marker>
@@ -284,26 +487,29 @@ submitOrder(payload)
         </defs>
         <rect width="100%" height="100%" fill="#f5f5f5" rx="6"/>
 
-        <!-- 连线层 -->
-        <line x1="180" y1="160" x2="300" y2="160" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
-        <line x1="440" y1="160" x2="560" y2="160" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+        <!-- 连线层 (必须先于节点绘制) -->
+        <line x1="220" y1="130" x2="380" y2="130" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arrow-link)" />
+        <line x1="560" y1="130" x2="720" y2="130" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#arrow-accent)" />
 
         <!-- 节点层 -->
-        <rect x="60" y="132" width="120" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
-        <text x="120" y="165" fill="#2d3142" font-size="13" font-weight="600" font-family="'Noto Sans', sans-serif" text-anchor="middle">Client API</text>
+        <rect x="60" y="102" width="160" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1" />
+        <text x="140" y="135" fill="#2d3142" font-size="13" font-weight="600" font-family="'LXGW WenKai', sans-serif"
+          text-anchor="middle">Client API Entry</text>
 
-        <rect x="300" y="132" width="140" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
-        <text x="370" y="165" fill="#2d3142" font-size="13" font-weight="600" font-family="'Noto Sans', sans-serif" text-anchor="middle">Order Service</text>
+        <rect x="380" y="102" width="180" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1" />
+        <text x="470" y="135" fill="#2d3142" font-size="13" font-weight="600" font-family="'LXGW WenKai', sans-serif"
+          text-anchor="middle">Order Service Orchestrator</text>
 
-        <rect x="560" y="132" width="140" height="56" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1.2"/>
-        <text x="630" y="165" fill="#2d3142" font-size="13" font-weight="600" font-family="'Noto Sans', sans-serif" text-anchor="middle">Payment Core</text>
+        <rect x="720" y="102" width="180" height="56" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1.2" />
+        <text x="810" y="135" fill="#2d3142" font-size="13" font-weight="600" font-family="'LXGW WenKai', sans-serif"
+          text-anchor="middle">Payment Lock Engine</text>
       </svg>
     </div>
 
     <!-- 3. 结构化要点与决策卡片 -->
     <div class="summary-grid">
       <div class="summary-card">
-        <h4><span class="card-dot accent"></span>核心改动要点</h4>
+        <h4><span class="card-dot accent"></span>核心改动要点 (In Scope)</h4>
         <ul>
           <li>将同步支付调用解耦为异步队列处理。</li>
           <li>引入分布式锁防止高并发库存超卖。</li>
@@ -311,10 +517,18 @@ submitOrder(payload)
       </div>
 
       <div class="summary-card">
-        <h4><span class="card-dot ink"></span>状态与边界约束</h4>
+        <h4><span class="card-dot ink"></span>显式未包含/边界 (Gaps)</h4>
         <ul>
           <li>Pending 状态最长保留 15 分钟未支付自动释放。</li>
           <li>服务间通信全面迁移至 gRPC 协议。</li>
+        </ul>
+      </div>
+
+      <div class="summary-card">
+        <h4><span class="card-dot muted"></span>核对文件与索引 (Evidence)</h4>
+        <ul>
+          <li><code>src/orders/OrderService.kt</code>: 核心编排流</li>
+          <li><code>src/lock/DistributedLock.kt</code>: 锁实现</li>
         </ul>
       </div>
     </div>

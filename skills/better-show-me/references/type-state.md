@@ -6,7 +6,7 @@
 
 - **状态节点**：
   - 圆角矩形 `<rect rx="8">`，高度通常为 48~64px，底色 `#ffffff`，描边 `var(--color-ink)`。
-  - 节点顶部带有小号大写 Tag（如 `STATE`，字号 7px，`JetBrains Mono`），主名称 13~14px 600（`Noto Sans`）。
+  - 节点顶部带有小号大写 Tag（如 `STATE`，字号 7px，`JetBrains Mono`），主名称 13~14px 600（`JetBrains Mono`）。
 - **起止点图元**：
   - **初始状态 (Start)**：实心墨色圆 `<circle r="6" fill="#2d3142"/>`。
   - **终止状态 (End)**：双环圆（外圈 `<circle r="8" fill="none" stroke="#2d3142" stroke-width="1.2"/>`，内圈 `<circle r="5" fill="#2d3142"/>`）。

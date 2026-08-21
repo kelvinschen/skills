@@ -7,7 +7,7 @@
 ```svg
 <!-- 1. 倾斜手写体文字 (LXGW WenKai / 霞鹜文楷) -->
 <text x="904" y="36" fill="#2d3142" font-size="14" font-style="italic"
-      font-family="'LXGW WenKai', 'Noto Sans SC', serif" text-anchor="end">无配置·纯原生流式响应</text>
+      font-family="'LXGW WenKai', 'LXGW WenKai', serif" text-anchor="end">无配置·纯原生流式响应</text>
 
 <!-- 2. 贝塞尔曲线指引虚线 (Dashed Bézier Leader) -->
 <path d="M 820 44 Q 700 84 520 216" fill="none"

@@ -6,7 +6,7 @@
 
 - **参与者 (Actors)**：
   - 顶部水平排列的矩形卡片（`rx=6`，高 36~44px，底色 `#ffffff`，描边 `1px solid #2d3142`）。
-  - 主标签居中 12px 600（`Noto Sans`），副标签 9px（`JetBrains Mono`）。
+  - 主标签居中 12px 600（`JetBrains Mono`），副标签 9px（`JetBrains Mono`）。
 - **生命线 (Lifelines)**：
   - 从每个参与者底部中心向下垂直延伸的虚线：`<line stroke="rgba(45,49,66,0.20)" stroke-dasharray="3,3"/>`。
 - **激活条 (Activation Bar)**：
