@@ -11,19 +11,19 @@
        - 自然语言（标题/正文/卡片）：统一采用 LXGW WenKai (霞鹜文楷) (标题字距收紧 -0.02em，行高 1.15~1.25；正文行高 1.55~1.6)
        - 代码块：采用 JetBrains Mono；标题、正文、卡片及所有图表内文字：统一采用 LXGW WenKai (Tag 全大写并放宽字距 0.12~0.18em)
     2. 色彩与材质：
-       - 纸张底色：paper (#f5f5f5 主背景)、paper-card (#ffffff 卡片)、paper-code (#f0f1f3 代码底色)
-       - 墨色线条：ink (#2d3142 正文/主框)、muted (#4f5d75 次要/连线)、soft (#7a8399 弱化说明)
-       - 焦点克制：accent (#eb6c36 珊瑚橙，全图严格限制 1~2 处强调)
-       - 状态色彩：diff-add (#1e7e34)、diff-del (#c82333)、warn (#b86a04)、link (#2e5aa8)
+       - 纸张底色：paper (#f4f5f7 主背景)、paper-card (#ffffff 卡片)、paper-code (#eaedf2 代码底色)
+       - 墨色线条：ink (#1d2129 正文/主框)、muted (#374151 次要/连线)、soft (#57606a 弱化说明)
+       - 焦点克制：accent (#d9531e 珊瑚橙/赤橙，全图严格限制 1~2 处强调)
+       - 状态色彩：diff-add (#1e7e34)、diff-del (#c82333)、warn (#b86a04)、link (#275296)
     3. 语义微着色体系 (Micro-Syntax Tokens - 纯 inline 渲染，严禁破坏等宽对齐与行流)：
-       - 控制流关键字 (.token-kw)：墨水蓝加粗 (#2e5aa8)，用于 on, if, return, async 等
-       - 函数与动作 (.token-fn)：深墨色加粗 (#1d212f)，用于核心方法与调用
-       - UI 组件与标签 (.token-tag)：科技蓝 (#2e5aa8)，用于 <SessionPage>、目录名等
-       - 参数与属性 (.token-param)：柔和蓝灰 (#6272a4)，用于 payload, timeout=3s
-       - 文件路径归属 (.token-path)：柔灰小字 (#7a8399)，用于 (src/routes/page.tsx)
-       - 树状连接符 (.token-branch)：柔和中灰 (#7a8399)，用于 ├──, └──, │
-       - 业务注释说明 (.token-comment)：柔灰斜体 (#7a8399)
-       - 核心焦点强调 (.token-focal)：珊瑚橙加粗字体 (#eb6c36)，纯字体着色，无背景色
+       - 控制流关键字 (.token-kw)：深墨蓝加粗 (#275296)，用于 on, if, return, async 等
+       - 函数与动作 (.token-fn)：深墨色常规字重 (#1d2129)，用于核心方法与调用
+       - UI 组件与标签 (.token-tag)：深墨蓝 (#275296)，用于 <SessionPage>、目录名等
+       - 参数与属性 (.token-param)：柔和深蓝灰 (#475569)，用于 payload, timeout=3s
+       - 文件路径归属 (.token-path)：清晰灰字 (#57606a)，用于 (src/routes/page.tsx)
+       - 树状连接符 (.token-branch)：中灰清晰 (#64748b)，用于 ├──, └──, │
+       - 业务注释说明 (.token-comment)：清晰灰斜体 (#57606a)
+       - 核心焦点强调 (.token-focal)：珊瑚橙加粗字体 (#d9531e)，纯字体着色，无背景色
     4. 核心主视觉形态库 (按具体场景选取 1~2 种最匹配形态填充，避免堆砌)：
        - 形态 A (调用树 Runtime Flow)：运行时调用栈与嵌套（推荐使用 ├──、└──、│ 树状层级符号清晰指示父子关系）
        - 形态 B (伪代码 Logic Flow)：算法步骤、状态拦截与分支判定
@@ -48,19 +48,19 @@
 
     :root {
       /* 核心色板 */
-      --color-paper:       #f5f5f5;              /* 主背景色 */
+      --color-paper:       #f4f5f7;              /* 主背景色 */
       --color-paper-card:  #ffffff;              /* 卡片背景 */
-      --color-paper-code:  #f0f1f3;              /* 代码背景 */
-      --color-ink:         #2d3142;              /* 正文/主边框 */
-      --color-muted:       #4f5d75;              /* 次要文字/默认连线 */
-      --color-soft:        #7a8399;              /* 辅助说明 */
-      --color-rule:        rgba(45, 49, 66, 0.12); /* 细边框 */
-      --color-rule-solid:  rgba(79, 93, 117, 0.25);
+      --color-paper-code:  #eaedf2;              /* 代码背景 */
+      --color-ink:         #1d2129;              /* 正文/主边框 */
+      --color-muted:       #374151;              /* 次要文字/默认连线 */
+      --color-soft:        #57606a;              /* 辅助说明 */
+      --color-rule:        rgba(30, 41, 59, 0.14); /* 细边框 */
+      --color-rule-solid:  rgba(55, 65, 81, 0.28);
 
       /* 焦点与强调 */
-      --color-accent:      #eb6c36;              /* 焦点强调色 (珊瑚橙) */
-      --color-accent-tint: rgba(235, 108, 54, 0.08);
-      --color-link:        #2e5aa8;
+      --color-accent:      #d9531e;              /* 焦点强调色 (珊瑚橙) */
+      --color-accent-tint: rgba(217, 83, 30, 0.09);
+      --color-link:        #275296;
 
       /* 语义状态 */
       --color-success-text: #1e7e34;
@@ -71,10 +71,10 @@
       --color-warn-bg:      rgba(217, 130, 43, 0.10);
 
       /* 字体规范 */
-      --font-chinese: 'LXGW WenKai', sans-serif;
-      --font-english: 'LXGW WenKai', sans-serif;
-      --font-body:    'LXGW WenKai', sans-serif;
-      --font-display: 'LXGW WenKai', serif;
+      --font-chinese: 'LXGW WenKai', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-english: 'LXGW WenKai', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-body:    'LXGW WenKai', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-display: 'LXGW WenKai', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, serif;
       --font-mono:    'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
     }
 
@@ -112,6 +112,7 @@
     .subtitle {
       font-family: var(--font-chinese);
       font-size: 1.05rem;
+      font-weight: 500;
       color: var(--color-muted);
       max-width: 70ch;
     }
@@ -169,36 +170,36 @@
       border-radius: 3px;
       text-transform: uppercase;
     }
-    .badge-accent { background: var(--color-accent-tint); color: var(--color-accent); border: 1px solid rgba(235, 108, 54, 0.3); }
-    .badge-muted  { background: rgba(79, 93, 117, 0.1); color: var(--color-muted); border: 1px solid var(--color-rule); }
+    .badge-accent { background: var(--color-accent-tint); color: var(--color-accent); border: 1px solid rgba(217, 83, 30, 0.3); }
+    .badge-muted  { background: rgba(55, 65, 81, 0.08); color: var(--color-muted); border: 1px solid var(--color-rule); }
 
     /* ── 代码与形态展示容器 (Code Shapes & Preformatted Alignment) ─ */
     pre.code-shape {
       font-family: var(--font-mono);
       font-size: 0.82rem;
-      line-height: 1.45;
+      line-height: 1.55;
       background: var(--color-paper-code);
       border: 1px solid var(--color-rule);
       border-radius: 4px;
-      padding: 0.85rem 1.15rem;
+      padding: 0.9rem 1.15rem;
       overflow-x: auto;
       color: var(--color-ink);
       tab-size: 2;
     }
     pre.code-shape.code-full {
-      font-size: 0.84rem;
-      line-height: 1.48;
+      font-size: 0.83rem;
+      line-height: 1.55;
     }
 
     /* ── 纯 inline 语义微着色体系 (纯字体着色，无背景色，严格保持等宽对齐) ─────── */
-    .token-kw      { color: #2e5aa8; font-weight: 600; }          /* 控制流关键字 (on, if, return, async) */
-    .token-fn      { color: #1d212f; font-weight: 600; }          /* 核心方法与动作名 */
-    .token-tag     { color: #2e5aa8; font-weight: 600; }          /* UI 组件标签 (<SessionPage>) */
+    .token-kw      { color: #275296; font-weight: 600; }          /* 控制流关键字 (on, if, return, async) */
+    .token-fn      { color: #1d2129; }                            /* 核心方法与动作名 (常规字重，深墨色) */
+    .token-tag     { color: #275296; }                            /* UI 组件标签 (<SessionPage>) */
     .token-path    { color: var(--color-soft); font-size: 0.9em; }/* 文件路径归属 */
-    .token-param   { color: #6272a4; }                            /* 参数/属性 (skuId, payload) */
-    .token-branch  { color: var(--color-muted); }                 /* 树状连接符 (├──, └──, │) */
+    .token-param   { color: #475569; }                            /* 参数/属性 (skuId, payload) */
+    .token-branch  { color: #64748b; }                            /* 树状连接符 (├──, └──, │) */
     .token-comment { color: var(--color-soft); font-style: italic; } /* 注释说明 */
-    .token-focal   { color: var(--color-accent); font-weight: 700; } /* 核心焦点 (纯字体珊瑚橙加粗) */
+    .token-focal   { color: var(--color-accent); font-weight: 600; } /* 核心焦点 (纯字体珊瑚橙加粗) */
 
     /* ── 差异演进标注 (Diff Tokens - 带微背景色与 0.5em 舒适行间距) ── */
     .diff-add {
@@ -270,9 +271,10 @@
 
     .summary-card ul {
       list-style: none;
-      font-size: 0.85rem;
+      font-size: 0.88rem;
       color: var(--color-muted);
       font-family: var(--font-chinese);
+      font-weight: 500;
     }
     .summary-card li {
       margin-bottom: 0.35rem;
@@ -415,59 +417,59 @@
         <title id="seq-diag-title">请求处理与服务编排时序图</title>
         <desc id="seq-diag-desc">展示客户端发起请求后在网关、订单服务与事件中枢之间的时序往返流转</desc>
         <defs>
-          <marker id="arrow-seq" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
-          <marker id="arrow-seq-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/></marker>
-          <marker id="arrow-seq-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+          <marker id="arrow-seq" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#374151"/></marker>
+          <marker id="arrow-seq-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#d9531e"/></marker>
+          <marker id="arrow-seq-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#275296"/></marker>
         </defs>
-        <rect width="100%" height="100%" fill="#f5f5f5" rx="6"/>
+        <rect width="100%" height="100%" fill="#f4f5f7" rx="6"/>
 
         <!-- 参与者生命线 (Lifelines) -->
-        <line x1="160" y1="70" x2="160" y2="270" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
-        <line x1="420" y1="70" x2="420" y2="270" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
-        <line x1="680" y1="70" x2="680" y2="270" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
-        <line x1="860" y1="70" x2="860" y2="270" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="160" y1="70" x2="160" y2="270" stroke="rgba(30,41,59,0.22)" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="420" y1="70" x2="420" y2="270" stroke="rgba(30,41,59,0.22)" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="680" y1="70" x2="680" y2="270" stroke="rgba(30,41,59,0.22)" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="860" y1="70" x2="860" y2="270" stroke="rgba(30,41,59,0.22)" stroke-width="1" stroke-dasharray="3,3"/>
 
         <!-- 激活条 (Activation Bars) -->
-        <rect x="416" y="105" width="8" height="130" fill="rgba(45,49,66,0.06)" stroke="#4f5d75" stroke-width="0.8" rx="2"/>
-        <rect x="676" y="135" width="8" height="70" fill="rgba(45,49,66,0.06)" stroke="#4f5d75" stroke-width="0.8" rx="2"/>
+        <rect x="416" y="105" width="8" height="130" fill="rgba(30,41,59,0.06)" stroke="#374151" stroke-width="0.8" rx="2"/>
+        <rect x="676" y="135" width="8" height="70" fill="rgba(30,41,59,0.06)" stroke="#374151" stroke-width="0.8" rx="2"/>
 
         <!-- 消息 1: Client -> Gateway (HTTPS) -->
-        <line x1="160" y1="105" x2="416" y2="105" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arrow-seq-link)"/>
-        <rect x="235" y="91" width="106" height="14" rx="2" fill="#f5f5f5"/>
-        <text x="288" y="102" fill="#2e5aa8" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">POST /api/orders</text>
+        <line x1="160" y1="105" x2="416" y2="105" stroke="#275296" stroke-width="1.2" marker-end="url(#arrow-seq-link)"/>
+        <rect x="235" y="91" width="106" height="14" rx="2" fill="#f4f5f7"/>
+        <text x="288" y="102" fill="#275296" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">POST /api/orders</text>
 
         <!-- 消息 2: Gateway -> Service (gRPC) -->
-        <line x1="424" y1="135" x2="676" y2="135" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow-seq)"/>
-        <rect x="495" y="121" width="110" height="14" rx="2" fill="#f5f5f5"/>
-        <text x="550" y="132" fill="#4f5d75" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">RPC SubmitOrder</text>
+        <line x1="424" y1="135" x2="676" y2="135" stroke="#374151" stroke-width="1.2" marker-end="url(#arrow-seq)"/>
+        <rect x="495" y="121" width="110" height="14" rx="2" fill="#f4f5f7"/>
+        <text x="550" y="132" fill="#374151" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">RPC SubmitOrder</text>
 
         <!-- 消息 3: Service -> Event Queue (Async Lock) -->
-        <line x1="684" y1="165" x2="860" y2="165" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrow-seq)"/>
-        <rect x="720" y="151" width="104" height="14" rx="2" fill="#f5f5f5"/>
-        <text x="772" y="162" fill="#4f5d75" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">Publish LockEvent</text>
+        <line x1="684" y1="165" x2="860" y2="165" stroke="#374151" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrow-seq)"/>
+        <rect x="720" y="151" width="104" height="14" rx="2" fill="#f4f5f7"/>
+        <text x="772" y="162" fill="#374151" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">Publish LockEvent</text>
 
         <!-- 消息 4: Service -> Gateway (Return DTO) -->
-        <line x1="676" y1="205" x2="424" y2="205" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrow-seq)"/>
-        <rect x="500" y="191" width="100" height="14" rx="2" fill="#f5f5f5"/>
-        <text x="550" y="202" fill="#4f5d75" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">OrderCreated (DTO)</text>
+        <line x1="676" y1="205" x2="424" y2="205" stroke="#374151" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrow-seq)"/>
+        <rect x="500" y="191" width="100" height="14" rx="2" fill="#f4f5f7"/>
+        <text x="550" y="202" fill="#374151" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">OrderCreated (DTO)</text>
 
         <!-- 消息 5: Gateway -> Client (201 Created - 核心成功响应) -->
-        <line x1="416" y1="235" x2="160" y2="235" stroke="#eb6c36" stroke-width="1.4" marker-end="url(#arrow-seq-accent)"/>
-        <rect x="232" y="221" width="112" height="14" rx="2" fill="#f5f5f5"/>
-        <text x="288" y="232" fill="#eb6c36" font-size="9" font-weight="600" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">201 Created (Token)</text>
+        <line x1="416" y1="235" x2="160" y2="235" stroke="#d9531e" stroke-width="1.4" marker-end="url(#arrow-seq-accent)"/>
+        <rect x="232" y="221" width="112" height="14" rx="2" fill="#f4f5f7"/>
+        <text x="288" y="232" fill="#d9531e" font-size="9" font-weight="600" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">201 Created (Token)</text>
 
         <!-- 参与者表头 (Actors) -->
-        <rect x="90" y="25" width="140" height="40" rx="4" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
-        <text x="160" y="50" fill="#2d3142" font-size="12" font-weight="600" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">Client App</text>
+        <rect x="90" y="25" width="140" height="40" rx="4" fill="#ffffff" stroke="#1d2129" stroke-width="1"/>
+        <text x="160" y="50" fill="#1d2129" font-size="12" font-weight="600" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">Client App</text>
 
-        <rect x="350" y="25" width="140" height="40" rx="4" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
-        <text x="420" y="50" fill="#2d3142" font-size="12" font-weight="600" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">API Gateway</text>
+        <rect x="350" y="25" width="140" height="40" rx="4" fill="#ffffff" stroke="#1d2129" stroke-width="1"/>
+        <text x="420" y="50" fill="#1d2129" font-size="12" font-weight="600" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">API Gateway</text>
 
-        <rect x="610" y="25" width="140" height="40" rx="4" fill="#ffffff" stroke="#eb6c36" stroke-width="1.2"/>
-        <text x="680" y="50" fill="#2d3142" font-size="12" font-weight="600" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">Order Service</text>
+        <rect x="610" y="25" width="140" height="40" rx="4" fill="#ffffff" stroke="#d9531e" stroke-width="1.2"/>
+        <text x="680" y="50" fill="#1d2129" font-size="12" font-weight="600" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">Order Service</text>
 
-        <rect x="790" y="25" width="140" height="40" rx="4" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
-        <text x="860" y="50" fill="#2d3142" font-size="12" font-weight="600" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">Event Broker</text>
+        <rect x="790" y="25" width="140" height="40" rx="4" fill="#ffffff" stroke="#1d2129" stroke-width="1"/>
+        <text x="860" y="50" fill="#1d2129" font-size="12" font-weight="600" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">Event Broker</text>
       </svg>
     </div>
 
@@ -481,27 +483,27 @@
         <title id="arch-diag-title">系统交互与边界拓扑图</title>
         <desc id="arch-diag-desc">展示客户端与后端核心服务的交互与调用流程</desc>
         <defs>
-          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
-          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/></marker>
-          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#374151"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#d9531e"/></marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#275296"/></marker>
         </defs>
-        <rect width="100%" height="100%" fill="#f5f5f5" rx="6"/>
+        <rect width="100%" height="100%" fill="#f4f5f7" rx="6"/>
 
         <!-- 连线层 (必须先于节点绘制) -->
-        <line x1="220" y1="130" x2="380" y2="130" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arrow-link)" />
-        <line x1="560" y1="130" x2="720" y2="130" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#arrow-accent)" />
+        <line x1="220" y1="130" x2="380" y2="130" stroke="#275296" stroke-width="1.2" marker-end="url(#arrow-link)" />
+        <line x1="560" y1="130" x2="720" y2="130" stroke="#d9531e" stroke-width="1.2" marker-end="url(#arrow-accent)" />
 
         <!-- 节点层 -->
-        <rect x="60" y="102" width="160" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1" />
-        <text x="140" y="135" fill="#2d3142" font-size="13" font-weight="600" font-family="'LXGW WenKai', sans-serif"
+        <rect x="60" y="102" width="160" height="56" rx="6" fill="#ffffff" stroke="#1d2129" stroke-width="1" />
+        <text x="140" y="135" fill="#1d2129" font-size="13" font-weight="600" font-family="'LXGW WenKai', sans-serif"
           text-anchor="middle">Client API Entry</text>
 
-        <rect x="380" y="102" width="180" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1" />
-        <text x="470" y="135" fill="#2d3142" font-size="13" font-weight="600" font-family="'LXGW WenKai', sans-serif"
+        <rect x="380" y="102" width="180" height="56" rx="6" fill="#ffffff" stroke="#1d2129" stroke-width="1" />
+        <text x="470" y="135" fill="#1d2129" font-size="13" font-weight="600" font-family="'LXGW WenKai', sans-serif"
           text-anchor="middle">Order Service Orchestrator</text>
 
-        <rect x="720" y="102" width="180" height="56" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1.2" />
-        <text x="810" y="135" fill="#2d3142" font-size="13" font-weight="600" font-family="'LXGW WenKai', sans-serif"
+        <rect x="720" y="102" width="180" height="56" rx="6" fill="rgba(217,83,30,0.09)" stroke="#d9531e" stroke-width="1.2" />
+        <text x="810" y="135" fill="#1d2129" font-size="13" font-weight="600" font-family="'LXGW WenKai', sans-serif"
           text-anchor="middle">Payment Lock Engine</text>
       </svg>
     </div>
