@@ -76,21 +76,23 @@ sequenceDiagram
   - **适用场景**：快速解释局部逻辑、函数调用流、组件层级、代码差异、或轻量 Mermaid 流程图。
   - **交付方式**：直接在对话回复中输出代码块，轻量高效，无需生成额外文件。
 - **独立 HTML 页面形态**：
-  - **适用场景**：复杂跨端/跨系统架构全景、多实体复杂时序与状态流转、大型工程迁移与重构方案、或需要交付给用户保存与沉淀的完整设计。
+  - **适用场景**：复杂跨端/跨系统架构全景、多实体复杂时序与状态流转、UI 结构与视觉演进对比、大型工程迁移与重构方案、或需要交付给用户保存与沉淀的完整设计。
   - **交付方式**：读取 [`assets/template-show-me.html`](assets/template-show-me.html) 填充生成自包含单文件（设计规范与布局约束详见模板内注释），用合适的方式向用户展示，并在对话中附带文件链接与核心结论。
 
-## 场景化图表路由
+## 场景化图表与 UI 视觉化
 
-当需要绘制专业辅助图表（在 HTML 中以内联 SVG 呈现）时，按场景路由参考 [`references/`](references/)：
+根据技术主题选择合适的辅助呈现方式：
 
-- **跨端适配与分层拓扑**：[`references/type-architecture.md`](references/type-architecture.md)（区域分组、正交圆角折线、跳线）
-- **多实体时序交互**：[`references/type-sequence.md`](references/type-sequence.md)（生命线、激活条、分支框）
-- **状态机与生命周期**：[`references/type-state.md`](references/type-state.md)（起止圆、状态卡片、跃迁事件与守卫）
-- **逻辑分支与流程**：[`references/type-flowchart.md`](references/type-flowchart.md)（形状承载语义、正交分支）
-- **管道数据流转**：[`references/type-data-flow.md`](references/type-data-flow.md)（横向角色泳道 × 纵向处理阶段）
-- **实体模型与表结构**：[`references/type-db-schema.md`](references/type-db-schema.md)（表卡片、字段约束、字段精准连线）
-- **无图模式**：纯代码逻辑或无复杂拓扑场景无需强行塞图，版面留给全宽代码与要点卡片。
-- **图元支持**：单色技术图标库 [`references/primitive-icons.md`](references/primitive-icons.md)，手写体图注 [`references/primitive-annotation.md`](references/primitive-annotation.md)。
+- **专业图表路由（以规范内联 SVG 呈现，参考 [`references/`](references/)）**：
+  - **跨端适配与分层拓扑**：[`references/type-architecture.md`](references/type-architecture.md)（区域分组、正交圆角折线、跳线）
+  - **多实体时序交互**：[`references/type-sequence.md`](references/type-sequence.md)（生命线、激活条、分支框）
+  - **状态机与生命周期**：[`references/type-state.md`](references/type-state.md)（起止圆、状态卡片、跃迁事件与守卫）
+  - **逻辑分支与流程**：[`references/type-flowchart.md`](references/type-flowchart.md)（形状承载语义、正交分支）
+  - **管道数据流转**：[`references/type-data-flow.md`](references/type-data-flow.md)（横向角色泳道 × 纵向处理阶段）
+  - **实体模型与表结构**：[`references/type-db-schema.md`](references/type-db-schema.md)（表卡片、字段约束、字段精准连线）
+  - **无图模式**：纯代码逻辑或无复杂拓扑场景无需强行塞图，版面留给全宽代码与要点卡片。
+  - **图元支持**：单色技术图标库 [`references/primitive-icons.md`](references/primitive-icons.md)，手写体图注 [`references/primitive-annotation.md`](references/primitive-annotation.md)。
+- **UI 视觉化呈现**：前端排版、组件空间分布或界面重构前后对比（自由利用 HTML/CSS 或 SVG 呈现中性结构骨架，聚焦布局与改动点，避免复刻细节皮肤）。
 
 ## 执行工作流
 
