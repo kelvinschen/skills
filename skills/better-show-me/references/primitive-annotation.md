@@ -6,15 +6,15 @@
 
 ```svg
 <!-- 1. 倾斜手写体文字 (LXGW WenKai / 霞鹜文楷) -->
-<text x="904" y="36" fill="#2d3142" font-size="14" font-style="italic"
+<text x="904" y="36" fill="#1d2129" font-size="14" font-style="italic"
       font-family="'LXGW WenKai', 'LXGW WenKai', serif" text-anchor="end">无配置·纯原生流式响应</text>
 
 <!-- 2. 贝塞尔曲线指引虚线 (Dashed Bézier Leader) -->
 <path d="M 820 44 Q 700 84 520 216" fill="none"
-      stroke="rgba(45,49,66,0.40)" stroke-width="1" stroke-dasharray="4,3"/>
+      stroke="rgba(30,41,59,0.40)" stroke-width="1" stroke-dasharray="4,3"/>
 
 <!-- 3. 落点小圆点 (Landing Dot) -->
-<circle cx="520" cy="216" r="2.5" fill="#2d3142"/>
+<circle cx="520" cy="216" r="2.5" fill="#1d2129"/>
 ```
 
 ## 2. 颜色搭配

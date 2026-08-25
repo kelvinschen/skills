@@ -5,13 +5,13 @@
 ## 1. 表结构布局与图元规范
 
 - **表结构卡片 (Table Box)**：
-  - 宽度通常为 200~240px，底色 `#ffffff`，圆角 `rx=6`，边框 `1px solid #2d3142`。
+  - 宽度通常为 200~240px，底色 `#ffffff`，圆角 `rx=6`，边框 `1px solid #1d2129`。
   - **表头 (Header)**：包含 Schema 及表名（如 `public.orders`，字号 12px 600 `JetBrains Mono`），配以右上角 `TABLE` 标识。
   - **字段行 (Column Rows)**：每行高度固定为 24px。
     - 左侧：字段名（`JetBrains Mono` 11~12px）。
     - 中间：约束 Tag（`PK`, `FK`, `NN`, `UQ`，使用 `JetBrains Mono` 7~8px `rx=2` 小标签）。
     - 右侧：SQL 类型（`uuid`, `text`, `bigint`, `timestamptz`，使用 `JetBrains Mono` 9px `var(--color-muted)`）。
-    - 奇偶行使用微弱底色交替（偶数行 `rgba(45,49,66,0.02)`）增强可读性。
+    - 奇偶行使用微弱底色交替（偶数行 `rgba(30,41,59,0.02)`）增强可读性。
   - **超出字段截断行**：超过预算时，末行注明 `+ N more columns`，严禁无提示截断。
   - **索引分栏 (Indexes)**：底部分隔线下方可简要列出关键索引（如 `idx_orders_customer_id`）。
 

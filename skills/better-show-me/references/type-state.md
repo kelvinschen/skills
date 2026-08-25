@@ -8,14 +8,14 @@
   - 圆角矩形 `<rect rx="8">`，高度通常为 48~64px，底色 `#ffffff`，描边 `var(--color-ink)`。
   - 节点顶部带有小号大写 Tag（如 `STATE`，字号 7px，`JetBrains Mono`），主名称 13~14px 600（`JetBrains Mono`）。
 - **起止点图元**：
-  - **初始状态 (Start)**：实心墨色圆 `<circle r="6" fill="#2d3142"/>`。
-  - **终止状态 (End)**：双环圆（外圈 `<circle r="8" fill="none" stroke="#2d3142" stroke-width="1.2"/>`，内圈 `<circle r="5" fill="#2d3142"/>`）。
+  - **初始状态 (Start)**：实心墨色圆 `<circle r="6" fill="#1d2129"/>`。
+  - **终止状态 (End)**：双环圆（外圈 `<circle r="8" fill="none" stroke="#1d2129" stroke-width="1.2"/>`，内圈 `<circle r="5" fill="#1d2129"/>`）。
 - **流向与跃迁**：
   - 状态流转优先沿主方向（从左到右或从上到下）。
   - 跃迁连线标注触发事件与守卫：`event [guard] / action`（格式使用 `JetBrains Mono` 8px），省略不必要的部分。
   - 自环（Self-loop）从状态顶部弯出并重新接入。
 - **视觉焦点**：
-  - 焦点色（`accent` 橙色 `#eb6c36`）用于读者最应关注的重点状态（如最终完成态、核心处理中状态或关键熔断态）。
+  - 焦点色（`accent` 橙色 `#d9531e`）用于读者最应关注的重点状态（如最终完成态、核心处理中状态或关键熔断态）。
 
 ## 2. 状态机复杂度与约束
 

@@ -6,7 +6,7 @@
 
 - **层级与边界分区**：
   - 按技术分层或安全信任边界（如 Frontend → Gateway → Backend → Storage；Public → Private VPC）从左至右或从上至下分组。
-  - 使用区域边框（Zone / Region）圈定同一层级：`<rect rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.18)" stroke-dasharray="6,4"/>`。
+  - 使用区域边框（Zone / Region）圈定同一层级：`<rect rx="8" fill="rgba(30,41,59,0.02)" stroke="rgba(30,41,59,0.18)" stroke-dasharray="6,4"/>`。
   - 区域标签放置在左上角，使用 `JetBrains Mono` 8px 大写标注。
 - **绘制层级顺序 (Z-Order)**：
   1. 背景底色（`fill="#f4f5f7"`）
@@ -22,7 +22,7 @@
   ```svg
   <!-- 水平转垂直再转水平折线 -->
   <path d="M x1,y1 H mid-8 Q mid,y1 mid,y1+8 V y2-8 Q mid,y2 mid+8,y2 H x2"
-        fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        fill="none" stroke="#374151" stroke-width="1.2" marker-end="url(#arrow)"/>
   ```
 - **连线文字标注**：
   - 文字直接置于水平/垂直连线上方或侧方 4~6px（`text-anchor="middle"`），保持文字与连线分离。
