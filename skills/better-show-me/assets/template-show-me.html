@@ -3,59 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>[主题名称] · Show Me</title>
-
-  <!--
-    ═══════════════════════════════════════════════════════════════════
-    本模板 = 「地基区 FOUNDATION」+「画布区 CANVAS」两部分。使用契约：
-
-      ① 地基区：<head> 内的字体引入 + <style> 设计系统
-         —— 请【原样复制】，勿重写 / 精简 / 重新发明。它承载整套配色、
-            字体层级与类名词汇表，是页面美观的地基。
-      ② 画布区：<body> 内的内容
-         —— 你的【唯一工作区】。在此挑选形态、填入真实内容、删除多余示例。
-
-    ⚠ 切勿因"想从零写个更好的"而丢弃地基区——那会摧毁既有设计体系。
-      正确姿势：整份复制本模板 → 仅在画布区 <body> 增删改。
-    ═══════════════════════════════════════════════════════════════════
-  -->
-
-  <!--
-    ── 地基区 · 视觉与排版规范 (FOUNDATION · Design System & Typography) ──
-    1. 字体层级：
-       - 自然语言（标题/正文/卡片）：统一采用 LXGW WenKai (霞鹜文楷) (标题字距收紧 -0.02em，行高 1.15~1.25；正文行高 1.55~1.6)
-       - 代码块：采用 JetBrains Mono；标题、正文、卡片及所有图表内文字：统一采用 LXGW WenKai (Tag 全大写并放宽字距 0.12~0.18em)
-    2. 色彩与材质：
-       - 纸张底色：paper (#f4f5f7 主背景)、paper-card (#ffffff 卡片)、paper-code (#eaedf2 代码底色)
-       - 墨色线条：ink (#1d2129 正文/主框)、muted (#374151 次要/连线)、soft (#57606a 弱化说明)
-       - 焦点克制：accent (#d9531e 珊瑚橙/赤橙，全图严格限制 1~2 处强调)
-       - 状态色彩：diff-add (#1e7e34)、diff-del (#c82333)、warn (#b86a04)、link (#275296)
-    3. 语义微着色体系 (Micro-Syntax Tokens - 纯 inline 渲染，严禁破坏等宽对齐与行流)：
-       - 控制流关键字 (.token-kw)：深墨蓝加粗 (#275296)，用于 on, if, return, async 等
-       - 函数与动作 (.token-fn)：深墨色常规字重 (#1d2129)，用于核心方法与调用
-       - UI 组件与标签 (.token-tag)：深墨蓝 (#275296)，用于 <SessionPage>、目录名等
-       - 参数与属性 (.token-param)：柔和深蓝灰 (#475569)，用于 payload, timeout=3s
-       - 文件路径归属 (.token-path)：清晰灰字 (#57606a)，用于 (src/routes/page.tsx)
-       - 树状连接符 (.token-branch)：中灰清晰 (#64748b)，用于 ├──, └──, │
-       - 业务注释说明 (.token-comment)：清晰灰斜体 (#57606a)
-       - 核心焦点强调 (.token-focal)：珊瑚橙加粗字体 (#d9531e)，纯字体着色，无背景色
-    4. 核心主视觉形态库 (按具体场景选取 1~2 种最匹配形态填充，避免堆砌)：
-       - 形态 A (调用树 Runtime Flow)：运行时调用栈与嵌套（推荐使用 ├──、└──、│ 树状层级符号清晰指示父子关系）
-       - 形态 B (伪代码 Logic Flow)：算法步骤、状态拦截与分支判定
-       - 形态 C (组件树 Component Tree)：UI 组件层级、文件路径与核心 Hook/状态
-       - 形态 D (文件树 File Tree)：浅层模块分工与目录边界职责
-       - 形态 E (增量 Diff Evolution)：架构演进与局部代码变更对比
-    5. 辅助图表与 UI 视觉化选型指南 (按需选配 0~2 张，按核心矛盾精准选型)：
-       - 专业图表（以规范内联 SVG 呈现，参考 references/type-*.md）：
-         - 选项 1 (时序图 Sequence Flow)：多实体协议交互、鉴权请求、异步分发往返
-         - 选项 2 (架构拓扑 Architecture Zone)：分层边界、跨端宿主隔离、服务调用拓扑
-         - 选项 3 (状态机 State Machine)：有限状态流转、生命周期管理
-         - 选项 4 (无图模式 Zero-Diagram)：纯代码重构无需强行配图，留白给代码块
-       - UI 视觉化（无固定模板，自由发挥，做编辑型结构抽象）：
-         - 选项 5 (UI 视觉化 UI Visual)：前端排版、组件空间分布或界面重构前后对比
-           * 聚焦三要素：空间布局 (栅格/流式容器划分)、层级从属 (嵌套/弹窗抽屉/插槽)、改动焦点 (高亮新增/变动点)
-           * 克制原则：做中性结构骨架（白底/灰底/墨线），严禁像素级复刻真实产品皮肤（避免复杂渐变、阴影与重度装饰）
-  -->
+  <title>为什么 skill_result 到达了却没有显示</title>
 
   <!-- 引入字体：LXGW WenKai (正文/标题/图表) + JetBrains Mono (代码块/等宽) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -210,38 +158,10 @@
       font-size: 0.84rem;
       line-height: 1.7;
     }
-
-    /* ── 纯 inline 语义微着色体系 (纯字体着色，无背景色，严格保持等宽对齐) ─────── */
-    .token-kw      { color: #275296; font-weight: 600; }          /* 控制流关键字 (on, if, return, async) */
-    .token-fn      { color: #1d2129; }                            /* 核心方法与动作名 (常规字重，深墨色) */
-    .token-tag     { color: #275296; }                            /* UI 组件标签 (<SessionPage>) */
-    .token-path    { color: var(--color-soft); font-size: 0.9em; }/* 文件路径归属 */
-    .token-param   { color: #475569; }                            /* 参数/属性 (skuId, payload) */
-    .token-branch  { color: #64748b; }                            /* 树状连接符 (├──, └──, │) */
-    .token-comment { color: var(--color-soft); font-style: italic; } /* 注释说明 */
-    .token-focal   { color: var(--color-accent); font-weight: 600; } /* 核心焦点 (纯字体珊瑚橙加粗) */
-
-    /* ── 差异演进标注 (Diff Tokens - 带微背景色与 0.5em 舒适行间距) ── */
-    .diff-add {
-      background: var(--color-success-bg);
-      color: var(--color-success-text);
-      display: inline-block;
-      width: 100%;
-      box-sizing: border-box;
-      margin: 0.2em 0;
-      padding: 0.15em 0.5rem;
-      border-radius: 3px;
-    }
-    .diff-del {
-      background: var(--color-danger-bg);
-      color: var(--color-danger-text);
-      display: inline-block;
-      width: 100%;
-      box-sizing: border-box;
-      margin: 0.25em 0;
-      padding: 0.15em 0.5rem;
-      border-radius: 3px;
-      text-decoration: line-through;
+    pre.code-shape.semantic-diff {
+      font-size: 0.72rem;
+      line-height: 1.55;
+      padding: 0.8rem 1rem;
     }
 
     /* ── 辅助图表容器 (Diagram Container - 配角) ─────────────────── */
@@ -260,53 +180,181 @@
       margin-bottom: 1.5rem;
     }
     svg { width: 100%; min-width: 800px; display: block; }
+    .flow-diagram text { font-family: var(--font-body); }
+    .flow-diagram .mono { font-family: var(--font-mono); }
 
-    /* ── 关键决策与要点卡片 (Summary Cards) ───────────────────────── */
-    .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 1rem;
-      margin-top: 1.5rem;
-    }
-    .summary-card {
-      background: var(--color-paper-card);
+    /* ── 中性 UI 结构视图 (Neutral UI Frame) ───────────────────── */
+    .ui-frame {
+      background: var(--color-paper-code);
       border: 1px solid var(--color-rule);
-      border-radius: 6px;
-      padding: 1rem 1.25rem;
+      border-radius: 4px;
+      padding: 0.8rem;
+      align-self: start;
     }
-    .summary-card h4 {
-      font-family: var(--font-chinese);
-      font-size: 0.95rem;
-      font-weight: 600;
-      color: var(--color-ink);
-      margin-bottom: 0.5rem;
+    .ui-window {
+      overflow: hidden;
+      background: var(--color-paper-card);
+      border: 1px solid var(--color-rule-solid);
+      border-radius: 5px;
+    }
+    .ui-window-bar {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.45rem;
+      padding: 0.55rem 0.7rem;
+      border-bottom: 1px solid var(--color-rule);
+      color: var(--color-soft);
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
     }
-    .card-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-    .card-dot.accent { background: var(--color-accent); }
-    .card-dot.ink    { background: var(--color-ink); }
-    .card-dot.muted  { background: var(--color-muted); }
+    .ui-window-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-rule-solid); }
+    .ui-window-title { margin-left: 0.35rem; }
+    .ui-window-body { display: grid; grid-template-columns: 96px minmax(0, 1fr); min-height: 205px; }
+    .ui-sidebar {
+      padding: 0.7rem 0.55rem;
+      border-right: 1px solid var(--color-rule);
+      background: rgba(30, 41, 59, 0.025);
+      color: var(--color-soft);
+      font-size: 0.68rem;
+    }
+    .ui-sidebar-item { padding: 0.35rem 0.4rem; border-radius: 3px; margin-bottom: 0.25rem; }
+    .ui-sidebar-item.active { background: var(--color-accent-tint); color: var(--color-accent); font-weight: 600; }
+    .ui-timeline { padding: 0.75rem; min-width: 0; }
+    .ui-run-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.65rem; }
+    .ui-run-header strong { font-size: 0.78rem; }
+    .ui-status {
+      padding: 0.12rem 0.38rem;
+      border-radius: 3px;
+      background: var(--color-success-bg);
+      color: var(--color-success-text);
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+    }
+    .ui-event {
+      margin-bottom: 0.5rem;
+      padding-left: 0.6rem;
+      border-left: 2px solid var(--color-rule-solid);
+      color: var(--color-soft);
+      font-size: 0.68rem;
+    }
+    .ui-result-card {
+      padding: 0.65rem 0.7rem;
+      border: 1px solid rgba(217, 83, 30, 0.35);
+      border-left: 3px solid var(--color-accent);
+      border-radius: 4px;
+      background: var(--color-accent-tint);
+    }
+    .ui-result-card h5 { font-size: 0.72rem; margin-bottom: 0.3rem; }
+    .ui-result-card code { font-size: 0.64rem; color: var(--color-muted); }
+    .ui-result-meta { margin-top: 0.35rem; color: var(--color-success-text); font-size: 0.64rem; }
+    .ui-path-label {
+      margin-top: 0.55rem;
+      color: var(--color-soft);
+      font-family: var(--font-mono);
+      font-size: 0.64rem;
+      text-align: center;
+    }
+    pre.ui-source { margin-top: 0.65rem; padding: 0.65rem 0.75rem; font-size: 0.68rem; }
 
-    .summary-card ul {
-      list-style: none;
-      font-size: 0.88rem;
-      color: var(--color-muted);
-      font-family: var(--font-chinese);
-      font-weight: 500;
+    /* ── 数据形变与影响范围 (Data Shape & Impact) ───────────────── */
+    .primitive-grid { margin-bottom: 0; }
+    .primitive-panel {
+      background: var(--color-paper-code);
+      border: 1px solid var(--color-rule);
+      border-radius: 5px;
+      padding: 1rem;
+      min-width: 0;
     }
-    .summary-card li {
+    .primitive-heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.85rem;
+    }
+    .primitive-heading strong { font-size: 0.9rem; }
+    .primitive-heading span {
+      color: var(--color-soft);
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .transform-chain { display: flex; flex-direction: column; gap: 0.4rem; }
+    .transform-node {
+      background: var(--color-paper-card);
+      border: 1px solid var(--color-rule-solid);
+      border-radius: 4px;
+      padding: 0.65rem 0.75rem;
+    }
+    .transform-node.focus { border-color: var(--color-accent); background: var(--color-accent-tint); }
+    .transform-node-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
       margin-bottom: 0.35rem;
-      padding-left: 0.85rem;
-      position: relative;
     }
-    .summary-card li::before {
-      content: '•';
-      position: absolute;
-      left: 0;
+    .transform-node-head strong { font-family: var(--font-mono); font-size: 0.78rem; }
+    .transform-node-head code { color: var(--color-soft); font-size: 0.62rem; }
+    .transform-fields {
+      display: grid;
+      grid-template-columns: minmax(90px, 0.8fr) minmax(0, 1.5fr);
+      gap: 0.15rem 0.65rem;
+      color: var(--color-muted);
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+    }
+    .transform-fields span:nth-child(odd) { color: var(--color-soft); }
+    .transform-arrow {
       color: var(--color-accent);
+      font-family: var(--font-mono);
+      font-size: 0.64rem;
+      text-align: center;
     }
+    .impact-root {
+      padding: 0.65rem 0.75rem;
+      border: 1px solid var(--color-accent);
+      border-radius: 4px;
+      background: var(--color-accent-tint);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+    .impact-list {
+      margin-left: 0.85rem;
+      padding: 0.6rem 0 0 1rem;
+      border-left: 1px solid var(--color-rule-solid);
+    }
+    .impact-row {
+      position: relative;
+      display: grid;
+      grid-template-columns: 60px minmax(0, 1fr);
+      gap: 0.65rem;
+      align-items: start;
+      padding: 0.45rem 0;
+      color: var(--color-muted);
+      font-size: 0.72rem;
+    }
+    .impact-row::before {
+      content: '';
+      position: absolute;
+      left: -1rem;
+      top: 0.9rem;
+      width: 0.75rem;
+      border-top: 1px solid var(--color-rule-solid);
+    }
+    .impact-tag {
+      border-radius: 3px;
+      padding: 0.08rem 0.28rem;
+      font-family: var(--font-mono);
+      font-size: 0.56rem;
+      text-align: center;
+    }
+    .impact-tag.direct { color: var(--color-accent); background: var(--color-accent-tint); }
+    .impact-tag.test { color: var(--color-link); background: rgba(39, 82, 150, 0.08); }
+    .impact-tag.stable { color: var(--color-success-text); background: var(--color-success-bg); }
+    .impact-row code { display: block; color: var(--color-ink); font-size: 0.66rem; margin-bottom: 0.1rem; }
 
     /* ── Footer ─────────────────────────────────────────────────── */
     .footer {
@@ -320,263 +368,335 @@
       justify-content: space-between;
       flex-wrap: wrap;
     }
+/* ── 对齐比较矩阵 (Aligned Comparison Matrix) ───────────────── */
+.comparison-table-wrap { width: 100%; overflow-x: auto; margin-top: 0.5rem; }
+table.comparison-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  color: var(--color-ink);
+  font-family: var(--font-chinese);
+  font-size: 0.86rem;
+  text-align: left;
+}
+table.comparison-table th,
+table.comparison-table td {
+  padding: 0.75rem 1rem;
+  border-right: 1px solid var(--color-rule);
+  border-bottom: 1px solid var(--color-rule);
+  vertical-align: top;
+}
+table.comparison-table th {
+  color: var(--color-muted);
+  background: rgba(30, 41, 59, 0.025);
+  border-bottom-color: var(--color-rule-solid);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+table.comparison-table th:last-child,
+table.comparison-table td:last-child { border-right: 0; }
+table.comparison-table tr:last-child td { border-bottom: 0; }
+table.comparison-table code {
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  background: var(--color-paper-code);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+table.comparison-table .recommended { background: rgba(217, 83, 30, 0.035); }
+table.comparison-table th.recommended {
+  color: var(--color-accent);
+  background: var(--color-accent-tint);
+  border-top: 2px solid var(--color-accent);
+}
+
+/* Highlight.js · 映射到既有语义微着色 Token */
+pre.code-shape code.hljs {
+  display: block;
+  padding: 0;
+  overflow: visible;
+  background: transparent;
+  color: var(--color-ink);
+  font-family: inherit;
+}
+.hljs-keyword, .hljs-selector-tag, .hljs-meta { color: var(--color-link); font-weight: 600; }
+.hljs-title.function_ { color: var(--color-ink); }
+.hljs-title.class_, .hljs-type, .hljs-built_in { color: var(--color-link); }
+.hljs-attr, .hljs-property, .hljs-variable, .hljs-params { color: #475569; }
+.hljs-string, .hljs-symbol { color: var(--color-success-text); }
+.hljs-number, .hljs-literal { color: var(--color-warn-text); }
+.hljs-comment, .hljs-quote { color: var(--color-soft); font-style: italic; }
+.hljs-addition,
+.hljs-deletion {
+  display: inline-block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0.2em 0;
+  padding: 0.15em 0;
+  border-radius: 3px;
+}
+.hljs-addition { color: var(--color-success-text); background: var(--color-success-bg); }
+.hljs-deletion { color: var(--color-danger-text); background: var(--color-danger-bg); text-decoration: line-through; }
+
+.hljs-tag, .hljs-name { color: var(--color-link); }
+.code-focus { color: var(--color-accent) !important; font-weight: 700; }
+
   </style>
-  <!-- ════════════ 地基区 END · 以上 <head> 请原样保留 ════════════ -->
+  <!-- FOUNDATION END -->
 </head>
 <body>
 
-  <!--
-    ═══════════════════════════════════════════════════════════════════
-    画布区 · CANVAS（你的唯一工作区）
-
-      下方所有内容都是「示例」，用来演示如何调用地基区的类名词汇表。
-      正确用法：保留骨架结构 (container / header / layout-stack /
-      summary-grid / footer) → 挑选 1~2 种最匹配的主视觉形态 → 用真实
-      源码内容替换占位文本 → 删除用不到的示例卡片与图表。
-
-      填充规则：真实函数名 / 文件路径 / 业务标签，杜绝 foo·bar·Lorem；
-      焦点克制，accent 全页仅 1~2 处；每个节点每条连线都对应真实代码。
-    ═══════════════════════════════════════════════════════════════════
-  -->
-
+  <!-- CANVAS START -->
   <div class="container">
-
-    <!-- Header 区域 -->
     <header class="header">
-      <p class="header-eyebrow">[领域/模块] · SHOW-ME VISUAL</p>
-      <h1>[功能架构/逻辑重构主题]</h1>
-      <p class="subtitle">[用一两句凝练的中文说明本页面的核心设计结论或调用演进]</p>
+      <p class="header-eyebrow">SESSION EVENT PIPELINE · FIRST DIVERGENCE</p>
+      <h1>为什么 <code>skill_result</code> 到达了却没有显示</h1>
+      <p class="subtitle">服务端已发出且浏览器已接收 <code>skill_result</code>；客户端 <code>Registry.parse</code> 将未注册类型归为 <code>unknown</code>，事件因此没有进入时间线。</p>
     </header>
 
-    <!-- 
-      ── 核心主视觉模块示例库 (按需选用 1~2 种最匹配的形态) ───────────────
-      Agent 可根据主题从以下形态中选取并组装入 .layout-stack 或 .layout-grid-2 中：
-      1. 运行时调用树 (Runtime Flow)：展现执行先后与调用链
-      2. 业务算法伪代码 (Logic Flow)：展现状态拦截与计算分支
-      3. UI 组件树与状态 (Component Tree)：展现组件层级、文件归属与 Hooks
-      4. 模块职责文件树 (File Tree)：展现浅层目录边界与单行职责
-      5. 增量演进对比 (Evolution Diff)：展现重构变更点 (+ / -)
-    -->
-
     <div class="layout-stack">
-
-      <!-- 示例形态 1：运行时主调用树 (使用 ├──、└── 树形分支符号清晰呈现父子层级) -->
-      <div class="card-full">
+      <section class="card-full">
         <div class="section-title">
-          <span>运行时主调用链 (调用树)</span>
-          <span class="badge badge-accent">Runtime Flow</span>
+          <span>事件从服务端到界面的真实路径</span>
+          <span class="badge badge-accent">BREAKPOINT · Registry.parse :22</span>
         </div>
-        <pre class="code-shape code-full"><span class="token-fn">submitOrder</span>(<span class="token-param">payload</span>)
-<span class="token-branch">├── </span><span class="token-fn">validateInventory</span>(<span class="token-param">cart.items</span>)
-<span class="token-branch">│   └── </span><span class="token-focal">acquireStockLock</span>(<span class="token-param">skuId</span>)      <span class="token-comment"># 关键防超卖分布式锁</span>
-<span class="token-branch">├── </span><span class="token-fn">createPaymentSession</span>(<span class="token-param">orderId</span>)
-<span class="token-branch">│   └── </span><span class="token-fn">dispatchPaymentEvent</span>(<span class="token-param">session.id</span>)
-<span class="token-branch">└── </span><span class="token-fn">notifyUser</span>(<span class="token-param">session.id</span>)</pre>
-      </div>
+        <div class="diagram-wrap">
+          <svg class="flow-diagram" viewBox="0 0 960 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="event-flow-title event-flow-desc">
+            <title id="event-flow-title">skill_result 事件从服务端到界面的执行流程与分歧</title>
+            <desc id="event-flow-desc">共同路径从运行技能、发送事件、浏览器接收到注册表解析；注册表缺少类型时进入 unknown 并被过滤，修复后进入时间线并渲染结果卡片</desc>
+            <defs>
+              <marker id="event-flow-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#374151"/></marker>
+              <marker id="event-flow-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#d9531e"/></marker>
+            </defs>
+            <rect width="960" height="320" rx="5" fill="#f4f5f7"/>
 
-      <!-- 示例形态 2：业务算法伪代码 (展示分支判定与拦截) -->
-      <div class="card-full">
-        <div class="section-title">
-          <span>核心决策与缓存拦截逻辑</span>
-          <span class="badge badge-accent">Logic Flow</span>
-        </div>
-        <pre class="code-shape code-full"><span class="token-kw">on</span>(<span class="token-fn">SaveDocument</span>)
-  <span class="token-kw">if</span> content is unchanged
-    <span class="token-kw">return</span> cachedResult
-  <span class="token-fn">acquireLock</span>(<span class="token-param">docId</span>, <span class="token-param">timeout=3s</span>)
-  <span class="token-fn">writeStorage</span>(<span class="token-param">newContent</span>)
-  <span class="token-fn">invalidateCache</span>([<span class="token-param">summaryKey</span>, <span class="token-param">detailKey</span>])
-  <span class="token-focal">broadcastChangeEvent</span>(<span class="token-param">docId</span>, <span class="token-param">version</span>)  <span class="token-comment"># 触发多端协同同步</span>
-  <span class="token-kw">return</span> freshResult</pre>
-      </div>
+            <!-- 关系层：连线先于节点 -->
+            <path d="M150 118 H190" fill="none" stroke="#374151" stroke-width="1.2" marker-end="url(#event-flow-arrow)"/>
+            <path d="M310 118 H350" fill="none" stroke="#374151" stroke-width="1.2" marker-end="url(#event-flow-arrow)"/>
+            <path d="M470 118 H510" fill="none" stroke="#374151" stroke-width="1.2" marker-end="url(#event-flow-arrow)"/>
+            <path d="M630 118 H665" fill="none" stroke="#374151" stroke-width="1.2"/>
+            <path d="M665 118 V73 H700" fill="none" stroke="#d9531e" stroke-width="1.4" marker-end="url(#event-flow-arrow-accent)"/>
+            <path d="M665 118 V233 H700" fill="none" stroke="#374151" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#event-flow-arrow)"/>
+            <circle cx="665" cy="118" r="3" fill="#374151"/>
 
-      <!-- 示例形态 3：UI 组件树与状态边界 -->
-      <div class="card-full">
-        <div class="section-title">
-          <span>UI 结构与状态边界 (组件树)</span>
-          <span class="badge badge-accent">Component Tree</span>
-        </div>
-        <pre class="code-shape code-full">&lt;<span class="token-tag">SessionPage</span>&gt; <span class="token-path">(src/routes/session.tsx)</span>
-  <span class="token-kw">useSessionEvents</span>(<span class="token-param">sessionId</span>)            <span class="token-comment"># 订阅 SSE 实时流事件</span>
-  &lt;<span class="token-tag">SessionToolbar</span>&gt;
-    &lt;<span class="token-tag">SearchInput</span> /&gt;
-    &lt;<span class="token-focal">RunSkillButton</span> <span class="token-param">onClick</span>=handleRun /&gt;   <span class="token-comment"># 触发 Agent 执行</span>
-  &lt;<span class="token-tag">SessionTimeline</span>&gt;
-    &lt;<span class="token-tag">TimelineFilter</span> <span class="token-param">activeTab</span>="all" /&gt;
-    &lt;<span class="token-tag">SkillResultCard</span> <span class="token-param">status</span>="streaming" /&gt;</pre>
-      </div>
+            <!-- 共同路径节点 -->
+            <rect x="30" y="88" width="120" height="60" rx="5" fill="#ffffff" stroke="#374151"/>
+            <text x="90" y="113" text-anchor="middle" fill="#1d2129" font-size="12" font-weight="600">Run skill</text>
+            <text class="mono" x="90" y="132" text-anchor="middle" fill="#57606a" font-size="9">routes/skills.ts:42</text>
 
-      <!-- 示例形态 4：模块职责与浅层文件树 -->
-      <div class="card-full">
-        <div class="section-title">
-          <span>模块职责与核心文件边界</span>
-          <span class="badge badge-muted">Module Boundary</span>
-        </div>
-        <pre class="code-shape code-full">src/
-<span class="token-branch">├── </span><span class="token-tag">commands/</span>       <span class="token-comment"># 解析并分发用户指令与 CLI 入口</span>
-<span class="token-branch">├── </span><span class="token-tag">sessions/</span>       <span class="token-comment"># 会话状态机与持久化生命周期管理</span>
-<span class="token-branch">├── </span><span class="token-tag">cards/</span>          <span class="token-comment"># 业务卡片 DTO 转换与渲染模型</span>
-<span class="token-branch">│   └── </span><span class="token-focal">card_63/</span>    <span class="token-comment"># Card63 视频卡片领域模型与埋点</span>
-<span class="token-branch">└── </span><span class="token-tag">transport/</span>      <span class="token-comment"># 底层 SSE 流式长连接与 RPC 通信</span></pre>
-      </div>
+            <rect x="190" y="88" width="120" height="60" rx="5" fill="#ffffff" stroke="#374151"/>
+            <text x="250" y="113" text-anchor="middle" fill="#1d2129" font-size="12" font-weight="600">Emit event</text>
+            <text class="mono" x="250" y="132" text-anchor="middle" fill="#57606a" font-size="9">skill_result</text>
 
-      <!-- 示例形态 5：重构增量演进 (Diff 模式) -->
-      <div class="card-full">
-        <div class="section-title">
-          <span>重构增量演进 (Diff)</span>
-          <span class="badge badge-muted">Evolution</span>
+            <rect x="350" y="88" width="120" height="60" rx="5" fill="#ffffff" stroke="#374151"/>
+            <text x="410" y="113" text-anchor="middle" fill="#1d2129" font-size="12" font-weight="600">EventStream</text>
+            <text class="mono" x="410" y="132" text-anchor="middle" fill="#57606a" font-size="9">raw payload</text>
+
+            <rect x="510" y="88" width="120" height="60" rx="5" fill="rgba(217,83,30,.09)" stroke="#d9531e" stroke-width="1.4"/>
+            <text x="570" y="111" text-anchor="middle" fill="#1d2129" font-size="12" font-weight="600">Registry.parse</text>
+            <text class="mono" x="570" y="130" text-anchor="middle" fill="#d9531e" font-size="9">第一处分歧 · :22</text>
+
+            <!-- 分歧终态 -->
+            <rect x="700" y="32" width="225" height="82" rx="5" fill="rgba(40,167,69,.10)" stroke="#1e7e34"/>
+            <text x="718" y="56" fill="#1e7e34" font-size="11" font-weight="600">修复后 · typed path</text>
+            <text class="mono" x="718" y="77" fill="#1d2129" font-size="10">SkillResultEvent → Timeline</text>
+            <text class="mono" x="718" y="96" fill="#1d2129" font-size="10">→ SkillResultCard</text>
+
+            <rect x="700" y="192" width="225" height="82" rx="5" fill="rgba(220,53,69,.08)" stroke="#c82333"/>
+            <text x="718" y="216" fill="#c82333" font-size="11" font-weight="600">当前 · unknown path</text>
+            <text class="mono" x="718" y="237" fill="#1d2129" font-size="10">unknown → filtered</text>
+            <text class="mono" x="718" y="256" fill="#1d2129" font-size="10">→ timeline has no card</text>
+
+            <text x="30" y="292" fill="#57606a" font-size="10">共同事实：服务端已发送，浏览器已接收；修复点位于类型解析边界。</text>
+          </svg>
         </div>
-        <pre class="code-shape code-full"><span class="token-comment"># 订单处理流演进</span>
-<span class="token-kw">on</span>(<span class="token-fn">OrderSubmit</span>)
-<span class="diff-del">-  executePaymentSync()</span>
-<span class="diff-add">+  if (isRateLimited(userId)) return dropRequest()</span>
-<span class="diff-add">+  createPendingOrder()</span>
-<span class="diff-add">+  dispatchToAsyncQueue(orderId)</span></pre>
-      </div>
+
+      </section>
+
+      <section class="card-full">
+        <div class="section-title">
+          <span>Payload 如何成为卡片，以及改动会触及哪里</span>
+          <span class="badge badge-accent">skill_result → SkillResultCard</span>
+        </div>
+
+        <div class="layout-grid-2 primitive-grid">
+          <div class="primitive-panel">
+            <div class="primitive-heading">
+              <strong>从传输对象到 View Model</strong>
+              <span>raw payload → render model</span>
+            </div>
+            <div class="transform-chain">
+              <div class="transform-node">
+                <div class="transform-node-head"><strong>Raw SSE payload</strong><code>event-stream.ts:58</code></div>
+                <div class="transform-fields">
+                  <span>type</span><span>"skill_result"</span>
+                  <span>payload.status</span><span>"completed"</span>
+                  <span>payload.output</span><span>{ passed: 31, failed: 0 }</span>
+                </div>
+              </div>
+              <div class="transform-arrow">↓ skillResultSchema.parse()</div>
+              <div class="transform-node focus">
+                <div class="transform-node-head"><strong>SkillResultEvent</strong><code>validated union</code></div>
+                <div class="transform-fields">
+                  <span>kind</span><span>SkillResultEvent</span>
+                  <span>status</span><span>completed</span>
+                  <span>output</span><span>{ passed: 31, failed: 0 }</span>
+                </div>
+              </div>
+              <div class="transform-arrow">↓ toTimelineItem()</div>
+              <div class="transform-node">
+                <div class="transform-node-head"><strong>SkillResultCardProps</strong><code>render model</code></div>
+                <div class="transform-fields">
+                  <span>title</span><span>"Skill result"</span>
+                  <span>summary</span><span>"31 tests passed · 0 failed"</span>
+                  <span>tone</span><span>success</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="primitive-panel">
+            <div class="primitive-heading">
+              <strong>中心注册表改动的影响范围</strong>
+              <span>registry → client consumers</span>
+            </div>
+            <div class="impact-root">eventRegistry · add skill_result</div>
+            <div class="impact-list">
+              <div class="impact-row">
+                <span class="impact-tag direct">DIRECT</span>
+                <div><code>client/session/session-event.ts</code>联合类型获得 SkillResultEvent</div>
+              </div>
+              <div class="impact-row">
+                <span class="impact-tag direct">DIRECT</span>
+                <div><code>client/session/SkillResultCard.tsx</code>新增结果卡片渲染入口</div>
+              </div>
+              <div class="impact-row">
+                <span class="impact-tag test">TEST</span>
+                <div><code>client/session/event-registry.test.ts</code>覆盖合法与畸形 payload</div>
+              </div>
+              <div class="impact-row">
+                <span class="impact-tag stable">STABLE</span>
+                <div><code>server/events/skill-result.ts</code>payload 契约保持不变</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card-full">
+        <div class="section-title">
+          <span>修复如何进入系统，以及为什么选择中心注册表</span>
+          <span class="badge badge-accent">CHOSEN · central registry</span>
+        </div>
+
+        <div class="layout-grid-2">
+          <div>
+            <pre class="code-shape semantic-diff"><code class="language-diff" data-focus="SkillResultEvent|skill_result|eventRegistry.parse">&#45;type SessionEvent = ExistingEvent;
+&#43;type SessionEvent = ExistingEvent | SkillResultEvent;
+
+&#45;const schemas = { message, agent_status };
+&#43;const schemas = { message, agent_status, skill_result };
+
+&#45;if (!schemas[raw.type]) return;
+&#43;return eventRegistry.parse(raw.type, raw.payload);</code></pre>
+          </div>
+          <div>
+            <div class="ui-frame">
+              <div class="ui-window">
+                <div class="ui-window-bar">
+                  <span class="ui-window-dot"></span><span class="ui-window-dot"></span><span class="ui-window-dot"></span>
+                  <span class="ui-window-title">Session · Run #1842</span>
+                </div>
+                <div class="ui-window-body">
+                  <aside class="ui-sidebar">
+                    <div class="ui-sidebar-item">Session 1841</div>
+                    <div class="ui-sidebar-item active">Session 1842</div>
+                    <div class="ui-sidebar-item">Session 1843</div>
+                  </aside>
+                  <main class="ui-timeline">
+                    <div class="ui-run-header"><strong>Run test suite</strong><span class="ui-status">completed</span></div>
+                    <div class="ui-event">You · Run the session package tests</div>
+                    <div class="ui-event">Agent · Executing <code>pnpm test</code></div>
+                    <div class="ui-result-card">
+                      <h5>Skill result</h5>
+                      <code>31 tests passed · 0 failed</code>
+                      <div class="ui-result-meta">Rendered from skill_result</div>
+                    </div>
+                  </main>
+                </div>
+              </div>
+              <div class="ui-path-label">SessionTimeline · normalized event → SkillResultCard</div>
+              <pre class="code-shape ui-source"><code class="language-tsx" data-focus="events|SkillResultCard">&lt;SessionPage&gt;                         [owns normalized events]
+└── &lt;SessionTimeline events={events}&gt;
+    ├── &lt;MessageCard /&gt;
+    └── event.kind === 'skill_result'
+        └── &lt;SkillResultCard event={event} /&gt;</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="comparison-table-wrap">
+          <table class="comparison-table">
+            <thead>
+              <tr><th>当前约束</th><th>时间线局部 Switch</th><th class="recommended">中心事件注册表</th><th>Raw Event 兜底</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>未知 payload 必须先校验</td><td>渲染时才发现类型</td><td class="recommended">入口处完成 schema 校验</td><td>未经校验进入 UI</td></tr>
+              <tr><td>新增事件只声明一次</td><td>类型与渲染分支分别修改</td><td class="recommended">schema 同时驱动类型与解析</td><td>下游持续处理 unknown</td></tr>
+              <tr><td>解析失败需要可观测</td><td>容易静默落入 default</td><td class="recommended">注册表统一记录失败原因</td><td>保留原始值但弱化契约</td></tr>
+              <tr><td>当前改动范围</td><td>最小补丁</td><td class="recommended">注册、联合类型、卡片三处高内聚修改</td><td>修改所有消费方</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </section>
 
     </div>
 
-    <!-- 
-      ── 场景化辅助图表与 UI 视觉化 (按需选配 0~2 张，以下提供高频范例) ─────────
-      - 专业图表（内联 SVG，规范参考 references/type-*.md）：
-        - 范例 A：多实体时序交互 (Sequence Flow) ── 协议交互、鉴权请求、异步分发往返
-        - 范例 B：分层架构拓扑 (Architecture Zone) ── 模块分工、跨端隔离、服务边界
-        - 其它类型 (状态机/流程/数据流/表结构) 参见 references/type-*.md，纯代码重构可移除图表
-      - UI 视觉化（无固定模板，自由发挥）：
-        - 涉及前端排版或界面改动时，自由利用 HTML/CSS 容器或 SVG 真实画出 UI 元素与布局变化
-        - 保持中性骨架抽象，聚焦空间排版、层级与改动焦点，避免过度修饰真实产品皮肤
-    -->
-
-    <!-- 辅助图表范例 A：多实体时序交互图 (Sequence Flow - 高频) -->
-    <div class="diagram-wrap">
-      <div class="section-title" style="border:none; margin-bottom: 0.5rem;">
-        <span>请求处理与服务编排时序 (Sequence Flow 范例)</span>
-      </div>
-      <svg viewBox="0 0 960 300" xmlns="http://www.w3.org/2000/svg" role="img"
-        aria-labelledby="seq-diag-title seq-diag-desc">
-        <title id="seq-diag-title">请求处理与服务编排时序图</title>
-        <desc id="seq-diag-desc">展示客户端发起请求后在网关、订单服务与事件中枢之间的时序往返流转</desc>
-        <defs>
-          <marker id="arrow-seq" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#374151"/></marker>
-          <marker id="arrow-seq-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#d9531e"/></marker>
-          <marker id="arrow-seq-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#275296"/></marker>
-        </defs>
-        <rect width="100%" height="100%" fill="#f4f5f7" rx="6"/>
-
-        <!-- 参与者生命线 (Lifelines) -->
-        <line x1="160" y1="70" x2="160" y2="270" stroke="rgba(30,41,59,0.22)" stroke-width="1" stroke-dasharray="3,3"/>
-        <line x1="420" y1="70" x2="420" y2="270" stroke="rgba(30,41,59,0.22)" stroke-width="1" stroke-dasharray="3,3"/>
-        <line x1="680" y1="70" x2="680" y2="270" stroke="rgba(30,41,59,0.22)" stroke-width="1" stroke-dasharray="3,3"/>
-        <line x1="860" y1="70" x2="860" y2="270" stroke="rgba(30,41,59,0.22)" stroke-width="1" stroke-dasharray="3,3"/>
-
-        <!-- 激活条 (Activation Bars) -->
-        <rect x="416" y="105" width="8" height="130" fill="rgba(30,41,59,0.06)" stroke="#374151" stroke-width="0.8" rx="2"/>
-        <rect x="676" y="135" width="8" height="70" fill="rgba(30,41,59,0.06)" stroke="#374151" stroke-width="0.8" rx="2"/>
-
-        <!-- 消息 1: Client -> Gateway (HTTPS) -->
-        <line x1="160" y1="105" x2="416" y2="105" stroke="#275296" stroke-width="1.2" marker-end="url(#arrow-seq-link)"/>
-        <text x="288" y="99" fill="#275296" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">POST /api/orders</text>
-
-        <!-- 消息 2: Gateway -> Service (gRPC) -->
-        <line x1="424" y1="135" x2="676" y2="135" stroke="#374151" stroke-width="1.2" marker-end="url(#arrow-seq)"/>
-        <text x="550" y="129" fill="#374151" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">RPC SubmitOrder</text>
-
-        <!-- 消息 3: Service -> Event Queue (Async Lock) -->
-        <line x1="684" y1="165" x2="860" y2="165" stroke="#374151" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrow-seq)"/>
-        <text x="772" y="159" fill="#374151" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">Publish LockEvent</text>
-
-        <!-- 消息 4: Service -> Gateway (Return DTO) -->
-        <line x1="676" y1="205" x2="424" y2="205" stroke="#374151" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrow-seq)"/>
-        <text x="550" y="199" fill="#374151" font-size="9" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">OrderCreated (DTO)</text>
-
-        <!-- 消息 5: Gateway -> Client (201 Created - 核心成功响应) -->
-        <line x1="416" y1="235" x2="160" y2="235" stroke="#d9531e" stroke-width="1.4" marker-end="url(#arrow-seq-accent)"/>
-        <text x="288" y="229" fill="#d9531e" font-size="9" font-weight="600" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">201 Created (Token)</text>
-
-        <!-- 参与者表头 (Actors) -->
-        <rect x="90" y="25" width="140" height="40" rx="4" fill="#ffffff" stroke="#1d2129" stroke-width="1"/>
-        <text x="160" y="50" fill="#1d2129" font-size="12" font-weight="600" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">Client App</text>
-
-        <rect x="350" y="25" width="140" height="40" rx="4" fill="#ffffff" stroke="#1d2129" stroke-width="1"/>
-        <text x="420" y="50" fill="#1d2129" font-size="12" font-weight="600" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">API Gateway</text>
-
-        <rect x="610" y="25" width="140" height="40" rx="4" fill="#ffffff" stroke="#d9531e" stroke-width="1.2"/>
-        <text x="680" y="50" fill="#1d2129" font-size="12" font-weight="600" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">Order Service</text>
-
-        <rect x="790" y="25" width="140" height="40" rx="4" fill="#ffffff" stroke="#1d2129" stroke-width="1"/>
-        <text x="860" y="50" fill="#1d2129" font-size="12" font-weight="600" font-family="'LXGW WenKai', sans-serif" text-anchor="middle">Event Broker</text>
-      </svg>
-    </div>
-
-    <!-- 辅助图表范例 B：分层架构与边界拓扑 (Architecture Zone - 高频) -->
-    <div class="diagram-wrap">
-      <div class="section-title" style="border:none; margin-bottom: 0.5rem;">
-        <span>系统交互与边界拓扑 (Architecture Topology 范例)</span>
-      </div>
-      <svg viewBox="0 0 960 260" xmlns="http://www.w3.org/2000/svg" role="img"
-        aria-labelledby="arch-diag-title arch-diag-desc">
-        <title id="arch-diag-title">系统交互与边界拓扑图</title>
-        <desc id="arch-diag-desc">展示客户端与后端核心服务的交互与调用流程</desc>
-        <defs>
-          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#374151"/></marker>
-          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#d9531e"/></marker>
-          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#275296"/></marker>
-        </defs>
-        <rect width="100%" height="100%" fill="#f4f5f7" rx="6"/>
-
-        <!-- 连线层 (必须先于节点绘制) -->
-        <line x1="220" y1="130" x2="380" y2="130" stroke="#275296" stroke-width="1.2" marker-end="url(#arrow-link)" />
-        <line x1="560" y1="130" x2="720" y2="130" stroke="#d9531e" stroke-width="1.2" marker-end="url(#arrow-accent)" />
-
-        <!-- 节点层 -->
-        <rect x="60" y="102" width="160" height="56" rx="6" fill="#ffffff" stroke="#1d2129" stroke-width="1" />
-        <text x="140" y="135" fill="#1d2129" font-size="13" font-weight="600" font-family="'LXGW WenKai', sans-serif"
-          text-anchor="middle">Client API Entry</text>
-
-        <rect x="380" y="102" width="180" height="56" rx="6" fill="#ffffff" stroke="#1d2129" stroke-width="1" />
-        <text x="470" y="135" fill="#1d2129" font-size="13" font-weight="600" font-family="'LXGW WenKai', sans-serif"
-          text-anchor="middle">Order Service Orchestrator</text>
-
-        <rect x="720" y="102" width="180" height="56" rx="6" fill="rgba(217,83,30,0.09)" stroke="#d9531e" stroke-width="1.2" />
-        <text x="810" y="135" fill="#1d2129" font-size="13" font-weight="600" font-family="'LXGW WenKai', sans-serif"
-          text-anchor="middle">Payment Lock Engine</text>
-      </svg>
-    </div>
-
-    <!-- 3. 结构化要点与决策卡片 -->
-    <div class="summary-grid">
-      <div class="summary-card">
-        <h4><span class="card-dot accent"></span>核心改动要点 (In Scope)</h4>
-        <ul>
-          <li>将同步支付调用解耦为异步队列处理。</li>
-          <li>引入分布式锁防止高并发库存超卖。</li>
-        </ul>
-      </div>
-
-      <div class="summary-card">
-        <h4><span class="card-dot ink"></span>显式未包含/边界 (Gaps)</h4>
-        <ul>
-          <li>Pending 状态最长保留 15 分钟未支付自动释放。</li>
-          <li>服务间通信全面迁移至 gRPC 协议。</li>
-        </ul>
-      </div>
-
-      <div class="summary-card">
-        <h4><span class="card-dot muted"></span>核对文件与索引 (Evidence)</h4>
-        <ul>
-          <li><code>src/orders/OrderService.kt</code>: 核心编排流</li>
-          <li><code>src/lock/DistributedLock.kt</code>: 锁实现</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- Footer 区域 -->
     <footer class="footer">
-      <span>Generated by Better-Show-Me</span>
-      <span>[Date / Subsystem]</span>
+      <span>client/session · skill_result event path</span>
     </footer>
-
   </div>
-  <!-- ════════════ 画布区 END ════════════ -->
+  <!-- CANVAS END -->
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.12.0/build/highlight.min.js"></script>
+<script>
+  function applyCodeFocus(code) {
+    const terms = (code.dataset.focus || '').split('|').map(term => term.trim()).filter(Boolean);
+    for (const term of terms) {
+      const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
+      const nodes = [];
+      while (walker.nextNode()) {
+        if (!walker.currentNode.parentElement.closest('.code-focus')) nodes.push(walker.currentNode);
+      }
+      for (const node of nodes) {
+        const text = node.nodeValue;
+        if (!text.includes(term)) continue;
+        const fragment = document.createDocumentFragment();
+        let cursor = 0;
+        let index = text.indexOf(term, cursor);
+        while (index !== -1) {
+          fragment.append(text.slice(cursor, index));
+          const focus = document.createElement('span');
+          focus.className = 'code-focus';
+          focus.textContent = term;
+          fragment.append(focus);
+          cursor = index + term.length;
+          index = text.indexOf(term, cursor);
+        }
+        fragment.append(text.slice(cursor));
+        node.replaceWith(fragment);
+      }
+    }
+  }
+
+  if (window.hljs) {
+    document.querySelectorAll('code[class*="language-"]').forEach(code => {
+      window.hljs.highlightElement(code);
+      applyCodeFocus(code);
+    });
+  }
+</script>
 </body>
 </html>

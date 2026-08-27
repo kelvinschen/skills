@@ -1,103 +1,45 @@
 ---
 name: better-show-me
-description: 通过紧凑的代码形态、直观的结构草图或聚焦的可视化页面，帮助用户以极低认知负担理解当前的技术方案、系统架构、逻辑流转、界面形态与重构决策。
+description: 将技术概念、仓库、模块、代码逻辑、变更、故障或技术选择组织成低认知负担的文本或美观 HTML。用于用户要求 show me、可视化、解释、追踪、比较、调试或快速理解技术主题时。
 ---
 
-帮助用户以直观的可视化方式理解当前技术主题。省略寒暄，保持叙述凝练，选取能讲清核心主线的最小视图。
+# Better Show Me
 
-## 代码结构与架构形态 (核心主视觉)
+把技术事实组织成可扫读、可定位、可继续探索的认知界面。内容量服从问题；低认知负担来自清晰分层、显式关联和渐进展开。
 
-- **算法与业务逻辑（伪代码）**：用缩进文本展现分支与算法步骤，省略冗余语法：
-```text
-on(save)
-  if content is unchanged
-    return cached result
-  write new content
-  invalidate cache
-  return fresh result
-```
+先明确用户此刻要回答的问题和观察范围，再提取足以支撑结论的决定性事实。
 
-- **运行时控制流（调用树）**：用树形连接符清晰体现层级归属与调用栈：
-```text
-submitForm
-├── createSession
-│   ├── persistPrompt
-│   └── launchAgent
-└── navigateToSession
-    └── subscribeToEvents
-```
+## 输出构造
 
-- **UI 结构与状态边界（组件树）**：标注组件层级、文件归属与核心 Hook/状态：
-```tsx
-<SessionPage> (apps/example/src/routes/session.tsx)
-  useSessionEvents()
-  <SessionToolbar>
-    <RunSkillButton> (packages/ui)
-  <SessionTimeline>
-    <SkillResultCard>
-```
+1. **一句话结论**：先回答用户真正关心的问题。
+2. **主关系**：把核心问题写成“起点 → 关键跃迁 → 终态”，选择一个原语完整承载。
+3. **关系映射**：仅当另一问题需要不同的关系形状、且会改变结论或下一步时，增加“问题 → 原语 → 主线连接点”的辅助映射。
+4. **关系内表达**：原因、规则、状态与例外贴在对应节点或边上；可从同一关系推出的说明沿主视图渐进展开。
+5. **原位证据**：符号或路径足以证明时直接标注；精确语法承载结论时附局部代码。
+6. **实现附件**：用户需要完整实现时，将其作为独立附件层交付。
 
-- **模块职责与目录边界（浅层文件树）**：仅列关键文件并标注职责注释：
-```text
-src/
-├── commands/       # 解析并扩展用户指令
-├── sessions/       # 负责会话生命周期与状态持久化
-└── transport/      # 底层 API 与 SSE 流式通信
-```
+## 任务方向
 
-- **实体交互与数据流转（Mermaid）**：用轻量 Mermaid 表达交互时序或数据流：
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Gateway
-    participant Service
-    Client->>Gateway: POST /orders
-    Gateway->>Service: RPC CreateOrder
-    Service-->>Client: 201 Created (orderId)
-```
+| 方向 | 核心问题 | 常用组合 |
+| --- | --- | --- |
+| 理解现状 | 它由什么组成，如何工作 | 组件树、浅文件树、调用树、轻量时序、数据转换链、状态路径 |
+| 理解变化 | 什么变了，会影响哪里 | 语义 Diff、行为前后、影响范围、局部代码 |
+| 定位问题 | 预期与实际从哪里分叉 | 预期/实际分叉、故障因果链、状态快照、路径追踪 |
+| 做出决策 | 方案差异与取舍是什么 | 对齐比较、权衡矩阵、方案骨架比较 |
 
-- **局部增量演进（Diff 模式）**：用 `+` / `-` 聚焦改动点，形态精准匹配主题（组件、目录树、调用栈或状态变更）：
-```diff
- <SessionToolbar>
-+  <RunSkillButton />
-```
+仓库级请求以高层地图为入口，再围绕当前问题渐进展开。模块或逻辑级请求直接聚焦关键机制与证据。
 
-- **完整实现（代码块）**：仅在全新实现或用户需要完整可复制内容时展示。
+## 原语与媒介
 
-- **表达指导准则**：
-  - **真实数据与文案**：使用真实业务标签、函数名与数据，杜绝 `foo`/`bar`/`Lorem ipsum` 占位符。
-  - **适度克制**：聚焦当前核心矛盾，选取最匹配的 1~3 种形态，切忌堆砌造成认知过载。
+选择原语前先阅读 [references/primitive-system.md](references/primitive-system.md)；其中紧邻定义的示例既是选型依据，也是输出形态的语义基线。选定媒介后，再读取一份渲染指南：
 
-## 交付形态决策
+- 文本输出：[references/rendering-text.md](references/rendering-text.md)
+- HTML 输出：[references/rendering-html.md](references/rendering-html.md)，在关系结构确定后组合模板原语
 
-根据场景复杂度与沟通深度或用户需求，选择最合适的展现介质：
+## 质量标准
 
-- **终端文本形态**：
-  - **适用场景**：快速解释局部逻辑、函数调用流、组件层级、代码差异、或轻量 Mermaid 流程图。
-  - **交付方式**：直接在对话回复中输出代码块，轻量高效，无需生成额外文件。
-- **独立 HTML 页面形态**：
-  - **适用场景**：复杂跨端/跨系统架构全景、多实体复杂时序与状态流转、UI 结构与视觉演进对比、大型工程迁移与重构方案、或需要交付给用户保存与沉淀的完整设计。
-  - **交付方式**：复制 [`assets/template-show-me.html`](assets/template-show-me.html)，保留其地基区的设计系统，仅在画布区挑选形态、填充真实内容、删除多余示例，生成自包含单文件，用合适的方式向用户展示，并在对话中附带文件链接与核心结论。
-
-## 场景化图表与 UI 视觉化
-
-根据技术主题选择合适的辅助呈现方式：
-
-- **专业图表路由（以规范内联 SVG 呈现，参考 [`references/`](references/)）**：
-  - **跨端适配与分层拓扑**：[`references/type-architecture.md`](references/type-architecture.md)（区域分组、正交圆角折线、跳线）
-  - **多实体时序交互**：[`references/type-sequence.md`](references/type-sequence.md)（生命线、激活条、分支框）
-  - **状态机与生命周期**：[`references/type-state.md`](references/type-state.md)（起止圆、状态卡片、跃迁事件与守卫）
-  - **逻辑分支与流程**：[`references/type-flowchart.md`](references/type-flowchart.md)（形状承载语义、正交分支）
-  - **管道数据流转**：[`references/type-data-flow.md`](references/type-data-flow.md)（横向角色泳道 × 纵向处理阶段）
-  - **实体模型与表结构**：[`references/type-db-schema.md`](references/type-db-schema.md)（表卡片、字段约束、字段精准连线）
-  - **无图模式**：纯代码逻辑或无复杂拓扑场景无需强行塞图，版面留给全宽代码与要点卡片。
-  - **图元支持**：单色技术图标库 [`references/primitive-icons.md`](references/primitive-icons.md)，手写体图注 [`references/primitive-annotation.md`](references/primitive-annotation.md)。
-- **UI 视觉化呈现**：前端排版、组件空间分布或界面重构前后对比（自由利用 HTML/CSS 或 SVG 呈现中性结构骨架，聚焦布局与改动点，避免复刻细节皮肤）。
-
-## 执行工作流
-
-1. **提炼核心**：理解源码，识别核心矛盾与主线，确定代码形态与 1~2 处重点强调。
-2. **选择形态**：简单/局部问题直接在对话中输出文本代码形态；复杂/全局方案决定生成 HTML 页面。
-3. **生成与交付**：
-   - 文本形态：直接在回复中呈现。
-   - HTML 形态：读取模板并组装，确保产物是自包含、真实可渲染的单文件后打开展示，并在对话中附带文件链接与核心结论。
+- 主视图在首屏或首段内形成完整闭环，细节随后按需展开。
+- 关系比清单更醒目，重点比装饰更醒目。
+- 名称、状态与结论能够回到真实证据。
+- 每个辅助视图回答一个主视图无法承载的独有问题，并从关联节点自然展开。
+- 删除一个块若不损失独有关系，就把其中信息并回原位。
