@@ -1,0 +1,103 @@
+<svg class="diagram-canvas" viewBox="0 0 980 664" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="uml-class-title uml-class-desc">
+  <title id="uml-class-title">Payments domain class model</title>
+  <desc id="uml-class-desc">UML class diagram showing payment implementations, service dependency, order composition, customer association, class compartments, and relationship vocabulary.</desc>
+  <defs>
+    <marker id="uml-class-triangle" markerWidth="16" markerHeight="12" refX="15" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+      <polygon points="0 0, 16 6, 0 12" fill="var(--color-paper, #f4f5f7)" stroke="var(--color-ink, #1d2129)" stroke-width="1"/>
+    </marker>
+    <marker id="uml-class-diamond-filled" markerWidth="18" markerHeight="10" refX="0" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <polygon points="0 5, 9 0, 18 5, 9 10" fill="var(--color-ink, #1d2129)"/>
+    </marker>
+    <marker id="uml-class-diamond-hollow" markerWidth="18" markerHeight="10" refX="0" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <polygon points="0 5, 9 0, 18 5, 9 10" fill="var(--color-paper, #f4f5f7)" stroke="var(--color-ink, #1d2129)" stroke-width="1"/>
+    </marker>
+    <marker id="uml-class-open" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L9,4 L0,8" fill="none" stroke="var(--color-muted, #374151)" stroke-width="1"/>
+    </marker>
+  </defs>
+
+  <rect width="100%" height="100%" fill="var(--color-paper, #f4f5f7)"/>
+
+  <!-- Relationships: drawn before class boxes -->
+  <line x1="480" y1="220" x2="480" y2="140" stroke="var(--color-accent, #d9531e)" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#uml-class-triangle)"/>
+  <line x1="760" y1="220" x2="760" y2="140" stroke="var(--color-accent, #d9531e)" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#uml-class-triangle)"/>
+  <line x1="320" y1="100" x2="420" y2="100" stroke="var(--color-muted, #374151)" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#uml-class-open)"/>
+  <line x1="260" y1="474" x2="380" y2="474" stroke="var(--color-muted, #374151)" stroke-width="1" marker-start="url(#uml-class-diamond-filled)"/>
+  <path d="M 160,558 V 574 Q 160,582 168,582 H 752 Q 760,582 760,574 V 540" fill="none" stroke="var(--color-muted, #374151)" stroke-width="1" marker-end="url(#uml-class-open)"/>
+
+  <text class="mono" x="368" y="93" fill="var(--color-muted, #374151)" font-size="8" text-anchor="middle" letter-spacing="0.06em">USES</text>
+  <text class="mono" x="294" y="467" fill="var(--color-ink, #1d2129)" font-size="8" text-anchor="middle">1</text>
+  <text class="mono" x="360" y="467" fill="var(--color-ink, #1d2129)" font-size="8" text-anchor="middle">1..*</text>
+  <text class="mono" x="168" y="569" fill="var(--color-ink, #1d2129)" font-size="8">0..*</text>
+  <text class="mono" x="752" y="557" fill="var(--color-ink, #1d2129)" font-size="8" text-anchor="end">1</text>
+
+  <!-- Interface: operations compartment only -->
+  <rect x="420" y="40" width="360" height="100" rx="6" fill="var(--color-accent-tint, rgba(217,83,30,0.09))" stroke="var(--color-accent, #d9531e)" stroke-width="1"/>
+  <line x1="420" y1="80" x2="780" y2="80" stroke="rgba(217,83,30,0.40)" stroke-width="1"/>
+  <text class="mono" x="600" y="56" fill="var(--color-accent, #d9531e)" font-size="8" text-anchor="middle" letter-spacing="0.08em">«interface»</text>
+  <text x="600" y="72" fill="var(--color-ink, #1d2129)" font-size="12" font-weight="600" text-anchor="middle">PaymentMethod</text>
+  <text class="mono" x="436" y="100" fill="var(--color-ink, #1d2129)" font-size="9">+ authorize(amount: Money): AuthResult</text>
+  <text class="mono" x="436" y="120" fill="var(--color-ink, #1d2129)" font-size="9">+ capture(ref: String): void</text>
+
+  <!-- Service: name + operations -->
+  <rect x="40" y="60" width="280" height="80" rx="6" fill="var(--color-paper-card, #ffffff)" stroke="var(--color-ink, #1d2129)" stroke-width="1"/>
+  <line x1="40" y1="100" x2="320" y2="100" stroke="var(--color-rule-solid, rgba(55,65,81,0.28))" stroke-width="1"/>
+  <text x="180" y="84" fill="var(--color-ink, #1d2129)" font-size="12" font-weight="600" text-anchor="middle">PaymentService</text>
+  <text class="mono" x="56" y="120" fill="var(--color-ink, #1d2129)" font-size="9">+ charge(order: Order): Receipt</text>
+
+  <!-- Implementations: name + attributes + operations -->
+  <rect x="380" y="220" width="200" height="150" rx="6" fill="var(--color-paper-card, #ffffff)" stroke="var(--color-ink, #1d2129)" stroke-width="1"/>
+  <line x1="380" y1="260" x2="580" y2="260" stroke="var(--color-rule-solid, rgba(55,65,81,0.28))" stroke-width="1"/>
+  <line x1="380" y1="320" x2="580" y2="320" stroke="var(--color-rule-solid, rgba(55,65,81,0.28))" stroke-width="1"/>
+  <text x="480" y="244" fill="var(--color-ink, #1d2129)" font-size="12" font-weight="600" text-anchor="middle">Card</text>
+  <text class="mono" x="396" y="280" fill="var(--color-ink, #1d2129)" font-size="9">- number: String</text>
+  <text class="mono" x="396" y="300" fill="var(--color-ink, #1d2129)" font-size="9">- expiry: Date</text>
+  <text class="mono" x="396" y="342" fill="var(--color-ink, #1d2129)" font-size="9">+ mask(): String</text>
+  <text class="mono" x="396" y="360" fill="var(--color-ink, #1d2129)" font-size="9">+ authorize(amount): Auth</text>
+
+  <rect x="660" y="220" width="200" height="130" rx="6" fill="var(--color-paper-card, #ffffff)" stroke="var(--color-ink, #1d2129)" stroke-width="1"/>
+  <line x1="660" y1="260" x2="860" y2="260" stroke="var(--color-rule-solid, rgba(55,65,81,0.28))" stroke-width="1"/>
+  <line x1="660" y1="300" x2="860" y2="300" stroke="var(--color-rule-solid, rgba(55,65,81,0.28))" stroke-width="1"/>
+  <text x="760" y="244" fill="var(--color-ink, #1d2129)" font-size="12" font-weight="600" text-anchor="middle">BankTransfer</text>
+  <text class="mono" x="676" y="280" fill="var(--color-ink, #1d2129)" font-size="9">- iban: String</text>
+  <text class="mono" x="676" y="324" fill="var(--color-ink, #1d2129)" font-size="9">+ authorize(amount): Auth</text>
+
+  <!-- Domain classes -->
+  <rect x="60" y="410" width="200" height="148" rx="6" fill="var(--color-paper-card, #ffffff)" stroke="var(--color-ink, #1d2129)" stroke-width="1"/>
+  <line x1="60" y1="450" x2="260" y2="450" stroke="var(--color-rule-solid, rgba(55,65,81,0.28))" stroke-width="1"/>
+  <line x1="60" y1="510" x2="260" y2="510" stroke="var(--color-rule-solid, rgba(55,65,81,0.28))" stroke-width="1"/>
+  <text x="160" y="434" fill="var(--color-ink, #1d2129)" font-size="12" font-weight="600" text-anchor="middle">Order</text>
+  <text class="mono" x="76" y="470" fill="var(--color-ink, #1d2129)" font-size="9">- id: String</text>
+  <text class="mono" x="76" y="490" fill="var(--color-ink, #1d2129)" font-size="9">- placedAt: Date</text>
+  <text class="mono" x="76" y="532" fill="var(--color-ink, #1d2129)" font-size="9">+ total(): Money</text>
+
+  <rect x="380" y="410" width="200" height="130" rx="6" fill="var(--color-paper-card, #ffffff)" stroke="var(--color-ink, #1d2129)" stroke-width="1"/>
+  <line x1="380" y1="450" x2="580" y2="450" stroke="var(--color-rule-solid, rgba(55,65,81,0.28))" stroke-width="1"/>
+  <text x="480" y="434" fill="var(--color-ink, #1d2129)" font-size="12" font-weight="600" text-anchor="middle">OrderLine</text>
+  <text class="mono" x="396" y="470" fill="var(--color-ink, #1d2129)" font-size="9">- sku: String</text>
+  <text class="mono" x="396" y="490" fill="var(--color-ink, #1d2129)" font-size="9">- qty: Int</text>
+  <text class="mono" x="396" y="510" fill="var(--color-ink, #1d2129)" font-size="9">- price: Money</text>
+
+  <rect x="660" y="410" width="200" height="130" rx="6" fill="var(--color-paper-card, #ffffff)" stroke="var(--color-ink, #1d2129)" stroke-width="1"/>
+  <line x1="660" y1="450" x2="860" y2="450" stroke="var(--color-rule-solid, rgba(55,65,81,0.28))" stroke-width="1"/>
+  <text x="760" y="434" fill="var(--color-ink, #1d2129)" font-size="12" font-weight="600" text-anchor="middle">Customer</text>
+  <text class="mono" x="676" y="470" fill="var(--color-ink, #1d2129)" font-size="9">- id: String</text>
+  <text class="mono" x="676" y="490" fill="var(--color-ink, #1d2129)" font-size="9">- name: String</text>
+  <text class="mono" x="676" y="510" fill="var(--color-ink, #1d2129)" font-size="9">- email: String</text>
+
+  <!-- Complete relationship vocabulary -->
+  <line x1="40" y1="604" x2="940" y2="604" stroke="var(--color-rule, rgba(30,41,59,0.14))" stroke-width="0.8"/>
+  <text class="mono" x="40" y="620" fill="var(--color-muted, #374151)" font-size="8" letter-spacing="0.18em">LEGEND · RELATIONSHIPS</text>
+  <line x1="40" y1="638" x2="68" y2="638" stroke="var(--color-ink, #1d2129)" stroke-width="1" marker-end="url(#uml-class-triangle)"/>
+  <text x="76" y="642" fill="var(--color-muted, #374151)" font-size="8.5">Inheritance</text>
+  <line x1="188" y1="638" x2="216" y2="638" stroke="var(--color-ink, #1d2129)" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#uml-class-triangle)"/>
+  <text x="224" y="642" fill="var(--color-muted, #374151)" font-size="8.5">Realization</text>
+  <line x1="336" y1="638" x2="364" y2="638" stroke="var(--color-ink, #1d2129)" stroke-width="1" marker-start="url(#uml-class-diamond-filled)"/>
+  <text x="372" y="642" fill="var(--color-muted, #374151)" font-size="8.5">Composition</text>
+  <line x1="484" y1="638" x2="512" y2="638" stroke="var(--color-ink, #1d2129)" stroke-width="1" marker-start="url(#uml-class-diamond-hollow)"/>
+  <text x="520" y="642" fill="var(--color-muted, #374151)" font-size="8.5">Aggregation</text>
+  <line x1="632" y1="638" x2="660" y2="638" stroke="var(--color-muted, #374151)" stroke-width="1" marker-end="url(#uml-class-open)"/>
+  <text x="668" y="642" fill="var(--color-muted, #374151)" font-size="8.5">Association</text>
+  <line x1="780" y1="638" x2="808" y2="638" stroke="var(--color-muted, #374151)" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#uml-class-open)"/>
+  <text x="816" y="642" fill="var(--color-muted, #374151)" font-size="8.5">Dependency</text>
+</svg>

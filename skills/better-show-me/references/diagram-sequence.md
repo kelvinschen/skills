@@ -39,4 +39,4 @@
 
 ## 5. 示例产物
 
-- 参考示例：[`assets/example-sequence.html`](../assets/example-sequence.html)
+- SVG 几何示例：[`assets/diagrams/example-sequence.svg`](../assets/diagrams/example-sequence.svg)

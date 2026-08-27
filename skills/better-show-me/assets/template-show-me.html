@@ -1,702 +1,585 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>为什么 skill_result 到达了却没有显示</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>skill_result 解析故障 | Better Show Me</title>
 
-  <!-- 引入字体：LXGW WenKai (正文/标题/图表) + JetBrains Mono (代码块/等宽) -->
+  <!--
+    ALL-IN-ONE REFERENCE · CRAP COMPOSITION
+    Contrast: one dominant relationship per chapter; evidence stays quieter.
+    Repetition: chapters, figures and anchors repeat one stable grammar.
+    Alignment: every element resolves to the same numbered 12-column grid.
+    Proximity: evidence sits beside the claim it proves, never in a detached evidence wall.
+  -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.1.0/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Ysabeau+Office:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.1.0/style.css">
 
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body, h1, h2, h3, p, figure, ol, ul { margin: 0; }
 
     :root {
-      /* 核心色板 */
-      --color-paper:       #f4f5f7;              /* 主背景色 */
-      --color-paper-card:  #ffffff;              /* 卡片背景 */
-      --color-paper-code:  #eaedf2;              /* 代码背景 */
-      --color-ink:         #1d2129;              /* 正文/主边框 */
-      --color-muted:       #374151;              /* 次要文字/默认连线 */
-      --color-soft:        #57606a;              /* 辅助说明 */
-      --color-rule:        rgba(30, 41, 59, 0.14); /* 细边框 */
-      --color-rule-solid:  rgba(55, 65, 81, 0.28);
-
-      /* 焦点与强调 */
-      --color-accent:      #d9531e;              /* 焦点强调色 (珊瑚橙) */
-      --color-accent-tint: rgba(217, 83, 30, 0.09);
-      --color-link:        #275296;
-
-      /* 语义状态 */
+      --color-paper: #f4f5f7;
+      --color-paper-card: #ffffff;
+      --color-paper-code: #eaedf2;
+      --color-ink: #1d2129;
+      --color-muted: #374151;
+      --color-soft: #57606a;
+      --color-rule: rgba(30,41,59,.14);
+      --color-rule-solid: rgba(55,65,81,.28);
+      --color-accent: #d9531e;
+      --color-accent-tint: rgba(217,83,30,.09);
+      --color-link: #275296;
       --color-success-text: #1e7e34;
-      --color-success-bg:   rgba(40, 167, 69, 0.12);
-      --color-danger-text:  #c82333;
-      --color-danger-bg:    rgba(220, 53, 69, 0.12);
-      --color-warn-text:    #b86a04;
-      --color-warn-bg:      rgba(217, 130, 43, 0.10);
-
-      /* 字体规范 */
-      --font-chinese: 'LXGW WenKai', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      --font-english: 'LXGW WenKai', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      --font-body:    'LXGW WenKai', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      --font-display: 'LXGW WenKai', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, serif;
-      --font-mono:    'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+      --color-success-bg: rgba(40,167,69,.10);
+      --color-danger-text: #c82333;
+      --color-danger-bg: rgba(220,53,69,.08);
+      --font-body: 'Ysabeau Office','LXGW WenKai',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+      --font-display: 'Ysabeau Office','LXGW WenKai',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+      --font-mono: 'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
+      --page: 1320px;
+      --gap: 20px;
+      --radius: 7px;
     }
 
     body {
-      font-family: var(--font-body);
+      min-height: 100vh;
       background: var(--color-paper);
       color: var(--color-ink);
-      line-height: 1.6;
-      padding: 2.5rem 1.5rem;
-      min-height: 100vh;
+      font: 400 16px/1.65 var(--font-body);
     }
+    code, pre { font-family: var(--font-mono); }
+    code { font-size: .88em; }
+    .page { width: min(var(--page), calc(100% - 48px)); margin: 0 auto; }
+    .shell { display: grid; grid-template-columns: 140px minmax(0,1fr); gap: 28px; }
+    .content { min-width: 0; }
 
-    .container { max-width: 1140px; margin: 0 auto; }
+    /* CONTRAST · one typographic ladder, one accent, one dominant surface. */
+    .header { max-width: 900px; padding: 74px 0 50px 76px; }
+    .eyebrow { margin-bottom: 14px; color: var(--color-accent); font: 600 .72rem/1.2 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; }
+    h1 { max-width: 850px; margin-bottom: 18px; font: 600 clamp(2.2rem,4.5vw,3.5rem)/1.08 var(--font-display); letter-spacing: -.025em; }
+    h1 code { color: var(--color-accent); font-size: .86em; font-weight: 600; }
+    .lede { max-width: 760px; color: var(--color-muted); font-size: 1.1rem; line-height: 1.75; }
 
-    /* ── Header ─────────────────────────────────────────────────── */
-    .header { margin-bottom: 2rem; }
-    .header-eyebrow {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: var(--color-accent);
-      margin-bottom: 0.5rem;
-    }
-    h1 {
-      font-family: var(--font-display);
-      font-size: clamp(1.8rem, 3vw + 1rem, 2.5rem);
-      font-weight: 600;
-      letter-spacing: -0.01em;
-      line-height: 1.25;
-      color: var(--color-ink);
-      margin-bottom: 0.5rem;
-    }
-    .subtitle {
-      font-family: var(--font-chinese);
-      font-size: 1.05rem;
-      font-weight: 500;
-      color: var(--color-muted);
-      max-width: 70ch;
-    }
+    /* REPETITION · navigation stays in a quiet side rail, outside the reading canvas. */
+    .side-nav { position: sticky; top: 32px; align-self: start; margin-top: 180px; }
+    .side-nav a { display: grid; grid-template-columns: 27px 1fr; align-items: baseline; padding: 10px 0 10px 12px; color: var(--color-muted); border-left: 1px solid var(--color-rule); text-decoration: none; font-size: .84rem; line-height: 1.35; }
+    .side-nav a:hover { color: var(--color-ink); border-left-color: var(--color-accent); }
+    .side-nav a:focus-visible { color: var(--color-ink); border-left-color: var(--color-accent); outline: 2px solid rgba(217,83,30,.25); outline-offset: 3px; }
+    .side-nav strong { color: var(--color-soft); font: 600 .72rem/1.2 var(--font-mono); }
+    .side-nav span { color: var(--color-muted); font-weight: 600; }
+    .side-nav a:hover span,.side-nav a:focus-visible span { color: var(--color-ink); }
 
-    /* ── 灵活布局系统 (Modular Layouts) ─────────────────────────── */
-    .layout-stack  { display: flex; flex-direction: column; gap: 1.25rem; margin-bottom: 1.5rem; }
-    .layout-grid-2, .grid-2 {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-      gap: 1.25rem;
-      margin-bottom: 1.5rem;
-    }
-    .layout-grid-3 {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 1.25rem;
-      margin-bottom: 1.5rem;
-    }
+    /* ALIGNMENT · every chapter uses the same number rail and 12-column body. */
+    .chapter { display: grid; grid-template-columns: 56px repeat(12,minmax(0,1fr)); gap: 0 var(--gap); padding: 76px 0 86px; border-top: 1px solid var(--color-rule); }
+    .chapter-follow { padding-top: 64px; }
+    .act-start { margin-top: 28px; padding-top: 92px; border-top-color: var(--color-rule-solid); }
+    .chapter-no { grid-column: 1; padding-top: 7px; color: var(--color-soft); font: 500 .72rem/1 var(--font-mono); }
+    .chapter-head { grid-column: 2 / span 8; margin-bottom: 40px; }
+    .chapter-head h2 { margin-bottom: 9px; font: 600 clamp(1.55rem,2.4vw,2.05rem)/1.24 var(--font-display); letter-spacing: -.012em; }
+    .chapter-head p { max-width: 670px; color: var(--color-soft); font-size: .96rem; }
+    .chapter-body { grid-column: 2 / -1; min-width: 0; }
+    .grid-7-5 { display: grid; grid-template-columns: minmax(0,7fr) minmax(300px,5fr); gap: clamp(42px,6vw,76px); align-items: start; }
+    .grid-6-6 { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: clamp(42px,5vw,64px); align-items: start; }
+    .change-layout { display: grid; grid-template-columns: minmax(320px,.78fr) minmax(500px,1.22fr); gap: clamp(42px,5vw,64px); align-items: start; }
+    .grid-7-5 > *,.grid-6-6 > *,.change-layout > * { min-width: 0; }
 
-    /* 全宽卡片容器（优先推荐：保证长文本与深度调用链无横向溢出） */
-    .card-full {
-      background: var(--color-paper-card);
-      border: 1px solid var(--color-rule);
-      border-radius: 6px;
-      padding: 1.25rem;
-      width: 100%;
-    }
+    /* PROXIMITY · every figure names the question it answers, then keeps evidence attached. */
+    .figure-head { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
+    .figure-head h3 { font: 600 1.04rem/1.35 var(--font-display); }
+    .source { color: var(--color-soft); font: 500 .72rem/1.4 var(--font-mono); white-space: nowrap; }
+    a.source { color: var(--color-link); }
+    .caption { margin-top: 14px; color: var(--color-soft); font-size: .82rem; }
 
-    .section-card {
-      background: var(--color-paper-card);
-      border: 1px solid var(--color-rule);
-      border-radius: 6px;
-      padding: 1.25rem;
-      margin-bottom: 1.25rem;
-    }
+    /* PATTERN: expected/actual fork | dominant relationship for diagnosis. */
+    .hero-surface { padding: 34px 30px 22px; overflow-x: auto; background: rgba(255,255,255,.66); border: 1px solid var(--color-rule); border-radius: var(--radius); }
+    .hero-surface:focus-visible,.diagram-wrap:focus-visible { outline: 2px solid rgba(217,83,30,.28); outline-offset: 3px; }
+    .hero-surface svg { display: block; width: 100%; min-width: 900px; }
+    .hero-surface text { font-family: var(--font-body); }
+    .hero-surface .mono { font-family: var(--font-mono); }
 
-    .section-title {
-      font-family: var(--font-display);
-      font-size: 1.05rem;
-      font-weight: 600;
-      color: var(--color-ink);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-bottom: 0.75rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 1px solid var(--color-rule);
-    }
+    /* PATTERN: state snapshot | attached directly to the fork it proves. */
+    .evidence-strip { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); margin-top: 22px; border-top: 1px solid var(--color-rule); }
+    .evidence-cell { padding: 14px 18px 4px 0; }
+    .evidence-cell span { display: block; margin-bottom: 4px; color: var(--color-soft); font: 500 .72rem/1.3 var(--font-mono); }
+    .evidence-cell strong { color: var(--color-ink); font: 500 .76rem/1.4 var(--font-mono); overflow-wrap: anywhere; }
+    .evidence-cell strong.fault { color: var(--color-danger-text); }
 
-    .badge {
-      font-family: var(--font-mono);
-      font-size: 0.7rem;
-      font-weight: 600;
-      padding: 0.15rem 0.45rem;
-      border-radius: 3px;
-      text-transform: uppercase;
-    }
-    .badge-accent { background: var(--color-accent-tint); color: var(--color-accent); border: 1px solid rgba(217, 83, 30, 0.3); }
-    .badge-muted  { background: rgba(55, 65, 81, 0.08); color: var(--color-muted); border: 1px solid var(--color-rule); }
+    /* PATTERN: causal chain | explains propagation, not chronology. */
+    .causal { list-style: none; padding: 0; }
+    .causal li { position: relative; padding: 0 0 27px 30px; color: var(--color-muted); font-size: .9rem; }
+    .causal li:not(:last-child)::before { content: ''; position: absolute; left: 6px; top: 18px; bottom: 2px; border-left: 1px solid var(--color-rule-solid); }
+    .causal li::after { content: ''; position: absolute; left: 2px; top: 8px; width: 8px; height: 8px; border: 1px solid var(--color-muted); border-radius: 50%; background: var(--color-paper); }
+    .causal li.focus::after { border-color: var(--color-accent); background: var(--color-accent); }
+    .causal strong { display: block; margin-bottom: 3px; color: var(--color-ink); font-size: .94rem; }
+    .anchor { display: block; margin-top: 5px; color: var(--color-link); font: 500 .68rem/1.4 var(--font-mono); }
 
-    /* ── 代码与形态展示容器 (Code Shapes & Preformatted Alignment) ─ */
-    pre.code-shape {
-      font-family: var(--font-mono);
-      font-size: 0.83rem;
-      line-height: 1.7;
-      background: var(--color-paper-code);
-      border: 1px solid var(--color-rule);
-      border-radius: 4px;
-      padding: 1rem 1.25rem;
-      overflow-x: auto;
-      color: var(--color-ink);
-      tab-size: 2;
-    }
-    pre.code-shape.code-full {
-      font-size: 0.84rem;
-      line-height: 1.7;
-    }
-    pre.code-shape.semantic-diff {
-      font-size: 0.72rem;
-      line-height: 1.55;
-      padding: 0.8rem 1rem;
-    }
+    /* PATTERN: evidence ledger | separates observation, inference and uncertainty. */
+    .evidence-ledger { margin-top: 34px; }
+    .ledger-head { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; margin-bottom: 10px; }
+    .ledger-head h3 { font: 600 1.04rem/1.35 var(--font-display); }
+    .ledger-head span { color: var(--color-link); font: 500 .68rem/1.4 var(--font-mono); }
+    .ledger-list { border-top: 1px solid var(--color-rule-solid); }
+    .ledger-row { display: grid; grid-template-columns: 126px minmax(0,1fr) 190px; gap: 20px; align-items: baseline; padding: 12px 0; border-bottom: 1px solid var(--color-rule); }
+    .ledger-state { position: relative; padding-left: 16px; color: var(--color-soft); font: 600 .7rem/1.4 var(--font-mono); letter-spacing: .03em; }
+    .ledger-state::before { content: ''; position: absolute; left: 0; top: .42em; width: 6px; height: 6px; border: 1px solid currentColor; border-radius: 50%; }
+    .ledger-row.confirmed .ledger-state { color: var(--color-success-text); }
+    .ledger-row.confirmed .ledger-state::before { background: currentColor; }
+    .ledger-row.inferred .ledger-state { color: var(--color-accent); }
+    .ledger-row.inferred .ledger-state::before { background: currentColor; }
+    .ledger-copy { color: var(--color-muted); font-size: .84rem; }
+    .ledger-copy strong { color: var(--color-ink); font-weight: 600; }
+    .ledger-source { color: var(--color-soft); font: 500 .7rem/1.4 var(--font-mono); text-align: right; }
 
-    /* ── 辅助图表容器 (Diagram Container - 配角) ─────────────────── */
-    .diagram-wrap {
-      background: var(--color-paper-card);
-      border: 1px solid var(--color-rule);
-      border-radius: 6px;
-      padding: 1.25rem;
-      margin-bottom: 1.5rem;
-      overflow-x: auto;
-    }
-    .diagram-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-      gap: 1.25rem;
-      margin-bottom: 1.5rem;
-    }
-    svg { width: 100%; min-width: 800px; display: block; }
-    .flow-diagram text { font-family: var(--font-body); }
-    .flow-diagram .mono { font-family: var(--font-mono); }
+    /* DIAGRAM: sequence | control moves across runtime boundaries. */
+    .diagram-wrap { overflow-x: auto; background: rgba(255,255,255,.58); border: 1px solid var(--color-rule); border-radius: 6px; }
+    .sequence-focus { width: 100%; }
+    .sequence-diagram { padding: 13px 10px 5px; }
+    .sequence-diagram svg { display: block; width: 100%; min-width: 780px; }
+    .sequence-diagram text { font-family: var(--font-body); }
+    .sequence-diagram .mono { font-family: var(--font-mono); }
 
-    /* ── 中性 UI 结构视图 (Neutral UI Frame) ───────────────────── */
-    .ui-frame {
-      background: var(--color-paper-code);
-      border: 1px solid var(--color-rule);
-      border-radius: 4px;
-      padding: 0.8rem;
-      align-self: start;
-    }
-    .ui-window {
-      overflow: hidden;
-      background: var(--color-paper-card);
-      border: 1px solid var(--color-rule-solid);
-      border-radius: 5px;
-    }
-    .ui-window-bar {
-      display: flex;
-      align-items: center;
-      gap: 0.45rem;
-      padding: 0.55rem 0.7rem;
-      border-bottom: 1px solid var(--color-rule);
-      color: var(--color-soft);
-      font-family: var(--font-mono);
-      font-size: 0.68rem;
-    }
-    .ui-window-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-rule-solid); }
-    .ui-window-title { margin-left: 0.35rem; }
-    .ui-window-body { display: grid; grid-template-columns: 96px minmax(0, 1fr); min-height: 205px; }
-    .ui-sidebar {
-      padding: 0.7rem 0.55rem;
-      border-right: 1px solid var(--color-rule);
-      background: rgba(30, 41, 59, 0.025);
-      color: var(--color-soft);
-      font-size: 0.68rem;
-    }
-    .ui-sidebar-item { padding: 0.35rem 0.4rem; border-radius: 3px; margin-bottom: 0.25rem; }
-    .ui-sidebar-item.active { background: var(--color-accent-tint); color: var(--color-accent); font-weight: 600; }
-    .ui-timeline { padding: 0.75rem; min-width: 0; }
-    .ui-run-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.65rem; }
-    .ui-run-header strong { font-size: 0.78rem; }
-    .ui-status {
-      padding: 0.12rem 0.38rem;
-      border-radius: 3px;
-      background: var(--color-success-bg);
-      color: var(--color-success-text);
-      font-family: var(--font-mono);
-      font-size: 0.6rem;
-    }
-    .ui-event {
-      margin-bottom: 0.5rem;
-      padding-left: 0.6rem;
-      border-left: 2px solid var(--color-rule-solid);
-      color: var(--color-soft);
-      font-size: 0.68rem;
-    }
-    .ui-result-card {
-      padding: 0.65rem 0.7rem;
-      border: 1px solid rgba(217, 83, 30, 0.35);
-      border-left: 3px solid var(--color-accent);
-      border-radius: 4px;
-      background: var(--color-accent-tint);
-    }
-    .ui-result-card h5 { font-size: 0.72rem; margin-bottom: 0.3rem; }
-    .ui-result-card code { font-size: 0.64rem; color: var(--color-muted); }
-    .ui-result-meta { margin-top: 0.35rem; color: var(--color-success-text); font-size: 0.64rem; }
-    .ui-path-label {
-      margin-top: 0.55rem;
-      color: var(--color-soft);
-      font-family: var(--font-mono);
-      font-size: 0.64rem;
-      text-align: center;
-    }
-    pre.ui-source { margin-top: 0.65rem; padding: 0.65rem 0.75rem; font-size: 0.68rem; }
-
-    /* ── 数据形变与影响范围 (Data Shape & Impact) ───────────────── */
-    .primitive-grid { margin-bottom: 0; }
-    .primitive-panel {
-      background: var(--color-paper-code);
-      border: 1px solid var(--color-rule);
-      border-radius: 5px;
-      padding: 1rem;
-      min-width: 0;
-    }
-    .primitive-heading {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 0.75rem;
-      margin-bottom: 0.85rem;
-    }
-    .primitive-heading strong { font-size: 0.9rem; }
-    .primitive-heading span {
-      color: var(--color-soft);
-      font-family: var(--font-mono);
-      font-size: 0.62rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-    .transform-chain { display: flex; flex-direction: column; gap: 0.4rem; }
-    .transform-node {
-      background: var(--color-paper-card);
-      border: 1px solid var(--color-rule-solid);
-      border-radius: 4px;
-      padding: 0.65rem 0.75rem;
-    }
+    /* PATTERN: data transformation | fields change across stages. */
+    .transform { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 10px; align-items: stretch; }
+    .transform-node { padding: 17px; background: var(--color-paper-card); border: 1px solid var(--color-rule-solid); border-radius: 5px; }
     .transform-node.focus { border-color: var(--color-accent); background: var(--color-accent-tint); }
-    .transform-node-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.75rem;
-      margin-bottom: 0.35rem;
-    }
-    .transform-node-head strong { font-family: var(--font-mono); font-size: 0.78rem; }
-    .transform-node-head code { color: var(--color-soft); font-size: 0.62rem; }
-    .transform-fields {
-      display: grid;
-      grid-template-columns: minmax(90px, 0.8fr) minmax(0, 1.5fr);
-      gap: 0.15rem 0.65rem;
-      color: var(--color-muted);
-      font-family: var(--font-mono);
-      font-size: 0.66rem;
-    }
-    .transform-fields span:nth-child(odd) { color: var(--color-soft); }
-    .transform-arrow {
-      color: var(--color-accent);
-      font-family: var(--font-mono);
-      font-size: 0.64rem;
-      text-align: center;
-    }
-    .impact-root {
-      padding: 0.65rem 0.75rem;
-      border: 1px solid var(--color-accent);
-      border-radius: 4px;
-      background: var(--color-accent-tint);
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      font-weight: 600;
-    }
-    .impact-list {
-      margin-left: 0.85rem;
-      padding: 0.6rem 0 0 1rem;
-      border-left: 1px solid var(--color-rule-solid);
-    }
-    .impact-row {
-      position: relative;
-      display: grid;
-      grid-template-columns: 60px minmax(0, 1fr);
-      gap: 0.65rem;
-      align-items: start;
-      padding: 0.45rem 0;
-      color: var(--color-muted);
-      font-size: 0.72rem;
-    }
-    .impact-row::before {
-      content: '';
-      position: absolute;
-      left: -1rem;
-      top: 0.9rem;
-      width: 0.75rem;
-      border-top: 1px solid var(--color-rule-solid);
-    }
-    .impact-tag {
-      border-radius: 3px;
-      padding: 0.08rem 0.28rem;
-      font-family: var(--font-mono);
-      font-size: 0.56rem;
-      text-align: center;
-    }
-    .impact-tag.direct { color: var(--color-accent); background: var(--color-accent-tint); }
-    .impact-tag.test { color: var(--color-link); background: rgba(39, 82, 150, 0.08); }
-    .impact-tag.stable { color: var(--color-success-text); background: var(--color-success-bg); }
-    .impact-row code { display: block; color: var(--color-ink); font-size: 0.66rem; margin-bottom: 0.1rem; }
+    .transform-node strong { display: block; margin-bottom: 8px; font: 600 .76rem/1.35 var(--font-mono); }
+    .transform-node p { color: var(--color-muted); font: 500 .72rem/1.6 var(--font-mono); }
+    .shape-key { color: var(--color-link); }
+    .shape-value { color: var(--color-success-text); }
+    .transform-node.focus .shape-key,.transform-node.focus .shape-value { color: var(--color-accent); }
+    .transform-arrow { align-self: center; color: var(--color-accent); font-family: var(--font-mono); }
 
-    /* ── Footer ─────────────────────────────────────────────────── */
-    .footer {
-      margin-top: 2.5rem;
-      padding-top: 1.25rem;
-      border-top: 1px solid var(--color-rule);
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      color: var(--color-soft);
-      display: flex;
-      justify-content: space-between;
-      flex-wrap: wrap;
+    /* PATTERN: call/component hierarchy | ownership and depth determine behavior. */
+    .tree { padding: 20px; color: var(--color-muted); background: var(--color-paper-code); border: 1px solid var(--color-rule); border-radius: 5px; white-space: pre-wrap; font-size: .73rem; line-height: 1.75; }
+    .tree .tree-focus { color: var(--color-accent); font-weight: 600; }
+    .tree code { font: inherit; }
+    .structure-tree .tree-call { color: var(--color-link); }
+    .structure-tree .tree-owner { color: var(--color-ink); font-weight: 600; }
+    .structure-tree .tree-component { color: var(--color-link); font-weight: 500; }
+    .structure-tree .tree-role { color: var(--color-soft); font-style: italic; }
+    .file-tree .tree-root { color: var(--color-ink); font-weight: 600; }
+    .file-tree .tree-file { color: var(--color-link); }
+    .file-tree .tree-impact { color: var(--color-soft); }
+    .file-tree .tree-note { color: var(--color-soft); font-style: italic; }
+
+    /* Highlight.js · syntax colors resolve to the existing semantic tokens. */
+    pre.tree code.hljs { display: block; padding: 0; overflow: visible; background: transparent; color: var(--color-ink); }
+    .hljs-keyword,.hljs-selector-tag,.hljs-meta { color: var(--color-link); font-weight: 600; }
+    .hljs-title.function_ { color: var(--color-ink); }
+    .hljs-title.class_,.hljs-type,.hljs-built_in { color: var(--color-link); }
+    .hljs-attr,.hljs-property,.hljs-variable,.hljs-params { color: #475569; }
+    .hljs-string,.hljs-symbol { color: var(--color-success-text); }
+    .hljs-number,.hljs-literal { color: var(--color-accent); }
+    .hljs-comment,.hljs-quote { color: var(--color-soft); font-style: italic; }
+    .code-focus { color: var(--color-accent) !important; font-weight: 700; }
+
+    /* PATTERN: blast radius | propagation plus stable boundary. */
+    /* PATTERN: semantic diff | syntax is the evidence. */
+    .code-panel { overflow: hidden; background: var(--color-paper-code); border: 1px solid var(--color-rule); border-radius: 6px; }
+    .code-bar { display: flex; justify-content: space-between; padding: 11px 15px; color: var(--color-soft); border-bottom: 1px solid var(--color-rule); font: 500 .7rem/1.4 var(--font-mono); }
+    pre { overflow-x: auto; margin: 0; padding: 18px; font: 400 .75rem/1.72 var(--font-mono); }
+    .del,.add { display: block; margin: 1px -5px; padding: 0 5px; }
+    .del { color: var(--color-danger-text); background: var(--color-danger-bg); text-decoration: line-through; }
+    .add { color: var(--color-success-text); background: var(--color-success-bg); }
+
+    /* PATTERN: neutral UI frame | layout is the evidence; content only locates the result. */
+    .ui-frame { padding: 13px; background: var(--color-paper-code); border: 1px solid var(--color-rule); border-radius: 6px; }
+    .ui-window { overflow: hidden; background: var(--color-paper-card); border: 1px solid var(--color-rule-solid); border-radius: 5px; }
+    .ui-bar { padding: 11px 13px; color: var(--color-muted); border-bottom: 1px solid var(--color-rule); font: 600 .72rem/1 var(--font-body); }
+    .ui-shell { display: grid; grid-template-columns: 116px minmax(0,1fr); min-height: 274px; }
+    .ui-sidebar { padding: 15px 12px; border-right: 1px solid var(--color-rule); background: rgba(234,237,242,.55); }
+    .ui-region-label { display: block; margin-bottom: 14px; color: var(--color-muted); font-size: .72rem; font-weight: 600; }
+    .ui-nav-item { margin-bottom: 7px; padding: 7px 8px; color: var(--color-soft); border-left: 2px solid transparent; font-size: .72rem; }
+    .ui-nav-item.active { color: var(--color-ink); border-left-color: var(--color-accent); background: var(--color-paper-card); }
+    .ui-main { min-width: 0; padding: 16px 20px 20px; }
+    .ui-main-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding-bottom: 11px; border-bottom: 1px solid var(--color-rule); }
+    .ui-main-head strong { font-size: .78rem; }
+    .ui-timeline { position: relative; margin-top: 15px; padding-left: 19px; }
+    .ui-timeline::before { content: ''; position: absolute; left: 4px; top: 6px; bottom: 7px; border-left: 1px solid var(--color-rule-solid); }
+    .ui-event { position: relative; margin-bottom: 13px; color: var(--color-soft); font-size: .72rem; }
+    .ui-event::before,.ui-result::before { content: ''; position: absolute; width: 7px; height: 7px; left: -18px; top: 6px; background: var(--color-paper-card); border: 1px solid var(--color-rule-solid); border-radius: 50%; }
+    .ui-event strong { display: block; margin-bottom: 2px; color: var(--color-ink); font-size: .72rem; }
+    .ui-result { position: relative; margin-top: 4px; padding: 13px 14px 14px; border: 1px solid rgba(217,83,30,.32); border-left: 3px solid var(--color-accent); background: var(--color-accent-tint); }
+    .ui-result::before { left: -21px; top: 16px; border-color: var(--color-accent); background: var(--color-accent); }
+    .ui-result-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+    .ui-result-head strong { font-size: .76rem; }
+    .ui-result p { color: var(--color-muted); font: 500 .7rem/1.55 var(--font-mono); }
+
+    /* PATTERN: outcome band | one row separates new, improved and unchanged. */
+    .outcome-band { display: grid; grid-template-columns: repeat(3,1fr); margin-top: 34px; border-top: 1px solid var(--color-rule-solid); border-bottom: 1px solid var(--color-rule); }
+    .outcome-item { display: grid; grid-template-columns: 54px 1fr; gap: 12px; padding: 14px 18px; border-right: 1px solid var(--color-rule); align-items: baseline; }
+    .outcome-item:first-child { padding-left: 0; }
+    .outcome-item:last-child { border-right: 0; }
+    .outcome-item span { color: var(--color-soft); font-size: .76rem; }
+    .outcome-item strong { color: var(--color-ink); font-size: .82rem; }
+
+    /* PATTERN: aligned tradeoff matrix | shared constraints decide. */
+    .comparison-wrap { overflow-x: auto; }
+    .comparison { width: 100%; min-width: 800px; border-collapse: collapse; text-align: left; }
+    .comparison th,.comparison td { padding: 15px 18px; border-bottom: 1px solid var(--color-rule); vertical-align: top; }
+    .comparison th { color: var(--color-soft); font-size: .76rem; font-weight: 600; }
+    .comparison td { color: var(--color-muted); font-size: .86rem; }
+    .comparison th:first-child,.comparison td:first-child { padding-left: 0; color: var(--color-ink); font-weight: 600; }
+    .comparison .chosen { color: var(--color-accent); }
+    .decision { display: grid; grid-template-columns: 1.3fr .7fr; gap: 56px; margin-top: 25px; }
+    .decision-main { padding-left: 16px; border-left: 2px solid var(--color-accent); color: var(--color-muted); }
+    .decision-limit { color: var(--color-soft); font-size: .82rem; }
+    .decision-limit strong { display: block; color: var(--color-ink); }
+
+    /* PATTERN: implementation annex | shown as a full chapter in this template reference. */
+    .annex-grid { display: grid; grid-template-columns: .8fr 1.2fr; gap: 64px; }
+    .annex-grid h3 { margin-bottom: 14px; font-size: .95rem; }
+    .footer { padding: 23px 0 42px 76px; color: var(--color-soft); border-top: 1px solid var(--color-rule); font: 500 .7rem/1.5 var(--font-mono); }
+
+    @media (max-width: 1100px) {
+      .shell { grid-template-columns: 1fr; }
+      .side-nav { display: none; }
     }
-/* ── 对齐比较矩阵 (Aligned Comparison Matrix) ───────────────── */
-.comparison-table-wrap { width: 100%; overflow-x: auto; margin-top: 0.5rem; }
-table.comparison-table {
-  width: 100%;
-  min-width: 760px;
-  border-collapse: collapse;
-  color: var(--color-ink);
-  font-family: var(--font-chinese);
-  font-size: 0.86rem;
-  text-align: left;
-}
-table.comparison-table th,
-table.comparison-table td {
-  padding: 0.75rem 1rem;
-  border-right: 1px solid var(--color-rule);
-  border-bottom: 1px solid var(--color-rule);
-  vertical-align: top;
-}
-table.comparison-table th {
-  color: var(--color-muted);
-  background: rgba(30, 41, 59, 0.025);
-  border-bottom-color: var(--color-rule-solid);
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-}
-table.comparison-table th:last-child,
-table.comparison-table td:last-child { border-right: 0; }
-table.comparison-table tr:last-child td { border-bottom: 0; }
-table.comparison-table code {
-  padding: 0.1em 0.35em;
-  border-radius: 3px;
-  background: var(--color-paper-code);
-  color: var(--color-ink);
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-}
-table.comparison-table .recommended { background: rgba(217, 83, 30, 0.035); }
-table.comparison-table th.recommended {
-  color: var(--color-accent);
-  background: var(--color-accent-tint);
-  border-top: 2px solid var(--color-accent);
-}
 
-/* Highlight.js · 映射到既有语义微着色 Token */
-pre.code-shape code.hljs {
-  display: block;
-  padding: 0;
-  overflow: visible;
-  background: transparent;
-  color: var(--color-ink);
-  font-family: inherit;
-}
-.hljs-keyword, .hljs-selector-tag, .hljs-meta { color: var(--color-link); font-weight: 600; }
-.hljs-title.function_ { color: var(--color-ink); }
-.hljs-title.class_, .hljs-type, .hljs-built_in { color: var(--color-link); }
-.hljs-attr, .hljs-property, .hljs-variable, .hljs-params { color: #475569; }
-.hljs-string, .hljs-symbol { color: var(--color-success-text); }
-.hljs-number, .hljs-literal { color: var(--color-warn-text); }
-.hljs-comment, .hljs-quote { color: var(--color-soft); font-style: italic; }
-.hljs-addition,
-.hljs-deletion {
-  display: inline-block;
-  width: 100%;
-  box-sizing: border-box;
-  margin: 0.2em 0;
-  padding: 0.15em 0;
-  border-radius: 3px;
-}
-.hljs-addition { color: var(--color-success-text); background: var(--color-success-bg); }
-.hljs-deletion { color: var(--color-danger-text); background: var(--color-danger-bg); text-decoration: line-through; }
+    @media (max-width: 960px) {
+      .change-layout { grid-template-columns: 1fr; gap: 46px; }
+    }
 
-.hljs-tag, .hljs-name { color: var(--color-link); }
-.code-focus { color: var(--color-accent) !important; font-weight: 700; }
+    @media (max-width: 880px) {
+      .page { width: min(100% - 28px,var(--page)); }
+      .header { padding: 50px 0 42px; }
+      .chapter { grid-template-columns: 32px minmax(0,1fr); gap: 0 12px; padding: 58px 0 66px; }
+      .chapter-no { grid-column: 1; }
+      .chapter-head,.chapter-body { grid-column: 2; }
+      .grid-7-5,.grid-6-6,.change-layout,.annex-grid,.decision { grid-template-columns: 1fr; }
+      .grid-7-5,.grid-6-6,.change-layout { gap: 46px; }
+      .outcome-band { grid-template-columns: 1fr; }
+      .outcome-item { padding: 12px 0; border-right: 0; border-bottom: 1px solid var(--color-rule); }
+      .outcome-item:last-child { border-bottom: 0; }
+      .evidence-strip { grid-template-columns: repeat(2,1fr); }
+      .ledger-row { grid-template-columns: 106px minmax(0,1fr); gap: 10px 16px; }
+      .ledger-source { grid-column: 2; text-align: left; }
+      .footer { padding-left: 44px; }
+    }
 
+    @media (max-width: 520px) {
+      .transform { grid-template-columns: 1fr; }
+      .transform-arrow { justify-self: center; transform: rotate(90deg); }
+      .ui-shell { grid-template-columns: 1fr; }
+      .ui-sidebar { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding: 10px 12px; border-right: 0; border-bottom: 1px solid var(--color-rule); }
+      .ui-region-label { flex: 0 0 auto; margin: 0 4px 0 0; }
+      .ui-nav-item { flex: 0 0 auto; margin: 0; border-left: 0; border-bottom: 2px solid transparent; white-space: nowrap; }
+      .ui-nav-item.active { border-left-color: transparent; border-bottom-color: var(--color-accent); }
+    }
   </style>
-  <!-- FOUNDATION END -->
 </head>
 <body>
+  <div class="page">
+    <div class="shell">
+      <nav class="side-nav" aria-label="阅读路径">
+        <a href="#locate"><strong>01</strong><span>解析断点</span></a>
+        <a href="#explain"><strong>02</strong><span>事件时序</span></a>
+        <a href="#structure"><strong>03</strong><span>数据与所有权</span></a>
+        <a href="#change"><strong>04</strong><span>修复结果</span></a>
+        <a href="#decide"><strong>05</strong><span>修复位置</span></a>
+        <a href="#implementation"><strong>06</strong><span>实现范围</span></a>
+      </nav>
 
-  <!-- CANVAS START -->
-  <div class="container">
-    <header class="header">
-      <p class="header-eyebrow">SESSION EVENT PIPELINE · FIRST DIVERGENCE</p>
-      <h1>为什么 <code>skill_result</code> 到达了却没有显示</h1>
-      <p class="subtitle">服务端已发出且浏览器已接收 <code>skill_result</code>；客户端 <code>Registry.parse</code> 将未注册类型归为 <code>unknown</code>，事件因此没有进入时间线。</p>
-    </header>
+      <div class="content">
+        <header class="header">
+          <p class="eyebrow">client/session · skill_result event path</p>
+          <h1><code>Registry.parse()</code> 返回 <code>unknown</code></h1>
+          <p class="lede">Browser 收到完整的 <code>skill_result</code>，但客户端注册表未声明对应 schema。Timeline 因而不生成结果卡。</p>
+        </header>
 
-    <div class="layout-stack">
-      <section class="card-full">
-        <div class="section-title">
-          <span>事件从服务端到界面的真实路径</span>
-          <span class="badge badge-accent">BREAKPOINT · Registry.parse :22</span>
+        <main>
+      <section class="chapter" id="locate">
+        <span class="chapter-no">01</span>
+        <div class="chapter-head">
+          <h2>客户端没有注册 <code>skill_result</code> schema</h2>
+          <p>Browser 收到事件后，<code>schemas[type]</code> 返回 <code>undefined</code>，解析结果随即变为 <code>unknown</code>。</p>
         </div>
-        <div class="diagram-wrap">
-          <svg class="flow-diagram" viewBox="0 0 960 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="event-flow-title event-flow-desc">
-            <title id="event-flow-title">skill_result 事件从服务端到界面的执行流程与分歧</title>
-            <desc id="event-flow-desc">共同路径从运行技能、发送事件、浏览器接收到注册表解析；注册表缺少类型时进入 unknown 并被过滤，修复后进入时间线并渲染结果卡片</desc>
-            <defs>
-              <marker id="event-flow-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#374151"/></marker>
-              <marker id="event-flow-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#d9531e"/></marker>
-            </defs>
-            <rect width="960" height="320" rx="5" fill="#f4f5f7"/>
-
-            <!-- 关系层：连线先于节点 -->
-            <path d="M150 118 H190" fill="none" stroke="#374151" stroke-width="1.2" marker-end="url(#event-flow-arrow)"/>
-            <path d="M310 118 H350" fill="none" stroke="#374151" stroke-width="1.2" marker-end="url(#event-flow-arrow)"/>
-            <path d="M470 118 H510" fill="none" stroke="#374151" stroke-width="1.2" marker-end="url(#event-flow-arrow)"/>
-            <path d="M630 118 H665" fill="none" stroke="#374151" stroke-width="1.2"/>
-            <path d="M665 118 V73 H700" fill="none" stroke="#d9531e" stroke-width="1.4" marker-end="url(#event-flow-arrow-accent)"/>
-            <path d="M665 118 V233 H700" fill="none" stroke="#374151" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#event-flow-arrow)"/>
-            <circle cx="665" cy="118" r="3" fill="#374151"/>
-
-            <!-- 共同路径节点 -->
-            <rect x="30" y="88" width="120" height="60" rx="5" fill="#ffffff" stroke="#374151"/>
-            <text x="90" y="113" text-anchor="middle" fill="#1d2129" font-size="12" font-weight="600">Run skill</text>
-            <text class="mono" x="90" y="132" text-anchor="middle" fill="#57606a" font-size="9">routes/skills.ts:42</text>
-
-            <rect x="190" y="88" width="120" height="60" rx="5" fill="#ffffff" stroke="#374151"/>
-            <text x="250" y="113" text-anchor="middle" fill="#1d2129" font-size="12" font-weight="600">Emit event</text>
-            <text class="mono" x="250" y="132" text-anchor="middle" fill="#57606a" font-size="9">skill_result</text>
-
-            <rect x="350" y="88" width="120" height="60" rx="5" fill="#ffffff" stroke="#374151"/>
-            <text x="410" y="113" text-anchor="middle" fill="#1d2129" font-size="12" font-weight="600">EventStream</text>
-            <text class="mono" x="410" y="132" text-anchor="middle" fill="#57606a" font-size="9">raw payload</text>
-
-            <rect x="510" y="88" width="120" height="60" rx="5" fill="rgba(217,83,30,.09)" stroke="#d9531e" stroke-width="1.4"/>
-            <text x="570" y="111" text-anchor="middle" fill="#1d2129" font-size="12" font-weight="600">Registry.parse</text>
-            <text class="mono" x="570" y="130" text-anchor="middle" fill="#d9531e" font-size="9">第一处分歧 · :22</text>
-
-            <!-- 分歧终态 -->
-            <rect x="700" y="32" width="225" height="82" rx="5" fill="rgba(40,167,69,.10)" stroke="#1e7e34"/>
-            <text x="718" y="56" fill="#1e7e34" font-size="11" font-weight="600">修复后 · typed path</text>
-            <text class="mono" x="718" y="77" fill="#1d2129" font-size="10">SkillResultEvent → Timeline</text>
-            <text class="mono" x="718" y="96" fill="#1d2129" font-size="10">→ SkillResultCard</text>
-
-            <rect x="700" y="192" width="225" height="82" rx="5" fill="rgba(220,53,69,.08)" stroke="#c82333"/>
-            <text x="718" y="216" fill="#c82333" font-size="11" font-weight="600">当前 · unknown path</text>
-            <text class="mono" x="718" y="237" fill="#1d2129" font-size="10">unknown → filtered</text>
-            <text class="mono" x="718" y="256" fill="#1d2129" font-size="10">→ timeline has no card</text>
-
-            <text x="30" y="292" fill="#57606a" font-size="10">共同事实：服务端已发送，浏览器已接收；修复点位于类型解析边界。</text>
-          </svg>
+        <div class="chapter-body">
+          <figure class="hero-surface" tabindex="0" aria-label="预期与实际分叉图，可横向滚动">
+            <svg viewBox="0 0 1000 245" role="img" aria-labelledby="e-title e-desc">
+              <title id="e-title">skill_result 的共同路径与预期实际分叉</title>
+              <desc id="e-desc">事件从技能执行经 SSE 到达注册表，匹配 schema 后进入时间线；缺少 schema 时成为 unknown 并被过滤。</desc>
+              <defs>
+                <marker id="e-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0 0 8 3 0 6Z" fill="#374151"/></marker>
+              </defs>
+              <path d="M170 116H220M370 116H420M570 116H620" fill="none" stroke="#374151" stroke-width="1.2" marker-end="url(#e-arrow)"/>
+              <path d="M770 116H806V58H838" fill="none" stroke="#1e7e34" stroke-width="1.4" marker-end="url(#e-arrow)"/>
+              <path d="M770 116H806V184H838" fill="none" stroke="#c82333" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#e-arrow)"/>
+              <g fill="#fff" stroke="#374151"><rect x="20" y="80" width="150" height="72" rx="5"/><rect x="220" y="80" width="150" height="72" rx="5"/><rect x="420" y="80" width="150" height="72" rx="5"/></g>
+              <rect x="620" y="80" width="150" height="72" rx="5" fill="rgba(217,83,30,.09)" stroke="#d9531e" stroke-width="1.4"/>
+              <g text-anchor="middle" fill="#1d2129" font-size="13" font-weight="600"><text x="95" y="110">Run skill</text><text x="295" y="110">Emit SSE</text><text x="495" y="110">Browser receives</text><text x="695" y="110">Registry.parse</text></g>
+              <g class="mono" text-anchor="middle" fill="#57606a" font-size="10"><text x="95" y="132">server event source</text><text x="295" y="132">type: skill_result</text><text x="495" y="132">raw payload</text><text x="695" y="132">schemas[type]</text></g>
+              <rect x="838" y="18" width="148" height="80" rx="5" fill="rgba(40,167,69,.10)" stroke="#1e7e34"/><rect x="838" y="144" width="148" height="80" rx="5" fill="rgba(220,53,69,.08)" stroke="#c82333"/>
+              <text x="854" y="45" fill="#1e7e34" font-size="12" font-weight="600">匹配 schema</text><text class="mono" x="854" y="68" fill="#374151" font-size="10">typed → timeline</text><text class="mono" x="854" y="84" fill="#374151" font-size="10">→ result card</text>
+              <text x="854" y="171" fill="#c82333" font-size="12" font-weight="600">缺少 schema</text><text class="mono" x="854" y="194" fill="#374151" font-size="10">unknown → filtered</text><text class="mono" x="854" y="210" fill="#374151" font-size="10">→ no card</text>
+            </svg>
+            <div class="evidence-strip" aria-label="断点状态快照">
+              <div class="evidence-cell"><span>raw.type</span><strong>"skill_result"</strong></div>
+              <div class="evidence-cell"><span>schemas[type]</span><strong class="fault">undefined</strong></div>
+              <div class="evidence-cell"><span>parsed.kind</span><strong class="fault">"unknown"</strong></div>
+              <div class="evidence-cell"><span>source</span><strong>eventRegistry.parse()</strong></div>
+            </div>
+          </figure>
         </div>
-
       </section>
 
-      <section class="card-full">
-        <div class="section-title">
-          <span>Payload 如何成为卡片，以及改动会触及哪里</span>
-          <span class="badge badge-accent">skill_result → SkillResultCard</span>
+      <section class="chapter chapter-follow" id="explain">
+        <span class="chapter-no">02</span>
+        <div class="chapter-head">
+          <h2><code>unknown</code> 在进入 Timeline 前被过滤</h2>
+          <p>Server 到 Browser 的传输链路完整。类型变化发生在 Registry，过滤发生在 Timeline 入口。</p>
         </div>
+        <div class="chapter-body">
+          <figure class="sequence-focus">
+            <div class="figure-head"><h3><code>skill_result</code> 的实际解析时序</h3><span class="source">eventRegistry.parse()</span></div>
+            <div class="diagram-wrap sequence-diagram" tabindex="0" aria-label="skill_result 实际解析时序，可横向滚动">
+              <svg class="diagram-canvas" viewBox="0 0 1000 350" role="img" aria-labelledby="seq-f-title seq-f-desc">
+                <title id="seq-f-title">skill_result 实际解析时序</title>
+                <desc id="seq-f-desc">Server 发送的事件正常抵达 Browser；Registry 查找 schema 时得到 undefined，将事件降级为 unknown，随后被 Timeline 过滤。</desc>
+                <defs>
+                  <marker id="seq-f-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0 0 8 3 0 6Z" fill="#374151"/></marker>
+                  <marker id="seq-f-arrow-open" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><path d="M0 .5 8 3.5 0 6.5" fill="none" stroke="#275296" stroke-width="1.2"/></marker>
+                  <marker id="seq-f-arrow-focus" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0 0 8 3 0 6Z" fill="#d9531e"/></marker>
+                </defs>
 
-        <div class="layout-grid-2 primitive-grid">
-          <div class="primitive-panel">
-            <div class="primitive-heading">
-              <strong>从传输对象到 View Model</strong>
-              <span>raw payload → render model</span>
-            </div>
-            <div class="transform-chain">
-              <div class="transform-node">
-                <div class="transform-node-head"><strong>Raw SSE payload</strong><code>event-stream.ts:58</code></div>
-                <div class="transform-fields">
-                  <span>type</span><span>"skill_result"</span>
-                  <span>payload.status</span><span>"completed"</span>
-                  <span>payload.output</span><span>{ passed: 31, failed: 0 }</span>
-                </div>
-              </div>
-              <div class="transform-arrow">↓ skillResultSchema.parse()</div>
-              <div class="transform-node focus">
-                <div class="transform-node-head"><strong>SkillResultEvent</strong><code>validated union</code></div>
-                <div class="transform-fields">
-                  <span>kind</span><span>SkillResultEvent</span>
-                  <span>status</span><span>completed</span>
-                  <span>output</span><span>{ passed: 31, failed: 0 }</span>
-                </div>
-              </div>
-              <div class="transform-arrow">↓ toTimelineItem()</div>
-              <div class="transform-node">
-                <div class="transform-node-head"><strong>SkillResultCardProps</strong><code>render model</code></div>
-                <div class="transform-fields">
-                  <span>title</span><span>"Skill result"</span>
-                  <span>summary</span><span>"31 tests passed · 0 failed"</span>
-                  <span>tone</span><span>success</span>
-                </div>
-              </div>
-            </div>
-          </div>
+                <g stroke="rgba(30,41,59,.22)" stroke-dasharray="3 3">
+                  <line x1="100" y1="82" x2="100" y2="330"/><line x1="365" y1="82" x2="365" y2="330"/>
+                  <line x1="635" y1="82" x2="635" y2="330"/><line x1="900" y1="82" x2="900" y2="330"/>
+                </g>
+                <g fill="rgba(30,41,59,.06)" stroke="#374151" stroke-width=".8">
+                  <rect x="361" y="126" width="8" height="66" rx="2"/><rect x="631" y="184" width="8" height="106" rx="2"/><rect x="896" y="278" width="8" height="50" rx="2"/>
+                </g>
 
-          <div class="primitive-panel">
-            <div class="primitive-heading">
-              <strong>中心注册表改动的影响范围</strong>
-              <span>registry → client consumers</span>
+                <line x1="100" y1="138" x2="361" y2="138" stroke="#275296" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#seq-f-arrow-open)"/>
+                <text class="mono" x="231" y="130" fill="#275296" font-size="9" text-anchor="middle">skill_result · SSE</text>
+                <line x1="369" y1="192" x2="631" y2="192" stroke="#374151" stroke-width="1.2" marker-end="url(#seq-f-arrow)"/>
+                <text class="mono" x="500" y="184" fill="#374151" font-size="9" text-anchor="middle">parse(raw)</text>
+                <path d="M639 220H694V242H639" fill="none" stroke="#d9531e" stroke-width="1.3" marker-end="url(#seq-f-arrow-focus)"/>
+                <text class="mono" x="790" y="235" fill="#d9531e" font-size="9" text-anchor="middle">schema 未注册 → undefined</text>
+                <line x1="639" y1="282" x2="896" y2="282" stroke="#d9531e" stroke-width="1.3" marker-end="url(#seq-f-arrow-focus)"/>
+                <text class="mono" x="768" y="274" fill="#d9531e" font-size="9" font-weight="600" text-anchor="middle">unknown</text>
+                <path d="M904 302H950V324H904" fill="none" stroke="#374151" stroke-width="1.1" stroke-dasharray="4 3" marker-end="url(#seq-f-arrow)"/>
+                <text class="mono" x="947" y="297" fill="#57606a" font-size="9" text-anchor="end">filter</text>
+
+                <g fill="#fff" stroke="#374151">
+                  <rect x="40" y="30" width="120" height="52" rx="6"/><rect x="305" y="30" width="120" height="52" rx="6"/>
+                  <rect x="840" y="30" width="120" height="52" rx="6"/>
+                </g>
+                <rect x="575" y="30" width="120" height="52" rx="6" fill="rgba(217,83,30,.09)" stroke="#d9531e"/>
+                <g text-anchor="middle">
+                  <text class="mono" x="100" y="53" fill="#1d2129" font-size="11" font-weight="600">Server</text><text x="100" y="69" fill="#57606a" font-size="9">事件源</text>
+                  <text class="mono" x="365" y="53" fill="#1d2129" font-size="11" font-weight="600">Browser</text><text x="365" y="69" fill="#57606a" font-size="9">SSE 接收</text>
+                  <text class="mono" x="635" y="53" fill="#1d2129" font-size="11" font-weight="600">Registry</text><text x="635" y="69" fill="#d9531e" font-size="9">解析边界</text>
+                  <text class="mono" x="900" y="53" fill="#1d2129" font-size="11" font-weight="600">Timeline</text><text x="900" y="69" fill="#57606a" font-size="9">渲染入口</text>
+                </g>
+              </svg>
             </div>
-            <div class="impact-root">eventRegistry · add skill_result</div>
-            <div class="impact-list">
-              <div class="impact-row">
-                <span class="impact-tag direct">DIRECT</span>
-                <div><code>client/session/session-event.ts</code>联合类型获得 SkillResultEvent</div>
+          </figure>
+
+          <div class="evidence-ledger" aria-label="事实、推断与待验证项">
+            <div class="ledger-list">
+              <div class="ledger-row confirmed">
+                <span class="ledger-state">已确认</span>
+                <p class="ledger-copy"><strong>传输链路正常。</strong> Server 已发送且 Browser 已收到完整事件。</p>
+                <span class="ledger-source">运行时快照</span>
               </div>
-              <div class="impact-row">
-                <span class="impact-tag direct">DIRECT</span>
-                <div><code>client/session/SkillResultCard.tsx</code>新增结果卡片渲染入口</div>
+              <div class="ledger-row inferred">
+                <span class="ledger-state">当前推断</span>
+                <p class="ledger-copy"><strong>客户端 schema 未同步。</strong> 当前集合没有 <code>skill_result</code>，因此解析结果为 <code>unknown</code>。</p>
+                <span class="ledger-source">eventRegistry.parse()</span>
               </div>
-              <div class="impact-row">
-                <span class="impact-tag test">TEST</span>
-                <div><code>client/session/event-registry.test.ts</code>覆盖合法与畸形 payload</div>
-              </div>
-              <div class="impact-row">
-                <span class="impact-tag stable">STABLE</span>
-                <div><code>server/events/skill-result.ts</code>payload 契约保持不变</div>
+              <div class="ledger-row open">
+                <span class="ledger-state">待验证</span>
+                <p class="ledger-copy"><strong>异常 payload 的降级行为。</strong> 还需确认 schema 校验失败时是否继续返回 <code>unknownEvent()</code>。</p>
+                <span class="ledger-source">待补：异常输入测试</span>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="card-full">
-        <div class="section-title">
-          <span>修复如何进入系统，以及为什么选择中心注册表</span>
-          <span class="badge badge-accent">CHOSEN · central registry</span>
+      <section class="chapter act-start" id="structure">
+        <span class="chapter-no">03</span>
+        <div class="chapter-head">
+          <h2>Registry 收窄类型，SessionPage 持有解析后的事件</h2>
+          <p>Registry 将开放 payload 转换为联合类型；SkillResultCard 只接收规范化后的结果。</p>
         </div>
-
-        <div class="layout-grid-2">
-          <div>
-            <pre class="code-shape semantic-diff"><code class="language-diff" data-focus="SkillResultEvent|skill_result|eventRegistry.parse">&#45;type SessionEvent = ExistingEvent;
-&#43;type SessionEvent = ExistingEvent | SkillResultEvent;
-
-&#45;const schemas = { message, agent_status };
-&#43;const schemas = { message, agent_status, skill_result };
-
-&#45;if (!schemas[raw.type]) return;
-&#43;return eventRegistry.parse(raw.type, raw.payload);</code></pre>
-          </div>
-          <div>
-            <div class="ui-frame">
-              <div class="ui-window">
-                <div class="ui-window-bar">
-                  <span class="ui-window-dot"></span><span class="ui-window-dot"></span><span class="ui-window-dot"></span>
-                  <span class="ui-window-title">Session · Run #1842</span>
-                </div>
-                <div class="ui-window-body">
-                  <aside class="ui-sidebar">
-                    <div class="ui-sidebar-item">Session 1841</div>
-                    <div class="ui-sidebar-item active">Session 1842</div>
-                    <div class="ui-sidebar-item">Session 1843</div>
-                  </aside>
-                  <main class="ui-timeline">
-                    <div class="ui-run-header"><strong>Run test suite</strong><span class="ui-status">completed</span></div>
-                    <div class="ui-event">You · Run the session package tests</div>
-                    <div class="ui-event">Agent · Executing <code>pnpm test</code></div>
-                    <div class="ui-result-card">
-                      <h5>Skill result</h5>
-                      <code>31 tests passed · 0 failed</code>
-                      <div class="ui-result-meta">Rendered from skill_result</div>
-                    </div>
-                  </main>
-                </div>
+        <div class="chapter-body">
+          <div class="grid-6-6">
+            <figure>
+              <div class="figure-head"><h3>事件的数据形态</h3><span class="source">eventRegistry.parse()</span></div>
+              <div class="transform">
+                <div class="transform-node"><strong>RawEvent</strong><p><span class="shape-key">type</span>: <span class="shape-value">skill_result</span><br><span class="shape-key">output</span>: {...}</p></div><span class="transform-arrow">→</span>
+                <div class="transform-node focus"><strong>SkillResultEvent</strong><p><span class="shape-key">kind</span>: <span class="shape-value">typed</span><br><span class="shape-key">status</span>: <span class="shape-value">completed</span></p></div><span class="transform-arrow">→</span>
+                <div class="transform-node"><strong>CardProps</strong><p><span class="shape-key">summary</span><br><span class="shape-key">tone</span>: <span class="shape-value">success</span></p></div>
               </div>
-              <div class="ui-path-label">SessionTimeline · normalized event → SkillResultCard</div>
-              <pre class="code-shape ui-source"><code class="language-tsx" data-focus="events|SkillResultCard">&lt;SessionPage&gt;                         [owns normalized events]
-└── &lt;SessionTimeline events={events}&gt;
-    ├── &lt;MessageCard /&gt;
-    └── event.kind === 'skill_result'
-        └── &lt;SkillResultCard event={event} /&gt;</code></pre>
-            </div>
+              <figcaption class="caption">只有通过 schema 校验的 RawEvent 才会进入 SessionEvent 联合类型。</figcaption>
+            </figure>
+            <figure>
+              <div class="figure-head"><h3>调用链与组件所有权</h3><span class="source">client/session</span></div>
+              <pre class="tree structure-tree"><code><span class="tree-call">EventSource.onmessage()</span>
+└── <span class="tree-focus">eventRegistry.parse()</span>
+    └── <span class="tree-owner">SessionPage</span> <span class="tree-role">owns events</span>
+        └── <span class="tree-component">SessionTimeline</span>
+            └── <span class="tree-component">SkillResultCard</span></code></pre>
+              <figcaption class="caption">解析失败不会进入 SessionPage；卡片不处理开放 payload。</figcaption>
+            </figure>
           </div>
         </div>
-
-        <div class="comparison-table-wrap">
-          <table class="comparison-table">
-            <thead>
-              <tr><th>当前约束</th><th>时间线局部 Switch</th><th class="recommended">中心事件注册表</th><th>Raw Event 兜底</th></tr>
-            </thead>
-            <tbody>
-              <tr><td>未知 payload 必须先校验</td><td>渲染时才发现类型</td><td class="recommended">入口处完成 schema 校验</td><td>未经校验进入 UI</td></tr>
-              <tr><td>新增事件只声明一次</td><td>类型与渲染分支分别修改</td><td class="recommended">schema 同时驱动类型与解析</td><td>下游持续处理 unknown</td></tr>
-              <tr><td>解析失败需要可观测</td><td>容易静默落入 default</td><td class="recommended">注册表统一记录失败原因</td><td>保留原始值但弱化契约</td></tr>
-              <tr><td>当前改动范围</td><td>最小补丁</td><td class="recommended">注册、联合类型、卡片三处高内聚修改</td><td>修改所有消费方</td></tr>
-            </tbody>
-          </table>
-        </div>
-
       </section>
 
+      <section class="chapter chapter-follow" id="change">
+        <span class="chapter-no">04</span>
+        <div class="chapter-head">
+          <h2>注册 schema 后，Timeline 渲染 SkillResultCard</h2>
+          <p><code>skill_result</code> 进入 SessionEvent 联合类型，现有 Timeline 随即生成对应结果卡。</p>
+        </div>
+        <div class="chapter-body">
+          <div class="change-layout">
+            <figure>
+              <div class="figure-head"><h3>注册表与联合类型的修改</h3><span class="source">event-registry.ts</span></div>
+              <div class="code-panel">
+                <div class="code-bar"><span>类型声明与 schema 映射</span></div>
+                <pre><code><span class="del">- type SessionEvent = MessageEvent | AgentStatusEvent;</span><span class="add">+ type SessionEvent = MessageEvent | AgentStatusEvent</span><span class="add">+   | SkillResultEvent;</span>
+<span class="del">- const schemas = { message, agent_status };</span><span class="add">+ const schemas = { message, agent_status,</span><span class="add">+   skill_result: skillResultSchema };</span></code></pre>
+              </div>
+            </figure>
+            <figure>
+              <div class="figure-head"><h3>用户可见结果 · UI 布局</h3><span class="source">SessionPage</span></div>
+              <div class="ui-frame">
+                <div class="ui-window">
+                  <div class="ui-bar">会话详情</div>
+                  <div class="ui-shell">
+                    <aside class="ui-sidebar">
+                      <span class="ui-region-label">会话</span>
+                      <div class="ui-nav-item active">当前运行</div>
+                      <div class="ui-nav-item">较早运行</div>
+                      <div class="ui-nav-item">历史记录</div>
+                    </aside>
+                    <section class="ui-main">
+                      <div class="ui-main-head"><strong>执行记录</strong></div>
+                      <div class="ui-timeline">
+                        <div class="ui-event"><strong>Agent</strong>正在执行测试</div>
+                        <div class="ui-event"><strong>Tool</strong>已完成用例收集</div>
+                        <div class="ui-result">
+                          <div class="ui-result-head"><strong>Skill result</strong></div>
+                          <p>测试全部通过</p>
+                        </div>
+                      </div>
+                    </section>
+                  </div>
+                </div>
+              </div>
+              <figcaption class="caption">SkillResultCard 出现在时间线主区；会话导航与页面框架保持不变。</figcaption>
+            </figure>
+          </div>
+          <div class="outcome-band" aria-label="修复结果">
+            <div class="outcome-item"><span>界面</span><strong>显示 SkillResultCard</strong></div>
+            <div class="outcome-item"><span>失败路径</span><strong>统一记录解析错误</strong></div>
+            <div class="outcome-item"><span>服务端</span><strong>发送契约保持不变</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter act-start" id="decide">
+        <span class="chapter-no">05</span>
+        <div class="chapter-head">
+          <h2>中心注册表是当前约束下的修复位置</h2>
+          <p>它在同一入口完成 schema 声明、类型收窄和失败记录，下游组件无需重复处理开放 payload。</p>
+        </div>
+        <div class="chapter-body">
+          <div class="comparison-wrap">
+            <table class="comparison">
+              <thead><tr><th>当前约束</th><th>时间线局部 Switch</th><th class="chosen">中心注册表</th><th>Raw Event 兜底</th></tr></thead>
+              <tbody>
+                <tr><td>payload 必须先校验</td><td>渲染时才发现</td><td class="chosen">入口处完成</td><td>未经校验进入 UI</td></tr>
+                <tr><td>新事件只声明一次</td><td>类型与渲染分别修改</td><td class="chosen">schema 驱动解析</td><td>下游持续处理 unknown</td></tr>
+                <tr><td>失败需要可观测</td><td>容易落入 default</td><td class="chosen">统一记录原因</td><td>弱化类型契约</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="decision">
+            <p class="decision-main"><strong>选择中心注册表。</strong>校验、类型收窄和失败观测集中在同一个边界，页面与卡片不再重复防御开放 payload。</p>
+            <p class="decision-limit"><strong>适用边界</strong>若产品允许未经校验的动态事件直接进入 UI，则需要重新评估 Raw Event 方案。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter chapter-follow" id="implementation">
+        <span class="chapter-no">06</span>
+        <div class="chapter-head">
+          <h2>改动集中在四个客户端文件</h2>
+          <p>事件注册、联合类型、结果卡和解析测试需要修改；服务端事件发送逻辑不变。</p>
+        </div>
+        <div class="chapter-body annex-grid">
+          <article><h3>涉及的文件</h3><pre class="tree file-tree"><code><span class="tree-root">client/session/</span>
+├── <span class="tree-focus">event-registry.ts</span>      <span class="tree-impact">注册 skill_result schema</span>
+├── <span class="tree-file">session-event.ts</span>       <span class="tree-impact">扩展 SessionEvent 联合类型</span>
+├── <span class="tree-file">SkillResultCard.tsx</span>    <span class="tree-impact">渲染结果卡</span>
+└── <span class="tree-file">event-registry.test.ts</span> <span class="tree-impact">覆盖合法与异常输入</span>
+
+<span class="tree-note">server/events/                 无需修改 · 发送契约未变</span></code></pre></article>
+          <article><h3>schema 注册与解析</h3><pre class="tree"><code class="language-typescript" data-focus="skill_result|skillResultSchema">const eventRegistry = createRegistry({
+  message: messageSchema,
+  agent_status: agentStatusSchema,
+  skill_result: skillResultSchema,
+});
+
+export function parse(raw: RawEvent): SessionEvent {
+  const schema = eventRegistry[raw.type];
+  if (!schema) return unknownEvent(raw);
+  return schema.parse(raw.payload);
+}</code></pre></article>
+        </div>
+      </section>
+        </main>
+
+        <footer class="footer">client/session · skill_result event path</footer>
+      </div>
     </div>
-
-    <footer class="footer">
-      <span>client/session · skill_result event path</span>
-    </footer>
   </div>
-  <!-- CANVAS END -->
-<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.12.0/build/highlight.min.js"></script>
-<script>
-  function applyCodeFocus(code) {
-    const terms = (code.dataset.focus || '').split('|').map(term => term.trim()).filter(Boolean);
-    for (const term of terms) {
-      const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
-      const nodes = [];
-      while (walker.nextNode()) {
-        if (!walker.currentNode.parentElement.closest('.code-focus')) nodes.push(walker.currentNode);
-      }
-      for (const node of nodes) {
-        const text = node.nodeValue;
-        if (!text.includes(term)) continue;
-        const fragment = document.createDocumentFragment();
-        let cursor = 0;
-        let index = text.indexOf(term, cursor);
-        while (index !== -1) {
-          fragment.append(text.slice(cursor, index));
-          const focus = document.createElement('span');
-          focus.className = 'code-focus';
-          focus.textContent = term;
-          fragment.append(focus);
-          cursor = index + term.length;
-          index = text.indexOf(term, cursor);
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.12.0/build/highlight.min.js"></script>
+  <script>
+    function applyCodeFocus(code) {
+      const terms = (code.dataset.focus || '').split('|').map(term => term.trim()).filter(Boolean);
+      for (const term of terms) {
+        const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
+        const nodes = [];
+        while (walker.nextNode()) {
+          if (!walker.currentNode.parentElement.closest('.code-focus')) nodes.push(walker.currentNode);
         }
-        fragment.append(text.slice(cursor));
-        node.replaceWith(fragment);
+        for (const node of nodes) {
+          const value = node.nodeValue;
+          if (!value.includes(term)) continue;
+          const fragment = document.createDocumentFragment();
+          let cursor = 0;
+          let index = value.indexOf(term, cursor);
+          while (index !== -1) {
+            fragment.append(value.slice(cursor, index));
+            const focus = document.createElement('span');
+            focus.className = 'code-focus';
+            focus.textContent = term;
+            fragment.append(focus);
+            cursor = index + term.length;
+            index = value.indexOf(term, cursor);
+          }
+          fragment.append(value.slice(cursor));
+          node.replaceWith(fragment);
+        }
       }
     }
-  }
 
-  if (window.hljs) {
-    document.querySelectorAll('code[class*="language-"]').forEach(code => {
-      window.hljs.highlightElement(code);
-      applyCodeFocus(code);
-    });
-  }
-</script>
+    if (window.hljs) {
+      document.querySelectorAll('code[class*="language-"]').forEach(code => {
+        window.hljs.highlightElement(code);
+        applyCodeFocus(code);
+      });
+    }
+  </script>
 </body>
 </html>

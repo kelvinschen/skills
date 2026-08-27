@@ -7,7 +7,7 @@
 - **层级与边界分区**：
   - 按技术分层或安全信任边界（如 Frontend → Gateway → Backend → Storage；Public → Private VPC）从左至右或从上至下分组。
   - 使用区域边框（Zone / Region）圈定同一层级：`<rect rx="8" fill="rgba(30,41,59,0.02)" stroke="rgba(30,41,59,0.18)" stroke-dasharray="6,4"/>`。
-  - 区域标签放置在左上角，使用 `JetBrains Mono` 8px 大写标注。
+  - 区域标签放置在左上角边界内侧，保留 8~12px 内边距，使用 `JetBrains Mono` 8px 大写标注；不以实心底板遮断区域边框。
 - **绘制层级顺序 (Z-Order)**：
   1. 背景底色（`fill="#f4f5f7"`）
   2. 区域边界（Zone Rect）
@@ -25,7 +25,7 @@
         fill="none" stroke="#374151" stroke-width="1.2" marker-end="url(#arrow)"/>
   ```
 - **连线文字标注**：
-  - 文字直接置于水平/垂直连线上方或侧方 4~6px（`text-anchor="middle"`），保持文字与连线分离。
+  - 文字直接置于水平/垂直连线上方或侧方 4~6px（`text-anchor="middle"`），保持文字与连线分离；不用不透明矩形盖住线条。
 - **连线交叉与跳线 (Hop / Bridge)**：
   - 两条连线交叉时，次要连线使用半圆弧跨越：
   ```svg
@@ -47,4 +47,4 @@
 
 ## 5. 示例产物
 
-- 参考示例：[`assets/example-architecture.html`](../assets/example-architecture.html)
+- SVG 几何示例：[`assets/diagrams/example-architecture.svg`](../assets/diagrams/example-architecture.svg)

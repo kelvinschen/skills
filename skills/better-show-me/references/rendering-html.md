@@ -1,50 +1,95 @@
 # HTML 投影
 
-先把关系映射投影成 Canvas 草图：主关系形成连续的视觉脊柱；每条辅助关系只在自己的连接点形成一个展开。原因、规则、状态与例外属于关系内部，不产生新的页面区块。
+HTML 把选定的原语投影为单文件认知界面。本文件只规定媒介层的页面基底、容器、构件与资源约束。
 
-结构确定后复制真实案例 [template-show-me.html](../assets/template-show-me.html) 作为工作文件。保留其中的视觉地基，在 Canvas 中按映射重建主关系与辅助关系；示例片段提供原语形态，关系决定 section、card、grid 或 table 等容器的组合。
+## 1. 页面基底
 
-主视图在首屏获得最高视觉配额，用一个连续阅读方向到达终态。属于同一拓扑的原因、规则、状态与例外进入节点、边或紧邻标注；关系形状改变时才从对应节点展开辅助视图。
+- **工作文件**：先画 Canvas 草图；结构成立后复制 [template-show-me.html](../assets/template-show-me.html)。
+- **视觉地基**：保留模板的 Design Tokens、字体、通用 CSS 与脚本。
+- **视区分配**：主关系在首屏获得最高视觉配额；辅助关系从对应连接点展开。
+- **原位信息**：原因、规则、状态与例外进入节点、边或紧邻标注，不独立成块。
+- **页面元信息**：Eyebrow、badge、标题与 footer 只承载对象、状态、范围、关系或来源。
 
-Eyebrow、badge、标题与 footer 承载当前对象、状态、范围、关系或来源；可见标签直接服务于领域理解。
+### 技术标题与正文
 
-保留模板的 Design Tokens、字体、色彩、通用 CSS 与脚本，在 Canvas 中重构内容。
+- 页面标题和章节标题应能独立陈述技术事实，优先使用“对象或符号 + 状态、结果或原因”，例如 `Registry.parse() 返回 unknown`。
+- 导航使用与章节对应的短名词；正文只补证据、原因或适用边界，不换一种说法重复标题。
+- 删除“第一处……就在”“真正的问题”“为什么会”“如何发生”“断点落在”等叙事壳；只有用户的问题本身需要保留疑问时才使用问句。
 
-## 投影选择
+## 2. 原语 → HTML 容器
 
-| 表达家族 | 包含原语 | HTML 投影 |
+| 表达家族 | 包含原语 | 容器投影 |
 | --- | --- | --- |
-| 层级 | 组件树、调用树、浅文件树 | 嵌套 spine 或 row；名称与职责同组，源码锚点跟随焦点节点 |
+| 层级 | 组件树、调用树、浅文件树 | `.layout-stack`、嵌套 spine 或 row；名称、职责与源码锚点同组 |
 | 流转 | 轻量时序、数据转换链、状态路径 | 横向阶段、泳道或编号路径；方向与关键跃迁清晰可见 |
-| 变化与决策 | 语义 Diff、行为前后、对齐比较、权衡矩阵、方案骨架比较 | 对齐的双栏或矩阵；共享维度固定，变化点获得最高对比度 |
+| 变化与决策 | 语义 Diff、行为前后、对齐比较、权衡矩阵、方案骨架比较 | `.layout-grid-2`、对齐双栏或 table；固定共享维度，突出变化点 |
 | 定位问题 | 预期/实际分叉、故障因果链、影响范围、路径追踪 | 从共同起点展开分叉、因果或影响层级，并突出首个关键差异 |
 
-HTML 以静态层级为主。路径与 Trace 使用可直接扫读的阶段表达，运行时交互留给确实需要切换视角或揭示关联的场景。
+默认使用静态层级。仅当用户需要切换视角或揭示关联时增加交互。
 
-## 代码
+## 3. HTML/CSS 构件
 
-真实源码块沿用模板中固定版本的 Highlight.js，并按真实语言设置 language-* class。树、路径与伪代码使用等宽排版与焦点标注。源码切片只保留完成证明的上下文；写入 HTML 的源码必须转义 `&`、`<` 和 `>`。
+### 代码与结构文本
 
-## UI 视觉
+- **源码**：沿用模板固定版本的 Highlight.js，并设置真实的 `language-*` class。
+- **结构文本**：树、路径与伪代码使用等宽排版；焦点原位标注。
+- **切片**：只保留支撑结论的上下文；转义 `&`、`<` 和 `>`。
 
-界面布局本身是问题时，使用 HTML/CSS 构造中性 UI frame，表达组件边界、空间关系、状态与前后变化。源码路径贴近对应组件，视觉细节服务于当前判断。
+### UI Frame
 
-## 专业图表
+当主题涉及界面布局时，用 HTML/CSS 构造中性 UI frame 以表达组件边界、空间关系、状态与变化；
 
-复杂拓扑从 [template-diagram.html](../assets/template-diagram.html) 开始，并只读取匹配当前关系的一份规范：
+## 4. SVG Diagram
+
+### Diagram 路由
+
+关系确定后，只读取匹配的一份规范及其 SVG 示例。示例用于理解图元与几何规则，不作为空白模板或外部图片嵌入。
 
 | 关系 | 规范 |
 | --- | --- |
-| 跨端适配与分层拓扑 | [type-architecture.md](type-architecture.md) |
-| 多实体时序 | [type-sequence.md](type-sequence.md) |
-| 状态机与生命周期 | [type-state.md](type-state.md) |
-| 逻辑分支与流程 | [type-flowchart.md](type-flowchart.md) |
-| 管道数据流 | [type-data-flow.md](type-data-flow.md) |
-| 实体模型与表结构 | [type-db-schema.md](type-db-schema.md) |
+| 跨端适配与逻辑拓扑 | [diagram-architecture.md](diagram-architecture.md) |
+| 运行位置、网络区、版本与副本 | [diagram-deployment.md](diagram-deployment.md) |
+| 抽象层、协议栈与上下层次 | [diagram-layers.md](diagram-layers.md) |
+| 多父依赖、汇聚与循环依赖 | [diagram-dependency.md](diagram-dependency.md) |
+| 严格单父节点层级 | [diagram-tree.md](diagram-tree.md) |
+| 多实体时序 | [diagram-sequence.md](diagram-sequence.md) |
+| 真实时间轴上的事件与间隔 | [diagram-timeline.md](diagram-timeline.md) |
+| 跨角色流程与责任交接 | [diagram-swimlane.md](diagram-swimlane.md) |
+| 状态机与生命周期 | [diagram-state.md](diagram-state.md) |
+| 逻辑分支与流程 | [diagram-flowchart.md](diagram-flowchart.md) |
+| 管道数据流 | [diagram-data-flow.md](diagram-data-flow.md) |
+| 概念实体、字段与基数关系 | [diagram-er.md](diagram-er.md) |
+| 物理表、SQL 类型、约束与列级外键 | [diagram-db-schema.md](diagram-db-schema.md) |
+| 类成员、继承、实现、组合与聚合 | [diagram-uml-class.md](diagram-uml-class.md) |
 
-## 图标与图源
+### 内联集成与 SVG 契约
 
-- **图标**：语义图标能加速扫读时，使用固定版本 CDN 的 Lucide，按常见语义名称直接选择。
+- 使用模板中的 `.diagram-wrap` 承载 SVG，不创建第二份 HTML 外壳。
+- 将选中的 `assets/diagrams/*.svg` 内联进主模板，不使用 `<img>`。
+- SVG 示例只提供关系几何，不携带页面、字体、资源或 Design Tokens。
+- 根元素提供 `diagram-canvas`、`viewBox`、`title` 和 `desc`。
+- marker 与 pattern id 使用图表独有前缀。
+- 绘制顺序为“关系 → 节点 → 图例（可选）”。
+- 视觉值继承模板 CSS 变量；局部样式只服务当前拓扑。
+
+### 关系标注
+
+- 浮动标注不使用 `paper`、`paper-card` 或其他不透明底板遮线。
+- Zone / Group 标题放在边界内侧，内边距 8~12px。
+- 关系、协议、条件与基数文字偏离线条 4~8px。
+- 空间不足时移动文字、调整路径或拆开线段，留下真实间隙。
+- 节点卡片、类型 Tag、状态块与图例色块可按语义保留填充。
+
+### 编辑边注（可选）
+
+- 仅在补充信息无法自然进入节点、关系或图例时使用；不承载主结论。
+- 放在图表留白边缘，以“斜体文字 → 细虚线贝塞尔引导 → 2~3px 落点圆点”连接目标。
+- 继承模板字体与颜色变量，不写死字体或色值。
+- 每张图最多 2 处；原位标注足够时不使用。
+
+## 5. 视觉资产
+
+- **图标**：能加速扫读时，使用固定版本 CDN 的 Lucide。
 - **已有资产**：解释具体界面或对象时，优先复用仓库与用户提供的图像。
-- **真实对象**：外观、地点或产品识别有助于理解时，使用图片搜索并保留简短来源链接。
+- **真实对象**：识别外观、地点或产品时，使用图片搜索并保留来源链接。
 - **定制图像**：概念场景需要独特视觉锚点时，使用图像生成。

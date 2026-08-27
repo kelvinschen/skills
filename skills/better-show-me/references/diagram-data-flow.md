@@ -51,4 +51,4 @@ arrows:                             # 数据流转连线
 
 ## 4. 示例产物
 
-- 参考示例：[`assets/example-data-flow.html`](../assets/example-data-flow.html)
+- SVG 几何示例：[`assets/diagrams/example-data-flow.svg`](../assets/diagrams/example-data-flow.svg)

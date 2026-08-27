@@ -31,4 +31,4 @@
 
 ## 4. 示例产物
 
-- 参考示例：[`assets/example-state.html`](../assets/example-state.html)
+- SVG 几何示例：[`assets/diagrams/example-state.svg`](../assets/diagrams/example-state.svg)

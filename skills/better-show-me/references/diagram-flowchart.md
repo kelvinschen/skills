@@ -30,4 +30,4 @@
 
 ## 4. 示例产物
 
-- 参考示例：[`assets/example-flowchart.html`](../assets/example-flowchart.html)
+- SVG 几何示例：[`assets/diagrams/example-flowchart.svg`](../assets/diagrams/example-flowchart.svg)

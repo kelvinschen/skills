@@ -1,0 +1,84 @@
+<svg class="diagram-canvas" viewBox="0 0 1000 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="tree-title tree-desc">
+  <title id="tree-title">Export service module hierarchy</title>
+  <desc id="tree-desc">Single-parent tree showing an export system divided into API, worker, and storage modules, followed by their child responsibilities.</desc>
+  <defs>
+    <pattern id="tree-dots" width="22" height="22" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="0.9" fill="rgba(30,41,59,0.10)"/>
+    </pattern>
+  </defs>
+
+  <rect width="100%" height="100%" fill="var(--color-paper, #f4f5f7)"/>
+  <rect width="100%" height="100%" fill="url(#tree-dots)" opacity="0.55"/>
+
+  <g class="mono" fill="var(--color-muted, #374151)" font-size="8" letter-spacing="0.18em">
+    <text x="40" y="108">TIER 0 · ROOT</text>
+    <text x="40" y="224">TIER 1 · MODULE</text>
+    <text x="40" y="324">TIER 2 · LEAF</text>
+  </g>
+
+  <!-- Orthogonal connectors, drawn before nodes -->
+  <path d="M 500 128 V 168 H 220 V 208" fill="none" stroke="var(--color-muted, #374151)"/>
+  <path d="M 500 168 V 208" fill="none" stroke="var(--color-muted, #374151)"/>
+  <path d="M 500 168 H 780 V 208" fill="none" stroke="var(--color-muted, #374151)"/>
+
+  <path d="M 220 256 V 296 H 135 V 336" fill="none" stroke="var(--color-muted, #374151)"/>
+  <path d="M 220 296 H 305 V 336" fill="none" stroke="var(--color-muted, #374151)"/>
+  <path d="M 500 256 V 296 H 480 V 336" fill="none" stroke="var(--color-muted, #374151)"/>
+  <path d="M 500 296 H 660 V 336" fill="none" stroke="var(--color-muted, #374151)"/>
+  <path d="M 780 256 V 296 H 840 V 336" fill="none" stroke="var(--color-muted, #374151)"/>
+
+  <!-- Root -->
+  <rect x="420" y="80" width="160" height="48" rx="6" fill="var(--color-accent-tint, rgba(217,83,30,0.09))" stroke="var(--color-accent, #d9531e)"/>
+  <rect x="428" y="88" width="32" height="12" rx="2" fill="none" stroke="rgba(217,83,30,0.50)" stroke-width="0.8"/>
+  <text class="mono" x="444" y="97" fill="var(--color-accent, #d9531e)" font-size="7" text-anchor="middle" letter-spacing="0.08em">ROOT</text>
+  <text x="500" y="118" fill="var(--color-ink, #1d2129)" font-size="12" font-weight="600" text-anchor="middle">Export system</text>
+
+  <!-- Module tier -->
+  <g text-anchor="middle">
+    <rect x="140" y="208" width="160" height="48" rx="6" fill="var(--color-paper-card, #ffffff)" stroke="var(--color-ink, #1d2129)"/>
+    <text x="220" y="232" fill="var(--color-ink, #1d2129)" font-size="12" font-weight="600">API</text>
+    <text class="mono" x="220" y="247" fill="var(--color-muted, #374151)" font-size="9">accept · query</text>
+
+    <rect x="420" y="208" width="160" height="48" rx="6" fill="var(--color-paper-card, #ffffff)" stroke="var(--color-ink, #1d2129)"/>
+    <text x="500" y="232" fill="var(--color-ink, #1d2129)" font-size="12" font-weight="600">Worker</text>
+    <text class="mono" x="500" y="247" fill="var(--color-muted, #374151)" font-size="9">claim · generate</text>
+
+    <rect x="700" y="208" width="160" height="48" rx="6" fill="var(--color-paper-card, #ffffff)" stroke="var(--color-ink, #1d2129)"/>
+    <text x="780" y="232" fill="var(--color-ink, #1d2129)" font-size="12" font-weight="600">Storage</text>
+    <text class="mono" x="780" y="247" fill="var(--color-muted, #374151)" font-size="9">persist · serve</text>
+  </g>
+
+  <!-- Leaf tier -->
+  <g text-anchor="middle">
+    <rect x="60" y="336" width="150" height="48" rx="6" fill="rgba(30,41,59,0.05)" stroke="var(--color-muted, #374151)" stroke-width="0.8"/>
+    <text x="135" y="360" fill="var(--color-ink, #1d2129)" font-size="12" font-weight="600">Routes</text>
+    <text class="mono" x="135" y="375" fill="var(--color-muted, #374151)" font-size="9">POST · GET</text>
+
+    <rect x="230" y="336" width="150" height="48" rx="6" fill="rgba(30,41,59,0.05)" stroke="var(--color-muted, #374151)" stroke-width="0.8"/>
+    <text x="305" y="360" fill="var(--color-ink, #1d2129)" font-size="12" font-weight="600">Validation</text>
+    <text class="mono" x="305" y="375" fill="var(--color-muted, #374151)" font-size="9">scope · filters</text>
+
+    <rect x="400" y="336" width="160" height="48" rx="6" fill="rgba(30,41,59,0.05)" stroke="var(--color-muted, #374151)" stroke-width="0.8"/>
+    <text x="480" y="360" fill="var(--color-ink, #1d2129)" font-size="12" font-weight="600">CSV generator</text>
+    <text class="mono" x="480" y="375" fill="var(--color-muted, #374151)" font-size="9">rows → stream</text>
+
+    <rect x="580" y="336" width="160" height="48" rx="6" fill="rgba(30,41,59,0.05)" stroke="var(--color-muted, #374151)" stroke-width="0.8"/>
+    <text x="660" y="360" fill="var(--color-ink, #1d2129)" font-size="12" font-weight="600">Retry policy</text>
+    <text class="mono" x="660" y="375" fill="var(--color-muted, #374151)" font-size="9">attempts · backoff</text>
+
+    <rect x="760" y="336" width="160" height="48" rx="6" fill="rgba(30,41,59,0.05)" stroke="var(--color-muted, #374151)" stroke-width="0.8"/>
+    <text x="840" y="360" fill="var(--color-ink, #1d2129)" font-size="12" font-weight="600">Object store</text>
+    <text class="mono" x="840" y="375" fill="var(--color-muted, #374151)" font-size="9">bucket · signed URL</text>
+  </g>
+
+  <!-- Legend -->
+  <line x1="40" y1="412" x2="960" y2="412" stroke="var(--color-rule, rgba(30,41,59,0.14))" stroke-width="0.8"/>
+  <text class="mono" x="40" y="428" fill="var(--color-muted, #374151)" font-size="8" letter-spacing="0.18em">LEGEND</text>
+  <rect x="40" y="444" width="14" height="10" rx="2" fill="var(--color-accent-tint, rgba(217,83,30,0.09))" stroke="var(--color-accent, #d9531e)"/>
+  <text x="60" y="452" fill="var(--color-muted, #374151)" font-size="8.5">Root</text>
+  <rect x="120" y="444" width="14" height="10" rx="2" fill="var(--color-paper-card, #ffffff)" stroke="var(--color-ink, #1d2129)"/>
+  <text x="140" y="452" fill="var(--color-muted, #374151)" font-size="8.5">Branch</text>
+  <rect x="220" y="444" width="14" height="10" rx="2" fill="rgba(30,41,59,0.05)" stroke="var(--color-muted, #374151)" stroke-width="0.8"/>
+  <text x="240" y="452" fill="var(--color-muted, #374151)" font-size="8.5">Leaf</text>
+  <text x="330" y="452" fill="var(--color-muted, #374151)" font-size="8.5" font-style="italic">Each non-root node has exactly one parent.</text>
+</svg>

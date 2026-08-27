@@ -13,7 +13,7 @@
 | 证据 | 为关键推断选择最小的决定性事实，并贴在推断发生处 |
 | 裁剪 | 围绕当前判断选择分支，并交代视图覆盖范围 |
 
-基线、变化、预期/实际、契约、风险和修复锚点作为原位标注附着在主原语上。
+核心关系进入节点、边或分支；证据使用 `@ path:line` 沿对应事实下沉。解释性文字只有在改变理解或下一步时才保留。
 
 ## 通用原语
 
@@ -24,13 +24,13 @@
 ```text
 on publishDraft(draft)
   if draft is unchanged
-    return currentVersion                    [跳过]
+    return currentVersion
   errors = validate(draft)
   if errors exist
-    return validationErrors                  [失败]
-  persist new version                        [状态写入]
-  emit content.published                     [外部副作用]
-  return publishedVersion                    [成功]
+    return validationErrors
+  persist new version
+  emit content.published
+  return publishedVersion
 ```
 
 ### 调用树
@@ -38,24 +38,25 @@ on publishDraft(draft)
 从一个明确入口展开影响结果的父子调用，标出分支、状态读写、I/O 和返回值。源码锚点落在入口与决定路径的节点；内部条件复杂时附伪代码，跨进程或异步生命周期时局部升级为轻量时序。
 
 ```text
-submitOrder                                      [入口 orders/controller.ts:48]
-├── validateCart                                 [守卫]
-├── reserveInventory                             [状态写入]
-│   └── reservationRepository.save               [I/O]
-└── createOrder                                  [返回 Order]
-    └── orderRepository.insert                   [I/O]
+submitOrder() → Order
+├── validateCart()
+├── reserveInventory()
+│   └── reservationRepository.save()
+└── createOrder()
+    └── orderRepository.insert()
 ```
 
 ### 组件树
 
 保留相关组件层级、状态所有者、关键 prop ↓、event ↑ 和条件挂载，源码位置跟随状态所有者或当前焦点。组件树聚焦行为贡献；像素布局用 UI 视觉，跨生命周期协作用轻量时序。
 
-```tsx
-<CheckoutPage>                                   [状态所有者: useCheckout · CheckoutPage.tsx:18]
-  cart ↓
-  <OrderSummary />                               [只读]
-  <PaymentForm onSubmit={pay} />                 [submit ↑]
-  {paymentFailed && <PaymentError retry={pay} />} [条件挂载]
+```text
+CheckoutPage — state: useCheckout()
+  @ CheckoutPage.tsx:18
+  ├── cart ↓ OrderSummary
+  ├── PaymentForm submit(pay) ↑
+  └── when paymentFailed
+      └── PaymentError retry(pay) ↑
 ```
 
 ### 浅层文件树
@@ -75,13 +76,14 @@ src/orders/
 仅在网络、进程、队列、回调、超时、重试或并发竞争改变结果时使用，参与者数量不是启用依据。区分同步调用、返回、异步消息和等待终态；单线程内部调用改用调用树，数据结构演化改用数据形变链。
 
 ```text
-1. Client → API        POST /exports              [同步请求]
-2. API → Queue         enqueue(exportId)          [异步脱钩]
+1. Client → API        POST /exports
+2. API → Queue         enqueue(exportId)
 3. API → Client        202 Accepted
-4. Worker ← Queue      claim(exportId)            [等待任务]
-5. Worker → Storage    write report.csv           [I/O]
-6. Worker → Client     export.completed           [事件]
-   └─ 30s 未完成 → Client 显示“仍在处理”           [超时降级]
+4. Queue → Worker      claim(exportId)
+5. Worker → Storage    write report.csv
+6. Worker → Client     export.completed
+
+30s 未完成 → Client 显示“仍在处理”
 ```
 
 ### 语义 Diff
@@ -89,14 +91,13 @@ src/orders/
 声明基线与目标，保留意图、可观察后果和至少一个不变量，删除格式化与机械噪声。Diff 必须保留宿主形态；比较多个候选方案时改用对齐对照。
 
 ```diff
- <CheckoutPage>                         [状态仍归页面所有]
+ <CheckoutPage>
    <OrderSummary />
--  <PaymentForm onSubmit={pay} />       [失败只能整页重试]
-+  <PaymentForm onSubmit={pay} />
-+  <PaymentError retry={pay} />         [新增局部恢复]
+   <PaymentForm onSubmit={pay} />
++  {paymentFailed && <PaymentError retry={pay} />}
 ```
 
-结果：支付失败后可以原位重试；`pay()` 的调用契约保持不变。
+结果：支付失败后可以原位重试；状态仍归 `CheckoutPage`，`pay()` 的调用契约保持不变。
 
 ### 对齐对照
 
@@ -128,13 +129,13 @@ return session ?? createEmptySession(id); // 焦点：显式建立回退值
 围绕宿主节点聚焦相关字段、before → after 和证据来源；时间或运行标识用于区分实例。复杂字段转换用数据形变链，多个时间点的协作用轻量时序。
 
 ```text
-[步骤 4: reserveInventory(order-1842)]
-source: integration test inventory-reservation.test.ts
+step 4 · reserveInventory(order-1842)
+  @ inventory-reservation.test.ts
 
 available    3 → 1
 reserved     0 → 2
 order.status PENDING → RESERVED
-requestId    req-72f                     [用于区分本次运行]
+requestId    req-72f
 ```
 
 ## 理解现状
@@ -148,10 +149,10 @@ HTTP OrderInput
   { sku: "A-17", quantity: "2" }
     → normalizeOrderInput()
 Domain OrderRequest
-  { sku: "A-17", quantity: 2 }                  [quantity: string → number]
+  { sku: "A-17", quantity: 2 }
     → attachCatalogItem()
 Priced Order
-  { sku: "A-17", quantity: 2, unitPrice: 399 }  [+ unitPrice]
+  { sku: "A-17", quantity: 2, unitPrice: 399 }
 ```
 
 ### 状态路径
@@ -176,7 +177,7 @@ PENDING
 ────────────────────────────────────────────────────────────
 保存失败            关闭编辑器并显示 toast          保留草稿并原位重试
 再次提交            重新输入全部内容                复用本地草稿
-API 契约           PUT /drafts/:id               PUT /drafts/:id   [保持]
+API 契约           PUT /drafts/:id               PUT /drafts/:id
 ```
 
 结果：失败恢复从“重新开始”变为“原位继续”；服务端接口保持不变。
@@ -201,9 +202,11 @@ API 契约           PUT /drafts/:id               PUT /drafts/:id   [保持]
 ```text
 validateCoupon(input)
   │
-  ├── 预期  coupon == null → useBasePrice() → 200  [契约 pricing.md:18]
+  ├── 预期  coupon == null → useBasePrice() → 200
+  │   @ pricing.md:18
   └── 实际  coupon == null → coupon.rule
-                         ✕ TypeError @ promo-service.ts:42
+      ✕ TypeError
+      @ promo-service.ts:42
 ```
 
 ### 故障因果链
@@ -212,11 +215,11 @@ validateCoupon(input)
 
 ```text
 部署遗漏 SESSION_SECRET
-  → session middleware 生成临时密钥                 [首个错误状态]
-  → 下一实例无法验证旧 cookie                       [传播条件：多实例]
-  → 用户随机退出登录                                [可见症状]
-        ↑ 修复锚点 config/session.ts:18
-          启动时缺少密钥即失败，截断错误配置进入运行态
+  → session middleware 为当前实例生成临时密钥
+      └─ 修复：启动时缺少密钥即失败
+         @ config/session.ts:18
+  → 请求切换实例时，旧 cookie 无法通过验证
+  → 用户随机退出登录
 ```
 
 ## 做出决策
@@ -242,11 +245,10 @@ validateCoupon(input)
 ```text
 方案 A：页面持有状态                 方案 B：流程模块持有状态
 
-CheckoutPage                         CheckoutFlow
-├── useCheckout() [状态]             ├── state [状态]
-├── PaymentForm                      ├── submitPayment()
-└── submitPayment() [编排]           └── CheckoutPage
-                                          └── PaymentForm
+CheckoutPage owns state              CheckoutFlow owns state
+├── useCheckout()                    ├── submitPayment()
+├── PaymentForm                      └── CheckoutPage
+└── submitPayment()                      └── PaymentForm
 
 本质差异：B 将状态与提交流程从页面移入领域边界，页面只负责渲染。
 ```

@@ -35,4 +35,4 @@
 
 ## 5. 示例产物
 
-- 参考示例：[`assets/example-db-schema.html`](../assets/example-db-schema.html)
+- SVG 几何示例：[`assets/diagrams/example-db-schema.svg`](../assets/diagrams/example-db-schema.svg)

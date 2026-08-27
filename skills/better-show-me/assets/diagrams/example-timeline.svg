@@ -1,0 +1,70 @@
+<svg class="diagram-canvas" viewBox="0 0 1000 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="timeline-title timeline-desc">
+  <title id="timeline-title">Checkout latency incident · 46 minutes</title>
+  <desc id="timeline-desc">Proportional timeline from the first alert at 10:02 UTC through rollback, cache recovery, and full recovery at 10:48 UTC.</desc>
+  <defs>
+    <pattern id="timeline-dots" width="22" height="22" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="0.9" fill="rgba(30,41,59,0.10)"/>
+    </pattern>
+  </defs>
+
+  <rect width="100%" height="100%" fill="var(--color-paper, #f4f5f7)"/>
+  <rect width="100%" height="100%" fill="url(#timeline-dots)" opacity="0.55"/>
+
+  <text class="mono" x="60" y="82" fill="var(--color-muted, #374151)" font-size="9" letter-spacing="0.18em">UTC · ELAPSED TIME IS PROPORTIONAL</text>
+
+  <!-- Time axis: x=80 is 10:00, x=900 is 10:48 -->
+  <line x1="80" y1="220" x2="900" y2="220" stroke="var(--color-rule-solid, rgba(55,65,81,0.28))"/>
+  <g class="mono" fill="var(--color-soft, #57606a)" font-size="8" text-anchor="middle" letter-spacing="0.12em">
+    <line x1="80" y1="212" x2="80" y2="228" stroke="var(--color-rule-solid, rgba(55,65,81,0.28))"/>
+    <text x="80" y="244">10:00</text>
+    <line x1="336" y1="212" x2="336" y2="228" stroke="var(--color-rule-solid, rgba(55,65,81,0.28))"/>
+    <text x="336" y="244">10:15</text>
+    <line x1="593" y1="212" x2="593" y2="228" stroke="var(--color-rule-solid, rgba(55,65,81,0.28))"/>
+    <text x="593" y="244">10:30</text>
+    <line x1="849" y1="212" x2="849" y2="228" stroke="var(--color-rule-solid, rgba(55,65,81,0.28))"/>
+    <text x="849" y="244">10:45</text>
+  </g>
+
+  <!-- 10:02 · alert -->
+  <line x1="114" y1="220" x2="114" y2="282" stroke="var(--color-rule-solid, rgba(55,65,81,0.28))"/>
+  <circle cx="114" cy="220" r="4" fill="var(--color-ink, #1d2129)"/>
+  <text class="mono" x="114" y="300" fill="var(--color-muted, #374151)" font-size="8" text-anchor="middle" letter-spacing="0.12em">10:02 · +02M</text>
+  <text x="114" y="318" fill="var(--color-ink, #1d2129)" font-size="12" font-weight="600" text-anchor="middle">Latency alert</text>
+  <text class="mono" x="114" y="334" fill="var(--color-muted, #374151)" font-size="9" text-anchor="middle">p95 &gt; 2 s</text>
+
+  <!-- 10:09 · regression isolated -->
+  <line x1="234" y1="160" x2="234" y2="220" stroke="var(--color-rule-solid, rgba(55,65,81,0.28))"/>
+  <circle cx="234" cy="220" r="4" fill="var(--color-ink, #1d2129)"/>
+  <text class="mono" x="234" y="128" fill="var(--color-muted, #374151)" font-size="8" text-anchor="middle" letter-spacing="0.12em">10:09 · +09M</text>
+  <text x="234" y="146" fill="var(--color-ink, #1d2129)" font-size="12" font-weight="600" text-anchor="middle">Regression isolated</text>
+  <text class="mono" x="234" y="162" fill="var(--color-muted, #374151)" font-size="9" text-anchor="middle">release 7f2c</text>
+
+  <!-- 10:21 · rollback -->
+  <line x1="439" y1="220" x2="439" y2="282" stroke="var(--color-rule-solid, rgba(55,65,81,0.28))"/>
+  <circle cx="439" cy="220" r="4" fill="var(--color-ink, #1d2129)"/>
+  <text class="mono" x="439" y="300" fill="var(--color-muted, #374151)" font-size="8" text-anchor="middle" letter-spacing="0.12em">10:21 · +21M</text>
+  <text x="439" y="318" fill="var(--color-ink, #1d2129)" font-size="12" font-weight="600" text-anchor="middle">Rollback complete</text>
+  <text class="mono" x="439" y="334" fill="var(--color-muted, #374151)" font-size="9" text-anchor="middle">error rate falls</text>
+
+  <!-- 10:33 · cache recovery -->
+  <line x1="644" y1="160" x2="644" y2="220" stroke="var(--color-rule-solid, rgba(55,65,81,0.28))"/>
+  <circle cx="644" cy="220" r="4" fill="var(--color-ink, #1d2129)"/>
+  <text class="mono" x="644" y="128" fill="var(--color-muted, #374151)" font-size="8" text-anchor="middle" letter-spacing="0.12em">10:33 · +33M</text>
+  <text x="644" y="146" fill="var(--color-ink, #1d2129)" font-size="12" font-weight="600" text-anchor="middle">Cache warmed</text>
+  <text class="mono" x="644" y="162" fill="var(--color-muted, #374151)" font-size="9" text-anchor="middle">p95 trending down</text>
+
+  <!-- 10:48 · recovered -->
+  <line x1="900" y1="220" x2="900" y2="282" stroke="var(--color-accent, #d9531e)" stroke-width="1.2"/>
+  <circle cx="900" cy="220" r="6" fill="var(--color-accent, #d9531e)"/>
+  <text class="mono" x="900" y="300" fill="var(--color-accent, #d9531e)" font-size="8" font-weight="600" text-anchor="middle" letter-spacing="0.12em">10:48 · +48M</text>
+  <text x="900" y="318" fill="var(--color-ink, #1d2129)" font-size="12" font-weight="600" text-anchor="middle">Incident resolved</text>
+  <text class="mono" x="900" y="334" fill="var(--color-muted, #374151)" font-size="9" text-anchor="middle">p95 normal</text>
+
+  <!-- Legend -->
+  <line x1="40" y1="370" x2="960" y2="370" stroke="var(--color-rule, rgba(30,41,59,0.14))" stroke-width="0.8"/>
+  <circle cx="52" cy="396" r="4" fill="var(--color-ink, #1d2129)"/>
+  <text x="68" y="399" fill="var(--color-muted, #374151)" font-size="8.5">Event</text>
+  <circle cx="148" cy="396" r="6" fill="var(--color-accent, #d9531e)"/>
+  <text x="164" y="399" fill="var(--color-muted, #374151)" font-size="8.5">Major milestone</text>
+  <text x="310" y="399" fill="var(--color-muted, #374151)" font-size="8.5" font-style="italic">Horizontal spacing encodes real elapsed time.</text>
+</svg>
