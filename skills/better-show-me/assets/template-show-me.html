@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>skill_result 解析故障 | Better Show Me</title>
+  <title>EventRegistry · 客户端事件解析异常排查 | Better Show Me</title>
 
   <!--
     ALL-IN-ONE REFERENCE · CRAP COMPOSITION
@@ -64,6 +64,13 @@
     h1 { max-width: 850px; margin-bottom: 18px; font: 600 clamp(2.2rem,4.5vw,3.5rem)/1.08 var(--font-display); letter-spacing: -.025em; }
     h1 code { color: var(--color-accent); font-size: .86em; font-weight: 600; }
     .lede { max-width: 760px; color: var(--color-muted); font-size: 1.1rem; line-height: 1.75; }
+
+    /* CONTEXT STRIP · async context anchoring for external sharing. */
+    .context-strip { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px 20px; margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--color-rule-solid); }
+    .context-item { min-width: 0; }
+    .context-label { display: block; margin-bottom: 4px; color: var(--color-soft); font: 600 .72rem/1.3 var(--font-mono); letter-spacing: .04em; }
+    .context-value { display: block; color: var(--color-muted); font-size: .84rem; line-height: 1.55; overflow-wrap: anywhere; }
+    .context-value code { font-size: .88em; }
 
     /* REPETITION · navigation stays in a quiet side rail, outside the reading canvas. */
     .side-nav { position: sticky; top: 32px; align-self: start; margin-top: 180px; }
@@ -248,6 +255,7 @@
     @media (max-width: 880px) {
       .page { width: min(100% - 28px,var(--page)); }
       .header { padding: 50px 0 42px; }
+      .context-strip { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px 18px; }
       .chapter { grid-template-columns: 32px minmax(0,1fr); gap: 0 12px; padding: 58px 0 66px; }
       .chapter-no { grid-column: 1; }
       .chapter-head,.chapter-body { grid-column: 2; }
@@ -263,6 +271,7 @@
     }
 
     @media (max-width: 520px) {
+      .context-strip { grid-template-columns: 1fr; gap: 12px; }
       .transform { grid-template-columns: 1fr; }
       .transform-arrow { justify-self: center; transform: rotate(90deg); }
       .ui-shell { grid-template-columns: 1fr; }
@@ -277,26 +286,44 @@
   <div class="page">
     <div class="shell">
       <nav class="side-nav" aria-label="阅读路径">
-        <a href="#locate"><strong>01</strong><span>解析断点</span></a>
+        <a href="#locate"><strong>01</strong><span>根因诊断</span></a>
         <a href="#explain"><strong>02</strong><span>事件时序</span></a>
-        <a href="#structure"><strong>03</strong><span>数据与所有权</span></a>
+        <a href="#structure"><strong>03</strong><span>所有权拓扑</span></a>
         <a href="#change"><strong>04</strong><span>修复结果</span></a>
-        <a href="#decide"><strong>05</strong><span>修复位置</span></a>
+        <a href="#decide"><strong>05</strong><span>方案决策</span></a>
         <a href="#implementation"><strong>06</strong><span>实现范围</span></a>
       </nav>
 
       <div class="content">
         <header class="header">
           <p class="eyebrow">client/session · skill_result event path</p>
-          <h1><code>Registry.parse()</code> 返回 <code>unknown</code></h1>
-          <p class="lede">Browser 收到完整的 <code>skill_result</code>，但客户端注册表未声明对应 schema。Timeline 因而不生成结果卡。</p>
+          <h1><code>EventRegistry</code> · 客户端事件解析异常排查</h1>
+          <p class="lede"><strong>核心结论</strong>：Browser 收到完整的 <code>skill_result</code>，但客户端注册表未声明对应 schema。Timeline 因而不生成结果卡。建议在中心注册表补齐声明并收敛联合类型。</p>
+          <div class="context-strip" aria-label="分析上下文与边界">
+            <div class="context-item">
+              <span class="context-label">触发背景</span>
+              <span class="context-value">线上反馈技能执行完成后会话界面未渲染结果卡片</span>
+            </div>
+            <div class="context-item">
+              <span class="context-label">观察范围</span>
+              <span class="context-value"><code>client/session</code> 事件消费链路（不含服务端调度）</span>
+            </div>
+            <div class="context-item">
+              <span class="context-label">当前基线</span>
+              <span class="context-value">服务端正常吐出 SSE 且通道畅通，前端解析层缺失 schema</span>
+            </div>
+            <div class="context-item">
+              <span class="context-label">预期动作</span>
+              <span class="context-value">在 <code>event-registry.ts</code> 注册 schema 并补齐单元测试</span>
+            </div>
+          </div>
         </header>
 
         <main>
       <section class="chapter" id="locate">
         <span class="chapter-no">01</span>
         <div class="chapter-head">
-          <h2>客户端没有注册 <code>skill_result</code> schema</h2>
+          <h2>根因诊断：客户端未声明 schema 导致 <code>unknown</code> 降级</h2>
           <p>Browser 收到事件后，<code>schemas[type]</code> 返回 <code>undefined</code>，解析结果随即变为 <code>unknown</code>。</p>
         </div>
         <div class="chapter-body">
@@ -331,7 +358,7 @@
       <section class="chapter chapter-follow" id="explain">
         <span class="chapter-no">02</span>
         <div class="chapter-head">
-          <h2><code>unknown</code> 在进入 Timeline 前被过滤</h2>
+          <h2>事件时序：<code>unknown</code> 降级事件在进入 Timeline 前被过滤</h2>
           <p>Server 到 Browser 的传输链路完整。类型变化发生在 Registry，过滤发生在 Timeline 入口。</p>
         </div>
         <div class="chapter-body">
@@ -406,7 +433,7 @@
       <section class="chapter act-start" id="structure">
         <span class="chapter-no">03</span>
         <div class="chapter-head">
-          <h2>Registry 收窄类型，SessionPage 持有解析后的事件</h2>
+          <h2>所有权拓扑：Registry 收窄类型，SessionPage 持有解析后事件</h2>
           <p>Registry 将开放 payload 转换为联合类型；SkillResultCard 只接收规范化后的结果。</p>
         </div>
         <div class="chapter-body">
@@ -436,7 +463,7 @@
       <section class="chapter chapter-follow" id="change">
         <span class="chapter-no">04</span>
         <div class="chapter-head">
-          <h2>注册 schema 后，Timeline 渲染 SkillResultCard</h2>
+          <h2>修复结果：注册 schema 后 Timeline 正常渲染 SkillResultCard</h2>
           <p><code>skill_result</code> 进入 SessionEvent 联合类型，现有 Timeline 随即生成对应结果卡。</p>
         </div>
         <div class="chapter-body">
@@ -489,7 +516,7 @@
       <section class="chapter act-start" id="decide">
         <span class="chapter-no">05</span>
         <div class="chapter-head">
-          <h2>中心注册表是当前约束下的修复位置</h2>
+          <h2>方案决策：中心注册表是当前约束下的最优修复位置</h2>
           <p>它在同一入口完成 schema 声明、类型收窄和失败记录，下游组件无需重复处理开放 payload。</p>
         </div>
         <div class="chapter-body">
@@ -513,7 +540,7 @@
       <section class="chapter chapter-follow" id="implementation">
         <span class="chapter-no">06</span>
         <div class="chapter-head">
-          <h2>改动集中在四个客户端文件</h2>
+          <h2>实现范围：改动收敛于四个客户端文件，服务端保持不变</h2>
           <p>事件注册、联合类型、结果卡和解析测试需要修改；服务端事件发送逻辑不变。</p>
         </div>
         <div class="chapter-body annex-grid">

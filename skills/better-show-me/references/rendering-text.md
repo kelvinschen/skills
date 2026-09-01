@@ -34,11 +34,11 @@
 | 层级 | 缩进与树线；职责、状态、源码锚点跟随节点 |
 | 流转 | 编号步骤或单向箭头；标出关键跃迁与 I/O |
 | 变化与决策 | 行首 Diff 符号或按共享维度对齐的 Markdown 表格 |
-| 定位问题 | 从共同起点缩进展开首个差异，错误与证据贴在断点行 |
+| 定位排查 | 从共同起点缩进展开首个差异，错误与证据贴在断点行 |
 
 ## 轻量 Mermaid
 
-关系较少时使用缩进文本；空间关系成为主要问题时使用 Mermaid：`sequenceDiagram` 表达跨实体消息，`flowchart` 表达流程与数据流，`stateDiagram-v2` 表达有限状态，`erDiagram` 表达实体关系。
+关系较少时使用缩进文本；空间关系成为主要关注时使用 Mermaid：`sequenceDiagram` 表达跨实体消息，`flowchart` 表达流程与数据流，`stateDiagram-v2` 表达有限状态，`erDiagram` 表达实体关系。
 
 ## UI 视觉
 
