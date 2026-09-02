@@ -40,7 +40,7 @@
       --color-danger-bg: rgba(220,53,69,.08);
       --font-body: 'Ysabeau Office','LXGW WenKai',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
       --font-display: 'Ysabeau Office','LXGW WenKai',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-      --font-mono: 'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
+      --font-mono: 'JetBrains Mono','LXGW WenKai','LXGW WenKai Mono',ui-monospace,Menlo,Consolas,monospace;
       --page: 1320px;
       --gap: 20px;
       --radius: 7px;
@@ -54,6 +54,7 @@
     }
     code, pre { font-family: var(--font-mono); }
     code { font-size: .88em; }
+    h1 code, h2 code, h3 code { font-size: inherit; }
     .page { width: min(var(--page), calc(100% - 48px)); margin: 0 auto; }
     .shell { display: grid; grid-template-columns: 140px minmax(0,1fr); gap: 28px; }
     .content { min-width: 0; }
@@ -62,11 +63,11 @@
     .header { max-width: 900px; padding: 74px 0 50px 76px; }
     .eyebrow { margin-bottom: 14px; color: var(--color-accent); font: 600 .72rem/1.2 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; }
     h1 { max-width: 850px; margin-bottom: 18px; font: 600 clamp(2.2rem,4.5vw,3.5rem)/1.08 var(--font-display); letter-spacing: -.025em; }
-    h1 code { color: var(--color-accent); font-size: .86em; font-weight: 600; }
+    h1 code { color: var(--color-accent); font-size: inherit; font-weight: 600; }
     .lede { max-width: 760px; color: var(--color-muted); font-size: 1.1rem; line-height: 1.75; }
 
     /* CONTEXT STRIP · async context anchoring for external sharing. */
-    .context-strip { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px 20px; margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--color-rule-solid); }
+    .context-strip { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px 32px; margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--color-rule-solid); }
     .context-item { min-width: 0; }
     .context-label { display: block; margin-bottom: 4px; color: var(--color-soft); font: 600 .72rem/1.3 var(--font-mono); letter-spacing: .04em; }
     .context-value { display: block; color: var(--color-muted); font-size: .84rem; line-height: 1.55; overflow-wrap: anywhere; }
@@ -88,6 +89,7 @@
     .chapter-no { grid-column: 1; padding-top: 7px; color: var(--color-soft); font: 500 .72rem/1 var(--font-mono); }
     .chapter-head { grid-column: 2 / span 8; margin-bottom: 40px; }
     .chapter-head h2 { margin-bottom: 9px; font: 600 clamp(1.55rem,2.4vw,2.05rem)/1.24 var(--font-display); letter-spacing: -.012em; }
+    .chapter-head h2 code { color: var(--color-accent); font-size: inherit; font-weight: 600; }
     .chapter-head p { max-width: 670px; color: var(--color-soft); font-size: .96rem; }
     .chapter-body { grid-column: 2 / -1; min-width: 0; }
     .grid-7-5 { display: grid; grid-template-columns: minmax(0,7fr) minmax(300px,5fr); gap: clamp(42px,6vw,76px); align-items: start; }
@@ -109,13 +111,6 @@
     .hero-surface text { font-family: var(--font-body); }
     .hero-surface .mono { font-family: var(--font-mono); }
 
-    /* PATTERN: state snapshot | attached directly to the fork it proves. */
-    .evidence-strip { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); margin-top: 22px; border-top: 1px solid var(--color-rule); }
-    .evidence-cell { padding: 14px 18px 4px 0; }
-    .evidence-cell span { display: block; margin-bottom: 4px; color: var(--color-soft); font: 500 .72rem/1.3 var(--font-mono); }
-    .evidence-cell strong { color: var(--color-ink); font: 500 .76rem/1.4 var(--font-mono); overflow-wrap: anywhere; }
-    .evidence-cell strong.fault { color: var(--color-danger-text); }
-
     /* PATTERN: causal chain | explains propagation, not chronology. */
     .causal { list-style: none; padding: 0; }
     .causal li { position: relative; padding: 0 0 27px 30px; color: var(--color-muted); font-size: .9rem; }
@@ -124,23 +119,6 @@
     .causal li.focus::after { border-color: var(--color-accent); background: var(--color-accent); }
     .causal strong { display: block; margin-bottom: 3px; color: var(--color-ink); font-size: .94rem; }
     .anchor { display: block; margin-top: 5px; color: var(--color-link); font: 500 .68rem/1.4 var(--font-mono); }
-
-    /* PATTERN: evidence ledger | separates observation, inference and uncertainty. */
-    .evidence-ledger { margin-top: 34px; }
-    .ledger-head { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; margin-bottom: 10px; }
-    .ledger-head h3 { font: 600 1.04rem/1.35 var(--font-display); }
-    .ledger-head span { color: var(--color-link); font: 500 .68rem/1.4 var(--font-mono); }
-    .ledger-list { border-top: 1px solid var(--color-rule-solid); }
-    .ledger-row { display: grid; grid-template-columns: 126px minmax(0,1fr) 190px; gap: 20px; align-items: baseline; padding: 12px 0; border-bottom: 1px solid var(--color-rule); }
-    .ledger-state { position: relative; padding-left: 16px; color: var(--color-soft); font: 600 .7rem/1.4 var(--font-mono); letter-spacing: .03em; }
-    .ledger-state::before { content: ''; position: absolute; left: 0; top: .42em; width: 6px; height: 6px; border: 1px solid currentColor; border-radius: 50%; }
-    .ledger-row.confirmed .ledger-state { color: var(--color-success-text); }
-    .ledger-row.confirmed .ledger-state::before { background: currentColor; }
-    .ledger-row.inferred .ledger-state { color: var(--color-accent); }
-    .ledger-row.inferred .ledger-state::before { background: currentColor; }
-    .ledger-copy { color: var(--color-muted); font-size: .84rem; }
-    .ledger-copy strong { color: var(--color-ink); font-weight: 600; }
-    .ledger-source { color: var(--color-soft); font: 500 .7rem/1.4 var(--font-mono); text-align: right; }
 
     /* DIAGRAM: sequence | control moves across runtime boundaries. */
     .diagram-wrap { overflow-x: auto; background: rgba(255,255,255,.58); border: 1px solid var(--color-rule); border-radius: 6px; }
@@ -194,36 +172,20 @@
     .del { color: var(--color-danger-text); background: var(--color-danger-bg); text-decoration: line-through; }
     .add { color: var(--color-success-text); background: var(--color-success-bg); }
 
-    /* PATTERN: neutral UI frame | layout is the evidence; content only locates the result. */
+    /* PATTERN: structural UI layout wireframe | reveals spatial zones and slot hierarchy. */
     .ui-frame { padding: 13px; background: var(--color-paper-code); border: 1px solid var(--color-rule); border-radius: 6px; }
     .ui-window { overflow: hidden; background: var(--color-paper-card); border: 1px solid var(--color-rule-solid); border-radius: 5px; }
-    .ui-bar { padding: 11px 13px; color: var(--color-muted); border-bottom: 1px solid var(--color-rule); font: 600 .72rem/1 var(--font-body); }
-    .ui-shell { display: grid; grid-template-columns: 116px minmax(0,1fr); min-height: 274px; }
-    .ui-sidebar { padding: 15px 12px; border-right: 1px solid var(--color-rule); background: rgba(234,237,242,.55); }
-    .ui-region-label { display: block; margin-bottom: 14px; color: var(--color-muted); font-size: .72rem; font-weight: 600; }
-    .ui-nav-item { margin-bottom: 7px; padding: 7px 8px; color: var(--color-soft); border-left: 2px solid transparent; font-size: .72rem; }
-    .ui-nav-item.active { color: var(--color-ink); border-left-color: var(--color-accent); background: var(--color-paper-card); }
-    .ui-main { min-width: 0; padding: 16px 20px 20px; }
-    .ui-main-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding-bottom: 11px; border-bottom: 1px solid var(--color-rule); }
-    .ui-main-head strong { font-size: .78rem; }
-    .ui-timeline { position: relative; margin-top: 15px; padding-left: 19px; }
-    .ui-timeline::before { content: ''; position: absolute; left: 4px; top: 6px; bottom: 7px; border-left: 1px solid var(--color-rule-solid); }
-    .ui-event { position: relative; margin-bottom: 13px; color: var(--color-soft); font-size: .72rem; }
-    .ui-event::before,.ui-result::before { content: ''; position: absolute; width: 7px; height: 7px; left: -18px; top: 6px; background: var(--color-paper-card); border: 1px solid var(--color-rule-solid); border-radius: 50%; }
-    .ui-event strong { display: block; margin-bottom: 2px; color: var(--color-ink); font-size: .72rem; }
-    .ui-result { position: relative; margin-top: 4px; padding: 13px 14px 14px; border: 1px solid rgba(217,83,30,.32); border-left: 3px solid var(--color-accent); background: var(--color-accent-tint); }
-    .ui-result::before { left: -21px; top: 16px; border-color: var(--color-accent); background: var(--color-accent); }
-    .ui-result-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
-    .ui-result-head strong { font-size: .76rem; }
-    .ui-result p { color: var(--color-muted); font: 500 .7rem/1.55 var(--font-mono); }
-
-    /* PATTERN: outcome band | one row separates new, improved and unchanged. */
-    .outcome-band { display: grid; grid-template-columns: repeat(3,1fr); margin-top: 34px; border-top: 1px solid var(--color-rule-solid); border-bottom: 1px solid var(--color-rule); }
-    .outcome-item { display: grid; grid-template-columns: 54px 1fr; gap: 12px; padding: 14px 18px; border-right: 1px solid var(--color-rule); align-items: baseline; }
-    .outcome-item:first-child { padding-left: 0; }
-    .outcome-item:last-child { border-right: 0; }
-    .outcome-item span { color: var(--color-soft); font-size: .76rem; }
-    .outcome-item strong { color: var(--color-ink); font-size: .82rem; }
+    .ui-shell { display: grid; grid-template-columns: 120px minmax(0,1fr); min-height: 210px; }
+    .ui-sidebar { display: flex; flex-direction: column; gap: 8px; padding: 16px 12px; border-right: 1px solid var(--color-rule); background: rgba(234,237,242,.55); }
+    .ui-skeleton-slot { height: 20px; background: rgba(30,41,59,.06); border: 1px dashed var(--color-rule-solid); border-radius: 3px; }
+    .ui-main { min-width: 0; padding: 16px 18px; }
+    .ui-stack { display: flex; flex-direction: column; gap: 9px; }
+    .ui-slot { padding: 10px 12px; border-radius: 4px; }
+    .ui-slot strong { display: block; font: 500 .72rem/1.35 var(--font-mono); }
+    .ui-slot.existing { background: rgba(234,237,242,.45); border: 1px dashed var(--color-rule-solid); }
+    .ui-slot.existing strong { color: var(--color-soft); }
+    .ui-slot.inserted { background: var(--color-accent-tint); border: 1.5px solid var(--color-accent); }
+    .ui-slot.inserted strong { color: var(--color-accent); font-weight: 600; }
 
     /* PATTERN: aligned tradeoff matrix | shared constraints decide. */
     .comparison-wrap { overflow-x: auto; }
@@ -233,10 +195,6 @@
     .comparison td { color: var(--color-muted); font-size: .86rem; }
     .comparison th:first-child,.comparison td:first-child { padding-left: 0; color: var(--color-ink); font-weight: 600; }
     .comparison .chosen { color: var(--color-accent); }
-    .decision { display: grid; grid-template-columns: 1.3fr .7fr; gap: 56px; margin-top: 25px; }
-    .decision-main { padding-left: 16px; border-left: 2px solid var(--color-accent); color: var(--color-muted); }
-    .decision-limit { color: var(--color-soft); font-size: .82rem; }
-    .decision-limit strong { display: block; color: var(--color-ink); }
 
     /* PATTERN: implementation annex | shown as a full chapter in this template reference. */
     .annex-grid { display: grid; grid-template-columns: .8fr 1.2fr; gap: 64px; }
@@ -259,14 +217,8 @@
       .chapter { grid-template-columns: 32px minmax(0,1fr); gap: 0 12px; padding: 58px 0 66px; }
       .chapter-no { grid-column: 1; }
       .chapter-head,.chapter-body { grid-column: 2; }
-      .grid-7-5,.grid-6-6,.change-layout,.annex-grid,.decision { grid-template-columns: 1fr; }
+      .grid-7-5,.grid-6-6,.change-layout,.annex-grid { grid-template-columns: 1fr; }
       .grid-7-5,.grid-6-6,.change-layout { gap: 46px; }
-      .outcome-band { grid-template-columns: 1fr; }
-      .outcome-item { padding: 12px 0; border-right: 0; border-bottom: 1px solid var(--color-rule); }
-      .outcome-item:last-child { border-bottom: 0; }
-      .evidence-strip { grid-template-columns: repeat(2,1fr); }
-      .ledger-row { grid-template-columns: 106px minmax(0,1fr); gap: 10px 16px; }
-      .ledger-source { grid-column: 2; text-align: left; }
       .footer { padding-left: 44px; }
     }
 
@@ -275,10 +227,7 @@
       .transform { grid-template-columns: 1fr; }
       .transform-arrow { justify-self: center; transform: rotate(90deg); }
       .ui-shell { grid-template-columns: 1fr; }
-      .ui-sidebar { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding: 10px 12px; border-right: 0; border-bottom: 1px solid var(--color-rule); }
-      .ui-region-label { flex: 0 0 auto; margin: 0 4px 0 0; }
-      .ui-nav-item { flex: 0 0 auto; margin: 0; border-left: 0; border-bottom: 2px solid transparent; white-space: nowrap; }
-      .ui-nav-item.active { border-left-color: transparent; border-bottom-color: var(--color-accent); }
+      .ui-sidebar { border-right: 0; border-bottom: 1px solid var(--color-rule); }
     }
   </style>
 </head>
@@ -305,16 +254,8 @@
               <span class="context-value">线上反馈技能执行完成后会话界面未渲染结果卡片</span>
             </div>
             <div class="context-item">
-              <span class="context-label">观察范围</span>
+              <span class="context-label">观察/影响范围</span>
               <span class="context-value"><code>client/session</code> 事件消费链路（不含服务端调度）</span>
-            </div>
-            <div class="context-item">
-              <span class="context-label">当前基线</span>
-              <span class="context-value">服务端正常吐出 SSE 且通道畅通，前端解析层缺失 schema</span>
-            </div>
-            <div class="context-item">
-              <span class="context-label">预期动作</span>
-              <span class="context-value">在 <code>event-registry.ts</code> 注册 schema 并补齐单元测试</span>
             </div>
           </div>
         </header>
@@ -345,12 +286,6 @@
               <text x="854" y="45" fill="#1e7e34" font-size="12" font-weight="600">匹配 schema</text><text class="mono" x="854" y="68" fill="#374151" font-size="10">typed → timeline</text><text class="mono" x="854" y="84" fill="#374151" font-size="10">→ result card</text>
               <text x="854" y="171" fill="#c82333" font-size="12" font-weight="600">缺少 schema</text><text class="mono" x="854" y="194" fill="#374151" font-size="10">unknown → filtered</text><text class="mono" x="854" y="210" fill="#374151" font-size="10">→ no card</text>
             </svg>
-            <div class="evidence-strip" aria-label="断点状态快照">
-              <div class="evidence-cell"><span>raw.type</span><strong>"skill_result"</strong></div>
-              <div class="evidence-cell"><span>schemas[type]</span><strong class="fault">undefined</strong></div>
-              <div class="evidence-cell"><span>parsed.kind</span><strong class="fault">"unknown"</strong></div>
-              <div class="evidence-cell"><span>source</span><strong>eventRegistry.parse()</strong></div>
-            </div>
           </figure>
         </div>
       </section>
@@ -407,26 +342,6 @@
               </svg>
             </div>
           </figure>
-
-          <div class="evidence-ledger" aria-label="事实、推断与待验证项">
-            <div class="ledger-list">
-              <div class="ledger-row confirmed">
-                <span class="ledger-state">已确认</span>
-                <p class="ledger-copy"><strong>传输链路正常。</strong> Server 已发送且 Browser 已收到完整事件。</p>
-                <span class="ledger-source">运行时快照</span>
-              </div>
-              <div class="ledger-row inferred">
-                <span class="ledger-state">当前推断</span>
-                <p class="ledger-copy"><strong>客户端 schema 未同步。</strong> 当前集合没有 <code>skill_result</code>，因此解析结果为 <code>unknown</code>。</p>
-                <span class="ledger-source">eventRegistry.parse()</span>
-              </div>
-              <div class="ledger-row open">
-                <span class="ledger-state">待验证</span>
-                <p class="ledger-copy"><strong>异常 payload 的降级行为。</strong> 还需确认 schema 校验失败时是否继续返回 <code>unknownEvent()</code>。</p>
-                <span class="ledger-source">待补：异常输入测试</span>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -464,7 +379,6 @@
         <span class="chapter-no">04</span>
         <div class="chapter-head">
           <h2>修复结果：注册 schema 后 Timeline 正常渲染 SkillResultCard</h2>
-          <p><code>skill_result</code> 进入 SessionEvent 联合类型，现有 Timeline 随即生成对应结果卡。</p>
         </div>
         <div class="chapter-body">
           <div class="change-layout">
@@ -477,38 +391,27 @@
               </div>
             </figure>
             <figure>
-              <div class="figure-head"><h3>用户可见结果 · UI 布局</h3><span class="source">SessionPage</span></div>
+              <div class="figure-head"><h3>SessionPage · 界面布局骨架</h3><span class="source">双栏栅格 · 120px + 1fr</span></div>
               <div class="ui-frame">
                 <div class="ui-window">
-                  <div class="ui-bar">会话详情</div>
                   <div class="ui-shell">
-                    <aside class="ui-sidebar">
-                      <span class="ui-region-label">会话</span>
-                      <div class="ui-nav-item active">当前运行</div>
-                      <div class="ui-nav-item">较早运行</div>
-                      <div class="ui-nav-item">历史记录</div>
+                    <aside class="ui-sidebar" aria-label="侧边导航区">
+                      <div class="ui-skeleton-slot" title="已有导航槽位"></div>
+                      <div class="ui-skeleton-slot" title="已有导航槽位"></div>
+                      <div class="ui-skeleton-slot" title="已有导航槽位"></div>
                     </aside>
-                    <section class="ui-main">
-                      <div class="ui-main-head"><strong>执行记录</strong></div>
-                      <div class="ui-timeline">
-                        <div class="ui-event"><strong>Agent</strong>正在执行测试</div>
-                        <div class="ui-event"><strong>Tool</strong>已完成用例收集</div>
-                        <div class="ui-result">
-                          <div class="ui-result-head"><strong>Skill result</strong></div>
-                          <p>测试全部通过</p>
-                        </div>
+                    <section class="ui-main" aria-label="主视区">
+                      <div class="ui-stack">
+                        <div class="ui-slot existing"><strong>[已有槽位] MessageEvent · 用户输入与回复</strong></div>
+                        <div class="ui-slot existing"><strong>[已有槽位] AgentStatusEvent · 执行状态反馈</strong></div>
+                        <div class="ui-slot inserted"><strong>[新增插槽] SkillResultCard · 渲染规范化结果</strong></div>
                       </div>
                     </section>
                   </div>
                 </div>
               </div>
-              <figcaption class="caption">SkillResultCard 出现在时间线主区；会话导航与页面框架保持不变。</figcaption>
+              <figcaption class="caption">SkillResultCard 挂载于主视区时间线末尾；左侧导航栏与宿主容器保持不变。</figcaption>
             </figure>
-          </div>
-          <div class="outcome-band" aria-label="修复结果">
-            <div class="outcome-item"><span>界面</span><strong>显示 SkillResultCard</strong></div>
-            <div class="outcome-item"><span>失败路径</span><strong>统一记录解析错误</strong></div>
-            <div class="outcome-item"><span>服务端</span><strong>发送契约保持不变</strong></div>
           </div>
         </div>
       </section>
@@ -530,10 +433,7 @@
               </tbody>
             </table>
           </div>
-          <div class="decision">
-            <p class="decision-main"><strong>选择中心注册表。</strong>校验、类型收窄和失败观测集中在同一个边界，页面与卡片不再重复防御开放 payload。</p>
-            <p class="decision-limit"><strong>适用边界</strong>若产品允许未经校验的动态事件直接进入 UI，则需要重新评估 Raw Event 方案。</p>
-          </div>
+          <p class="caption"><strong>适用边界</strong>：若产品允许未经校验的动态事件直接进入 UI，则需重新评估 Raw Event 兜底方案。</p>
         </div>
       </section>
 
@@ -541,7 +441,6 @@
         <span class="chapter-no">06</span>
         <div class="chapter-head">
           <h2>实现范围：改动收敛于四个客户端文件，服务端保持不变</h2>
-          <p>事件注册、联合类型、结果卡和解析测试需要修改；服务端事件发送逻辑不变。</p>
         </div>
         <div class="chapter-body annex-grid">
           <article><h3>涉及的文件</h3><pre class="tree file-tree"><code><span class="tree-root">client/session/</span>
