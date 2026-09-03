@@ -172,20 +172,20 @@
     .del { color: var(--color-danger-text); background: var(--color-danger-bg); text-decoration: line-through; }
     .add { color: var(--color-success-text); background: var(--color-success-bg); }
 
-    /* PATTERN: structural UI layout wireframe | reveals spatial zones and slot hierarchy. */
+    /* PATTERN: structural UI layout wireframe | reveals spatial zones and component/node layout. */
     .ui-frame { padding: 13px; background: var(--color-paper-code); border: 1px solid var(--color-rule); border-radius: 6px; }
     .ui-window { overflow: hidden; background: var(--color-paper-card); border: 1px solid var(--color-rule-solid); border-radius: 5px; }
     .ui-shell { display: grid; grid-template-columns: 120px minmax(0,1fr); min-height: 210px; }
     .ui-sidebar { display: flex; flex-direction: column; gap: 8px; padding: 16px 12px; border-right: 1px solid var(--color-rule); background: rgba(234,237,242,.55); }
-    .ui-skeleton-slot { height: 20px; background: rgba(30,41,59,.06); border: 1px dashed var(--color-rule-solid); border-radius: 3px; }
+    .ui-skeleton-item { height: 20px; background: rgba(30,41,59,.06); border: 1px dashed var(--color-rule-solid); border-radius: 3px; }
     .ui-main { min-width: 0; padding: 16px 18px; }
     .ui-stack { display: flex; flex-direction: column; gap: 9px; }
-    .ui-slot { padding: 10px 12px; border-radius: 4px; }
-    .ui-slot strong { display: block; font: 500 .72rem/1.35 var(--font-mono); }
-    .ui-slot.existing { background: rgba(234,237,242,.45); border: 1px dashed var(--color-rule-solid); }
-    .ui-slot.existing strong { color: var(--color-soft); }
-    .ui-slot.inserted { background: var(--color-accent-tint); border: 1.5px solid var(--color-accent); }
-    .ui-slot.inserted strong { color: var(--color-accent); font-weight: 600; }
+    .ui-node { padding: 10px 12px; border-radius: 4px; }
+    .ui-node strong { display: block; font: 500 .72rem/1.35 var(--font-mono); }
+    .ui-node.existing { background: rgba(234,237,242,.45); border: 1px dashed var(--color-rule-solid); }
+    .ui-node.existing strong { color: var(--color-soft); }
+    .ui-node.added { background: var(--color-accent-tint); border: 1.5px solid var(--color-accent); }
+    .ui-node.added strong { color: var(--color-accent); font-weight: 600; }
 
     /* PATTERN: aligned tradeoff matrix | shared constraints decide. */
     .comparison-wrap { overflow-x: auto; }
@@ -396,15 +396,15 @@
                 <div class="ui-window">
                   <div class="ui-shell">
                     <aside class="ui-sidebar" aria-label="侧边导航区">
-                      <div class="ui-skeleton-slot" title="已有导航槽位"></div>
-                      <div class="ui-skeleton-slot" title="已有导航槽位"></div>
-                      <div class="ui-skeleton-slot" title="已有导航槽位"></div>
+                      <div class="ui-skeleton-item" title="已有导航项"></div>
+                      <div class="ui-skeleton-item" title="已有导航项"></div>
+                      <div class="ui-skeleton-item" title="已有导航项"></div>
                     </aside>
                     <section class="ui-main" aria-label="主视区">
                       <div class="ui-stack">
-                        <div class="ui-slot existing"><strong>[已有槽位] MessageEvent · 用户输入与回复</strong></div>
-                        <div class="ui-slot existing"><strong>[已有槽位] AgentStatusEvent · 执行状态反馈</strong></div>
-                        <div class="ui-slot inserted"><strong>[新增插槽] SkillResultCard · 渲染规范化结果</strong></div>
+                        <div class="ui-node existing"><strong>[已有组件] MessageEvent · 用户输入与回复</strong></div>
+                        <div class="ui-node existing"><strong>[已有组件] AgentStatusEvent · 执行状态反馈</strong></div>
+                        <div class="ui-node added"><strong>[新增组件] SkillResultCard · 渲染规范化结果</strong></div>
                       </div>
                     </section>
                   </div>
