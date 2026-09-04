@@ -20,7 +20,13 @@ A structured decision-grilling skill for plans, designs, and domain models.
 
 A technical visualization and explanation skill for concepts, codebases, logic flows, changes, incidents, and architectural decisions.
 
-**Credit**: Diagram design adapted from [cathrynlavery/diagram-design](https://github.com/cathrynlavery/diagram-design).
+**Credit**: 
+
+- Inspired by [show-me](https://github.com/humanlayer/skills/tree/main/plugins/show-me/skills/show-me).
+
+- Diagram design adapted from [cathrynlavery/diagram-design](https://github.com/cathrynlavery/diagram-design).
+
+
 
 **Purpose**: Organizes technical facts into low-cognitive-load structured text or polished HTML through clear hierarchy, intuitive associations, close evidence anchoring, and progressive disclosure. Renders in the user's language.
 
