@@ -20,6 +20,8 @@ A structured decision-grilling skill for plans, designs, and domain models.
 
 A technical visualization and explanation skill for concepts, codebases, logic flows, changes, incidents, and architectural decisions.
 
+**Credit**: Diagram design adapted from [cathrynlavery/diagram-design](https://github.com/cathrynlavery/diagram-design).
+
 **Purpose**: Organizes technical facts into low-cognitive-load structured text or polished HTML through clear hierarchy, intuitive associations, close evidence anchoring, and progressive disclosure. Renders in the user's language.
 
 **When to use**: When you want to "show me", visualize, explain, trace, compare, or debug technical topics (e.g., system architectures, call flows, state transitions, root-cause chains, or pull requests).

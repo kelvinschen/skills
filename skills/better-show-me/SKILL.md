@@ -1,6 +1,6 @@
 ---
 name: better-show-me
-description: 将技术概念、仓库、模块、代码逻辑、变更、故障或技术选择组织成低认知负担的文本或美观 HTML。用于用户要求 show me、可视化、解释、追踪、比较、调试或快速理解技术主题时。
+description: Organize technical concepts, codebases, modules, code logic, changes, incidents, or technical choices into low-cognitive-load text or beautiful HTML. Use when the user asks to show me, visualize, explain, trace, compare, or quickly understand technical topics.
 ---
 
 # Better Show Me
