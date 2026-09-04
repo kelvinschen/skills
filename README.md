@@ -1,6 +1,6 @@
 # Skills
 
-A collection of automation skills for web-based workflows.
+A curated collection of skills I use myself.
 
 ## Skills Overview
 
@@ -8,39 +8,27 @@ A collection of automation skills for web-based workflows.
 
 A structured decision-grilling skill for plans, designs, and domain models.
 
+**Credit**: Adapted from the [grilling](https://github.com/mattpocock/skills/tree/main/skills/productivity/grilling) skill in [mattpocock/skills](https://github.com/mattpocock/skills).
+
 **Purpose**: Builds a visible decision tree, batches independent high-risk questions, recommends defaults, records downstream effects, and keeps glossary and ADR documentation aligned.
 
 **Demo**: [English acpus workflow install decision log](https://kelvinschen.github.io/skills/grill-with-tree/)
 
 ---
 
-### agent-browser-automation-creator
+### better-show-me
 
-A **meta-skill** that creates new web automation skills.
+A technical visualization and explanation skill for concepts, codebases, logic flows, changes, incidents, and architectural decisions.
 
-**Purpose**: Automates the process of discovering and replicating web workflows by:
-- Exploring web pages via agent-browser
-- Analyzing network requests to identify API endpoints
-- Generating reusable automation scripts (Node.js)
-- Creating SKILL.md documentation for the new skill
+**Purpose**: Organizes technical facts into low-cognitive-load structured text or polished HTML through clear hierarchy, intuitive associations, close evidence anchoring, and progressive disclosure. Renders in the user's language.
 
-**When to use**: When you want to create a new skill to automate a repetitive web task (e.g., "create a skill to submit expense reports", "make a bot for creating Jira tickets").
+**When to use**: When you want to "show me", visualize, explain, trace, compare, or debug technical topics (e.g., system architectures, call flows, state transitions, root-cause chains, or pull requests).
 
----
+**Demos**:
 
-### remote-agent-browser
+- [pi Agent Context Window](https://kelvinschen.github.io/skills/pi-context-window/) — maps JSONL session trees, compaction triggers, safe cut points, and state preservation into one inspectable architecture.
+- [Vue Vapor: Markerless v-for Hydration](https://kelvinschen.github.io/skills/vue-pr-15420/) — explains Vue core PR #15420 through its before/after anchor ownership, DOM topology, runtime path, and regression evidence.
 
-A **service management skill** for running a remote GUI browser.
+## License
 
-**Purpose**: Launches and manages a remote browser stack (Xvfb + x11vnc + noVNC) where the browser runs in headed mode via agent-browser, accessible through VNC/noVNC for visual monitoring.
-
-**When to use**: When you need a stable remote browser for visual monitoring and automation, especially when you want to observe agent-browser actions in real-time through a web-based VNC interface.
-
----
-
-## Relationship
-
-These skills work together:
-1. Use `remote-agent-browser` to start a visible browser session for exploration
-2. Use `agent-browser-automation-creator` to discover workflows and create new skills
-3. The generated skills can then run independently (with or without the remote browser)
+[MIT](LICENSE)
