@@ -4,11 +4,11 @@ HTML 把选定的原语投影为单文件认知界面。本文件只规定媒介
 
 ## 1. 页面基底
 
-- **工作文件**：先画 Canvas 草图；结构成立后复制 [template-show-me.html](../assets/template-show-me.html)。
+- **工作文件**：先确定关系结构与阅读顺序，再复制最小页面底座 [template-show-me.html](../assets/template-show-me.html)，填入当前主题的主视图。需要查看现有构件组合时才参考 [完整案例](../assets/example-show-me.html)；案例章节不是默认目录。
 - **视觉地基**：保留模板的 Design Tokens、字体、通用 CSS 与脚本。
-- **视区分配**：主关系在首屏获得最高视觉配额；辅助关系从对应连接点展开。
+- **视区分配**：先为主关系预留完整可读的空间，再安排标题、导语与背景。主图或主要比较表优先占据整行，辅助关系从对应连接点展开；不要把宽图塞入双栏后依赖滚动才能看到关键关系。
 - **原位信息**：原因、规则、状态与例外进入节点、边或紧邻标注，不独立成块。
-- **上下文交代**：在正文前交代理解所需的背景与边界，使页面独立分享时自解释。
+- **上下文交代**：导语中交代理解主关系所需的背景。补充边界放在相关节点或视图之后；只有需要读者先区分多组环境时才使用 context strip，避免背景清单把主关系挤出首屏。
 - **页面元信息**：标题界定主题，核心结论放进导语而不要混入标题；眉题与页脚补充所属范围或来源。
 
 ### 视觉编排
@@ -32,9 +32,9 @@ HTML 视觉编排遵循 CRAP、Gestalt 分组、视觉层级、编辑式网格�
 
 | 表达家族 | 包含原语 | 容器投影 |
 | --- | --- | --- |
-| 层级 | 组件树、调用树、浅文件树 | `.layout-stack`、嵌套 spine 或 row；名称、职责与源码锚点同组 |
+| 层级 | 组件树、调用树、浅文件树 | 嵌套 spine、`.tree` 或单列节点；名称、职责与源码锚点同组 |
 | 流转 | 轻量时序、数据转换链、状态路径 | 横向阶段、泳道或编号路径；方向与关键跃迁清晰可见 |
-| 变化与决策 | 语义 Diff、行为前后、对齐比较、权衡矩阵、方案骨架比较 | `.layout-grid-2`、对齐双栏或 table；固定共享维度，突出变化点 |
+| 变化与决策 | 语义 Diff、行为前后、对齐比较、权衡矩阵、方案骨架比较 | `.grid-6-6`、对齐双栏或 `.comparison` table；固定共享维度，突出变化点 |
 | 定位排查 | 预期/实际分叉、故障因果链、影响范围、路径追踪 | 从共同起点展开分叉、因果或影响层级，并突出首个关键差异 |
 
 默认使用静态层级。仅当用户需要切换视角或揭示关联时增加交互。
@@ -55,24 +55,7 @@ HTML 视觉编排遵循 CRAP、Gestalt 分组、视觉层级、编辑式网格�
 
 ### Diagram 路由
 
-关系确定后，只读取匹配的一份规范及其 SVG 示例。示例用于理解图元与几何规则，不作为空白模板或外部图片嵌入。
-
-| 关系 | 规范 |
-| --- | --- |
-| 跨端适配与逻辑拓扑 | [diagram-architecture.md](diagram-architecture.md) |
-| 运行位置、网络区、版本与副本 | [diagram-deployment.md](diagram-deployment.md) |
-| 抽象层、协议栈与上下层次 | [diagram-layers.md](diagram-layers.md) |
-| 多父依赖、汇聚与循环依赖 | [diagram-dependency.md](diagram-dependency.md) |
-| 严格单父节点层级 | [diagram-tree.md](diagram-tree.md) |
-| 多实体时序 | [diagram-sequence.md](diagram-sequence.md) |
-| 真实时间轴上的事件与间隔 | [diagram-timeline.md](diagram-timeline.md) |
-| 跨角色流程与责任交接 | [diagram-swimlane.md](diagram-swimlane.md) |
-| 状态机与生命周期 | [diagram-state.md](diagram-state.md) |
-| 逻辑分支与流程 | [diagram-flowchart.md](diagram-flowchart.md) |
-| 管道数据流 | [diagram-data-flow.md](diagram-data-flow.md) |
-| 概念实体、字段与基数关系 | [diagram-er.md](diagram-er.md) |
-| 物理表、SQL 类型、约束与列级外键 | [diagram-db-schema.md](diagram-db-schema.md) |
-| 类成员、继承、实现、组合与聚合 | [diagram-uml-class.md](diagram-uml-class.md) |
+沿 [原语系统的关系选型入口](primitive-system.md#关系选型入口) 找到已经选定的关系，只读取对应图规范与 SVG 示例。规范决定关系语义，示例演示符合规范的几何；用当前事实重新构造节点、边、标签与边界，不复制示例的业务内容。
 
 ### 图形布局
 
@@ -81,7 +64,7 @@ Diagram 布局遵循 layered graph drawing、port-based routing 与 obstacle avo
 ### 内联集成与 SVG 契约
 
 - 使用模板中的 `.diagram-wrap` 承载 SVG，不创建第二份 HTML 外壳。
-- 将选中的 `assets/diagrams/*.svg` 内联进主模板，不使用 `<img>`。
+- 将为当前事实构造的 SVG 内联进主模板，不使用 `<img>`；`assets/diagrams/*.svg` 供参考几何与符号。
 - SVG 示例只提供关系几何，不携带页面、字体、资源或 Design Tokens。
 - 根元素提供 `diagram-canvas`、`viewBox`、`title` 和 `desc`。
 - marker 与 pattern id 使用图表独有前缀。
@@ -109,3 +92,14 @@ Diagram 布局遵循 layered graph drawing、port-based routing 与 obstacle avo
 - 已有资产：解释具体界面或对象时，优先复用仓库与用户提供的图像。
 - 真实对象：识别外观、地点或产品时，使用图片搜索并保留来源链接。
 - 定制图像：概念场景需要独特视觉锚点时，使用图像生成。
+
+
+## 6. 交付检查
+
+若当前环境已有明确可用的浏览器能力，可打开实际文件检查桌面首屏及窄视口，关注主关系可见性、文字可读性、节点与连线遮挡，以及表格和 SVG 的容器适配。未提供浏览器能力或调用失败时，完成当前可执行的检查即可，不为此寻找、安装工具或排查浏览器环境。用户另行要求浏览器验证时，按其任务范围执行。
+
+首屏应能读出完整主要关系；如果被背景或长导语挤下去，先合并重复内容和调整构图。保持 Design Tokens、字体与通用 CSS，不以缩小字号换取装得下。窄屏确需局部横向滚动时，容器可操作且主结论仍可见。
+
+核对关系方向、所有权与数字，以及引用和交互实现。HTML/XML 解析只证明结构层面的检查；报告验证情况时，只陈述实际完成的检查。
+
+最后移除未填的模板占位、示例业务内容和面向制作者的组织术语。每个章节保留其独有问题；若一章只是再次讲述主图，合并到原位。

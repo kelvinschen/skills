@@ -3,15 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>EventRegistry · 客户端事件解析异常排查 | Better Show Me</title>
+  <!-- 在 title 中填写当前主题。 -->
+  <title></title>
 
-  <!--
-    ALL-IN-ONE REFERENCE · CRAP COMPOSITION
-    Contrast: one dominant relationship per chapter; evidence stays quieter.
-    Repetition: chapters, figures and anchors repeat one stable grammar.
-    Alignment: every element resolves to the same numbered 12-column grid.
-    Proximity: evidence sits beside the claim it proves, never in a detached evidence wall.
-  -->
+  <!-- 页面底座：保留样式与资源，按当前事实填写正文。 -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Ysabeau+Office:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -233,240 +228,19 @@
 </head>
 <body>
   <div class="page">
-    <div class="shell">
-      <nav class="side-nav" aria-label="阅读路径">
-        <a href="#locate"><strong>01</strong><span>根因诊断</span></a>
-        <a href="#explain"><strong>02</strong><span>事件时序</span></a>
-        <a href="#structure"><strong>03</strong><span>所有权拓扑</span></a>
-        <a href="#change"><strong>04</strong><span>修复结果</span></a>
-        <a href="#decide"><strong>05</strong><span>方案决策</span></a>
-        <a href="#implementation"><strong>06</strong><span>实现范围</span></a>
-      </nav>
-
-      <div class="content">
-        <header class="header">
-          <p class="eyebrow">client/session · skill_result event path</p>
-          <h1><code>EventRegistry</code> · 客户端事件解析异常排查</h1>
-          <p class="lede"><strong>核心结论</strong>：Browser 收到完整的 <code>skill_result</code>，但客户端注册表未声明对应 schema。Timeline 因而不生成结果卡。建议在中心注册表补齐声明并收敛联合类型。</p>
-          <div class="context-strip" aria-label="分析上下文与边界">
-            <div class="context-item">
-              <span class="context-label">触发背景</span>
-              <span class="context-value">线上反馈技能执行完成后会话界面未渲染结果卡片</span>
-            </div>
-            <div class="context-item">
-              <span class="context-label">观察/影响范围</span>
-              <span class="context-value"><code>client/session</code> 事件消费链路（不含服务端调度）</span>
-            </div>
+    <div class="content">
+      <header class="header">
+        <h1><!-- 替换为读者要理解的主题 --></h1>
+        <p class="lede"><!-- 用一句完整的话给出当前结论，并交代理解所需的范围。 --></p>
+      </header>
+      <main>
+        <section class="chapter" id="main-relation">
+          <div class="chapter-body">
+            <!-- 用当前事实构建主关系；按已选原语填写 SVG、表格或结构文本。 -->
+            <!-- 原因、条件和证据贴在对应关系旁；交付前删除这些占位注释。 -->
           </div>
-        </header>
-
-        <main>
-      <section class="chapter" id="locate">
-        <span class="chapter-no">01</span>
-        <div class="chapter-head">
-          <h2>根因诊断：客户端未声明 schema 导致 <code>unknown</code> 降级</h2>
-          <p>Browser 收到事件后，<code>schemas[type]</code> 返回 <code>undefined</code>，解析结果随即变为 <code>unknown</code>。</p>
-        </div>
-        <div class="chapter-body">
-          <figure class="hero-surface" tabindex="0" aria-label="预期与实际分叉图，可横向滚动">
-            <svg viewBox="0 0 1000 245" role="img" aria-labelledby="e-title e-desc">
-              <title id="e-title">skill_result 的共同路径与预期实际分叉</title>
-              <desc id="e-desc">事件从技能执行经 SSE 到达注册表，匹配 schema 后进入时间线；缺少 schema 时成为 unknown 并被过滤。</desc>
-              <defs>
-                <marker id="e-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0 0 8 3 0 6Z" fill="#374151"/></marker>
-              </defs>
-              <path d="M170 116H220M370 116H420M570 116H620" fill="none" stroke="#374151" stroke-width="1.2" marker-end="url(#e-arrow)"/>
-              <path d="M770 116H806V58H838" fill="none" stroke="#1e7e34" stroke-width="1.4" marker-end="url(#e-arrow)"/>
-              <path d="M770 116H806V184H838" fill="none" stroke="#c82333" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#e-arrow)"/>
-              <g fill="#fff" stroke="#374151"><rect x="20" y="80" width="150" height="72" rx="5"/><rect x="220" y="80" width="150" height="72" rx="5"/><rect x="420" y="80" width="150" height="72" rx="5"/></g>
-              <rect x="620" y="80" width="150" height="72" rx="5" fill="rgba(217,83,30,.09)" stroke="#d9531e" stroke-width="1.4"/>
-              <g text-anchor="middle" fill="#1d2129" font-size="13" font-weight="600"><text x="95" y="110">Run skill</text><text x="295" y="110">Emit SSE</text><text x="495" y="110">Browser receives</text><text x="695" y="110">Registry.parse</text></g>
-              <g class="mono" text-anchor="middle" fill="#57606a" font-size="10"><text x="95" y="132">server event source</text><text x="295" y="132">type: skill_result</text><text x="495" y="132">raw payload</text><text x="695" y="132">schemas[type]</text></g>
-              <rect x="838" y="18" width="148" height="80" rx="5" fill="rgba(40,167,69,.10)" stroke="#1e7e34"/><rect x="838" y="144" width="148" height="80" rx="5" fill="rgba(220,53,69,.08)" stroke="#c82333"/>
-              <text x="854" y="45" fill="#1e7e34" font-size="12" font-weight="600">匹配 schema</text><text class="mono" x="854" y="68" fill="#374151" font-size="10">typed → timeline</text><text class="mono" x="854" y="84" fill="#374151" font-size="10">→ result card</text>
-              <text x="854" y="171" fill="#c82333" font-size="12" font-weight="600">缺少 schema</text><text class="mono" x="854" y="194" fill="#374151" font-size="10">unknown → filtered</text><text class="mono" x="854" y="210" fill="#374151" font-size="10">→ no card</text>
-            </svg>
-          </figure>
-        </div>
-      </section>
-
-      <section class="chapter chapter-follow" id="explain">
-        <span class="chapter-no">02</span>
-        <div class="chapter-head">
-          <h2>事件时序：<code>unknown</code> 降级事件在进入 Timeline 前被过滤</h2>
-          <p>Server 到 Browser 的传输链路完整。类型变化发生在 Registry，过滤发生在 Timeline 入口。</p>
-        </div>
-        <div class="chapter-body">
-          <figure class="sequence-focus">
-            <div class="figure-head"><h3><code>skill_result</code> 的实际解析时序</h3><span class="source">eventRegistry.parse()</span></div>
-            <div class="diagram-wrap sequence-diagram" tabindex="0" aria-label="skill_result 实际解析时序，可横向滚动">
-              <svg class="diagram-canvas" viewBox="0 0 1000 350" role="img" aria-labelledby="seq-f-title seq-f-desc">
-                <title id="seq-f-title">skill_result 实际解析时序</title>
-                <desc id="seq-f-desc">Server 发送的事件正常抵达 Browser；Registry 查找 schema 时得到 undefined，将事件降级为 unknown，随后被 Timeline 过滤。</desc>
-                <defs>
-                  <marker id="seq-f-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0 0 8 3 0 6Z" fill="#374151"/></marker>
-                  <marker id="seq-f-arrow-open" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><path d="M0 .5 8 3.5 0 6.5" fill="none" stroke="#275296" stroke-width="1.2"/></marker>
-                  <marker id="seq-f-arrow-focus" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0 0 8 3 0 6Z" fill="#d9531e"/></marker>
-                </defs>
-
-                <g stroke="rgba(30,41,59,.22)" stroke-dasharray="3 3">
-                  <line x1="100" y1="82" x2="100" y2="330"/><line x1="365" y1="82" x2="365" y2="330"/>
-                  <line x1="635" y1="82" x2="635" y2="330"/><line x1="900" y1="82" x2="900" y2="330"/>
-                </g>
-                <g fill="rgba(30,41,59,.06)" stroke="#374151" stroke-width=".8">
-                  <rect x="361" y="126" width="8" height="66" rx="2"/><rect x="631" y="184" width="8" height="106" rx="2"/><rect x="896" y="278" width="8" height="50" rx="2"/>
-                </g>
-
-                <line x1="100" y1="138" x2="361" y2="138" stroke="#275296" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#seq-f-arrow-open)"/>
-                <text class="mono" x="231" y="130" fill="#275296" font-size="9" text-anchor="middle">skill_result · SSE</text>
-                <line x1="369" y1="192" x2="631" y2="192" stroke="#374151" stroke-width="1.2" marker-end="url(#seq-f-arrow)"/>
-                <text class="mono" x="500" y="184" fill="#374151" font-size="9" text-anchor="middle">parse(raw)</text>
-                <path d="M639 220H694V242H639" fill="none" stroke="#d9531e" stroke-width="1.3" marker-end="url(#seq-f-arrow-focus)"/>
-                <text class="mono" x="790" y="235" fill="#d9531e" font-size="9" text-anchor="middle">schema 未注册 → undefined</text>
-                <line x1="639" y1="282" x2="896" y2="282" stroke="#d9531e" stroke-width="1.3" marker-end="url(#seq-f-arrow-focus)"/>
-                <text class="mono" x="768" y="274" fill="#d9531e" font-size="9" font-weight="600" text-anchor="middle">unknown</text>
-                <path d="M904 302H950V324H904" fill="none" stroke="#374151" stroke-width="1.1" stroke-dasharray="4 3" marker-end="url(#seq-f-arrow)"/>
-                <text class="mono" x="947" y="297" fill="#57606a" font-size="9" text-anchor="end">filter</text>
-
-                <g fill="#fff" stroke="#374151">
-                  <rect x="40" y="30" width="120" height="52" rx="6"/><rect x="305" y="30" width="120" height="52" rx="6"/>
-                  <rect x="840" y="30" width="120" height="52" rx="6"/>
-                </g>
-                <rect x="575" y="30" width="120" height="52" rx="6" fill="rgba(217,83,30,.09)" stroke="#d9531e"/>
-                <g text-anchor="middle">
-                  <text class="mono" x="100" y="53" fill="#1d2129" font-size="11" font-weight="600">Server</text><text x="100" y="69" fill="#57606a" font-size="9">事件源</text>
-                  <text class="mono" x="365" y="53" fill="#1d2129" font-size="11" font-weight="600">Browser</text><text x="365" y="69" fill="#57606a" font-size="9">SSE 接收</text>
-                  <text class="mono" x="635" y="53" fill="#1d2129" font-size="11" font-weight="600">Registry</text><text x="635" y="69" fill="#d9531e" font-size="9">解析边界</text>
-                  <text class="mono" x="900" y="53" fill="#1d2129" font-size="11" font-weight="600">Timeline</text><text x="900" y="69" fill="#57606a" font-size="9">渲染入口</text>
-                </g>
-              </svg>
-            </div>
-          </figure>
-        </div>
-      </section>
-
-      <section class="chapter act-start" id="structure">
-        <span class="chapter-no">03</span>
-        <div class="chapter-head">
-          <h2>所有权拓扑：Registry 收窄类型，SessionPage 持有解析后事件</h2>
-          <p>Registry 将开放 payload 转换为联合类型；SkillResultCard 只接收规范化后的结果。</p>
-        </div>
-        <div class="chapter-body">
-          <div class="grid-6-6">
-            <figure>
-              <div class="figure-head"><h3>事件的数据形态</h3><span class="source">eventRegistry.parse()</span></div>
-              <div class="transform">
-                <div class="transform-node"><strong>RawEvent</strong><p><span class="shape-key">type</span>: <span class="shape-value">skill_result</span><br><span class="shape-key">output</span>: {...}</p></div><span class="transform-arrow">→</span>
-                <div class="transform-node focus"><strong>SkillResultEvent</strong><p><span class="shape-key">kind</span>: <span class="shape-value">typed</span><br><span class="shape-key">status</span>: <span class="shape-value">completed</span></p></div><span class="transform-arrow">→</span>
-                <div class="transform-node"><strong>CardProps</strong><p><span class="shape-key">summary</span><br><span class="shape-key">tone</span>: <span class="shape-value">success</span></p></div>
-              </div>
-              <figcaption class="caption">只有通过 schema 校验的 RawEvent 才会进入 SessionEvent 联合类型。</figcaption>
-            </figure>
-            <figure>
-              <div class="figure-head"><h3>调用链与组件所有权</h3><span class="source">client/session</span></div>
-              <pre class="tree structure-tree"><code><span class="tree-call">EventSource.onmessage()</span>
-└── <span class="tree-focus">eventRegistry.parse()</span>
-    └── <span class="tree-owner">SessionPage</span> <span class="tree-role">owns events</span>
-        └── <span class="tree-component">SessionTimeline</span>
-            └── <span class="tree-component">SkillResultCard</span></code></pre>
-              <figcaption class="caption">解析失败不会进入 SessionPage；卡片不处理开放 payload。</figcaption>
-            </figure>
-          </div>
-        </div>
-      </section>
-
-      <section class="chapter chapter-follow" id="change">
-        <span class="chapter-no">04</span>
-        <div class="chapter-head">
-          <h2>修复结果：注册 schema 后 Timeline 正常渲染 SkillResultCard</h2>
-        </div>
-        <div class="chapter-body">
-          <div class="change-layout">
-            <figure>
-              <div class="figure-head"><h3>注册表与联合类型的修改</h3><span class="source">event-registry.ts</span></div>
-              <div class="code-panel">
-                <div class="code-bar"><span>类型声明与 schema 映射</span></div>
-                <pre><code><span class="del">- type SessionEvent = MessageEvent | AgentStatusEvent;</span><span class="add">+ type SessionEvent = MessageEvent | AgentStatusEvent</span><span class="add">+   | SkillResultEvent;</span>
-<span class="del">- const schemas = { message, agent_status };</span><span class="add">+ const schemas = { message, agent_status,</span><span class="add">+   skill_result: skillResultSchema };</span></code></pre>
-              </div>
-            </figure>
-            <figure>
-              <div class="figure-head"><h3>SessionPage · 界面布局骨架</h3><span class="source">双栏栅格 · 120px + 1fr</span></div>
-              <div class="ui-frame">
-                <div class="ui-window">
-                  <div class="ui-shell">
-                    <aside class="ui-sidebar" aria-label="侧边导航区">
-                      <div class="ui-skeleton-item" title="已有导航项"></div>
-                      <div class="ui-skeleton-item" title="已有导航项"></div>
-                      <div class="ui-skeleton-item" title="已有导航项"></div>
-                    </aside>
-                    <section class="ui-main" aria-label="主视区">
-                      <div class="ui-stack">
-                        <div class="ui-node existing"><strong>[已有组件] MessageEvent · 用户输入与回复</strong></div>
-                        <div class="ui-node existing"><strong>[已有组件] AgentStatusEvent · 执行状态反馈</strong></div>
-                        <div class="ui-node added"><strong>[新增组件] SkillResultCard · 渲染规范化结果</strong></div>
-                      </div>
-                    </section>
-                  </div>
-                </div>
-              </div>
-              <figcaption class="caption">SkillResultCard 挂载于主视区时间线末尾；左侧导航栏与宿主容器保持不变。</figcaption>
-            </figure>
-          </div>
-        </div>
-      </section>
-
-      <section class="chapter act-start" id="decide">
-        <span class="chapter-no">05</span>
-        <div class="chapter-head">
-          <h2>方案决策：中心注册表是当前约束下的最优修复位置</h2>
-          <p>它在同一入口完成 schema 声明、类型收窄和失败记录，下游组件无需重复处理开放 payload。</p>
-        </div>
-        <div class="chapter-body">
-          <div class="comparison-wrap">
-            <table class="comparison">
-              <thead><tr><th>当前约束</th><th>时间线局部 Switch</th><th class="chosen">中心注册表</th><th>Raw Event 兜底</th></tr></thead>
-              <tbody>
-                <tr><td>payload 必须先校验</td><td>渲染时才发现</td><td class="chosen">入口处完成</td><td>未经校验进入 UI</td></tr>
-                <tr><td>新事件只声明一次</td><td>类型与渲染分别修改</td><td class="chosen">schema 驱动解析</td><td>下游持续处理 unknown</td></tr>
-                <tr><td>失败需要可观测</td><td>容易落入 default</td><td class="chosen">统一记录原因</td><td>弱化类型契约</td></tr>
-              </tbody>
-            </table>
-          </div>
-          <p class="caption"><strong>适用边界</strong>：若产品允许未经校验的动态事件直接进入 UI，则需重新评估 Raw Event 兜底方案。</p>
-        </div>
-      </section>
-
-      <section class="chapter chapter-follow" id="implementation">
-        <span class="chapter-no">06</span>
-        <div class="chapter-head">
-          <h2>实现范围：改动收敛于四个客户端文件，服务端保持不变</h2>
-        </div>
-        <div class="chapter-body annex-grid">
-          <article><h3>涉及的文件</h3><pre class="tree file-tree"><code><span class="tree-root">client/session/</span>
-├── <span class="tree-focus">event-registry.ts</span>      <span class="tree-impact">注册 skill_result schema</span>
-├── <span class="tree-file">session-event.ts</span>       <span class="tree-impact">扩展 SessionEvent 联合类型</span>
-├── <span class="tree-file">SkillResultCard.tsx</span>    <span class="tree-impact">渲染结果卡</span>
-└── <span class="tree-file">event-registry.test.ts</span> <span class="tree-impact">覆盖合法与异常输入</span>
-
-<span class="tree-note">server/events/                 无需修改 · 发送契约未变</span></code></pre></article>
-          <article><h3>schema 注册与解析</h3><pre class="tree"><code class="language-typescript" data-focus="skill_result|skillResultSchema">const eventRegistry = createRegistry({
-  message: messageSchema,
-  agent_status: agentStatusSchema,
-  skill_result: skillResultSchema,
-});
-
-export function parse(raw: RawEvent): SessionEvent {
-  const schema = eventRegistry[raw.type];
-  if (!schema) return unknownEvent(raw);
-  return schema.parse(raw.payload);
-}</code></pre></article>
-        </div>
-      </section>
-        </main>
-
-        <footer class="footer">client/session · skill_result event path</footer>
-      </div>
+        </section>
+      </main>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.12.0/build/highlight.min.js"></script>

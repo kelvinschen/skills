@@ -11,6 +11,9 @@
       <marker id="seq-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
         <polygon points="0 0, 8 3, 0 6" fill="var(--color-muted, #374151)"/>
       </marker>
+      <marker id="seq-arrow-open" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <path d="M 0 0 L 7 3 L 0 6" fill="none" stroke="var(--color-muted, #374151)" stroke-width="1"/>
+      </marker>
       <marker id="seq-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
         <polygon points="0 0, 8 3, 0 6" fill="var(--color-accent, #d9531e)"/>
       </marker>
@@ -46,22 +49,22 @@
          ================================================================= -->
 
     <!-- M1: Reader → Cloudflare  (HTTPS request · link-blue) -->
-    <line x1="128" y1="176" x2="352" y2="176" stroke="var(--color-link, #275296)" stroke-width="1.2" marker-end="url(#seq-arrow-link)"/>
+    <line data-message-role="sync" x1="128" y1="176" x2="352" y2="176" stroke="var(--color-link, #275296)" stroke-width="1.2" marker-end="url(#seq-arrow-link)"/>
 
     <!-- M2: Cloudflare → Astro  (cache miss · muted) -->
-    <line x1="352" y1="232" x2="580" y2="232" stroke="var(--color-muted, #374151)" stroke-width="1.2" marker-end="url(#seq-arrow)"/>
+    <line data-message-role="sync" x1="352" y1="232" x2="580" y2="232" stroke="var(--color-muted, #374151)" stroke-width="1.2" marker-end="url(#seq-arrow)"/>
 
     <!-- M3: Astro self-message  (render MDX · muted U-loop) -->
-    <path d="M 588 284 L 624 284 L 624 316 L 588 316" fill="none" stroke="var(--color-muted, #374151)" stroke-width="1.2" marker-end="url(#seq-arrow)"/>
+    <path data-message-role="self" d="M 588 284 L 624 284 L 624 316 L 588 316" fill="none" stroke="var(--color-muted, #374151)" stroke-width="1.2" marker-end="url(#seq-arrow)"/>
 
     <!-- M4: Astro → Cloudflare  (return HTML · muted dashed) -->
-    <line x1="580" y1="352" x2="356" y2="352" stroke="var(--color-muted, #374151)" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#seq-arrow)"/>
+    <line data-message-role="return" x1="580" y1="352" x2="356" y2="352" stroke="var(--color-muted, #374151)" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#seq-arrow)"/>
 
-    <!-- M5: Cloudflare → Reader  (primary success · coral) -->
-    <line x1="348" y1="408" x2="128" y2="408" stroke="var(--color-accent, #d9531e)" stroke-width="1.4" marker-end="url(#seq-arrow-accent)"/>
+    <!-- M5: Cloudflare → Reader  (primary success return · coral dashed) -->
+    <line data-message-role="return" x1="348" y1="408" x2="128" y2="408" stroke="var(--color-accent, #d9531e)" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#seq-arrow-accent)"/>
 
     <!-- M6: Reader → Analytics  (async beacon · muted dashed) -->
-    <line x1="128" y1="464" x2="800" y2="464" stroke="var(--color-muted, #374151)" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#seq-arrow)"/>
+    <line data-message-role="async" x1="128" y1="464" x2="800" y2="464" stroke="var(--color-muted, #374151)" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#seq-arrow-open)"/>
 
     <!-- =================================================================
          MESSAGE LABELS — placed cleanly 4~6px above arrow lines
@@ -141,12 +144,16 @@
     <line x1="308" y1="546" x2="336" y2="546" stroke="var(--color-link, #275296)" stroke-width="1.2" marker-end="url(#seq-arrow-link)"/>
     <text x="344" y="548" fill="var(--color-muted, #374151)" font-size="8.5">HTTP request</text>
 
-    <!-- Item 4: Return / async (muted dashed) -->
+    <!-- Item 4: Return (muted dashed, filled arrowhead) -->
     <line x1="476" y1="546" x2="504" y2="546" stroke="var(--color-muted, #374151)" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#seq-arrow)"/>
-    <text x="512" y="548" fill="var(--color-muted, #374151)" font-size="8.5">Return / async</text>
+    <text x="512" y="548" fill="var(--color-muted, #374151)" font-size="8.5">Return</text>
 
     <!-- Item 5: Primary response (coral) -->
-    <line x1="652" y1="546" x2="680" y2="546" stroke="var(--color-accent, #d9531e)" stroke-width="1.4" marker-end="url(#seq-arrow-accent)"/>
+    <line x1="652" y1="546" x2="680" y2="546" stroke="var(--color-accent, #d9531e)" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#seq-arrow-accent)"/>
     <text x="688" y="548" fill="var(--color-muted, #374151)" font-size="8.5">Primary response</text>
+
+    <!-- Item 6: Async (muted dashed, open arrowhead) -->
+    <line x1="790" y1="546" x2="818" y2="546" stroke="var(--color-muted, #374151)" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#seq-arrow-open)"/>
+    <text x="826" y="548" fill="var(--color-muted, #374151)" font-size="8.5">Async</text>
 
   </svg>

@@ -4,6 +4,24 @@
 
 先确定用户要建立的心理模型，再选一个主导原语。局部代码与状态快照只能作为证据附着其上。
 
+## 关系选型入口
+
+按读者的问题选关系，媒介只改变呈现方式。先读本表，再定位相关定义；不必通读所有例子。
+
+| 要理解的关系 | 入口 |
+| --- | --- |
+| 单体条件、调用、组件或相关文件层级 | 下文伪代码、调用树、组件树、浅层文件树 |
+| 等待与跨主体协作、数据结构变化、状态跃迁 | 下文轻量时序、数据形变链、状态路径 |
+| 行为变化或方案差异 | 下文语义 Diff、行为前后对照、对齐对照、权衡矩阵、方案骨架对照 |
+| 预期分叉、错误传播或变更影响 | 下文预期 / 实际分叉、故障因果链、影响半径 |
+| 逻辑组件通信、部署位置或抽象层 | [Architecture](diagram-architecture.md)、[Deployment](diagram-deployment.md)、[Layers](diagram-layers.md) 的适用边界 |
+| 多父依赖 / 回边，或严格单父层级 | [Dependency](diagram-dependency.md)、[Tree](diagram-tree.md) 的独有关系 |
+| 消息顺序、真实时间间隔、责任交接 | [Sequence](diagram-sequence.md)、[Timeline](diagram-timeline.md)、[Swimlane](diagram-swimlane.md) 的适用边界 |
+| 分支、状态机或跨阶段数据流 | [Flowchart](diagram-flowchart.md)、[State](diagram-state.md)、[Data Flow](diagram-data-flow.md) 的适用边界 |
+| 实体基数、物理外键或类成员关系 | [ER](diagram-er.md)、[Database Schema](diagram-db-schema.md)、[UML Class](diagram-uml-class.md) 的独有关系 |
+
+图规范的适用边界也用于文本选型；只有绘制 SVG 时才需要读取其中的几何细则和 SVG 示例。没有匹配原语时，用能忠实表达关系的最小结构，不为套用图种改变事实。
+
 ## 共同约束
 
 | 关注点 | 要求 |
@@ -14,6 +32,8 @@
 | 裁剪 | 围绕当前判断选择分支，并交代视图覆盖范围 |
 
 核心关系进入节点、边或分支；证据使用 `@ path:line` 沿对应事实下沉。解释性文字只有在改变理解或下一步时才保留。
+
+结论的确定程度不能超过来源。静态依赖不能证明运行时顺序，缺少日志不能单独证明某步未发生；数字、状态归属和因果断言均需回查输入。对同一事实的推断和未知项附在该事实附近，不再复制一份“已知事实”清单。
 
 ## 通用原语
 
