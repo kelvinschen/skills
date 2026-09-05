@@ -2,6 +2,12 @@
 
 A curated collection of skills I use myself.
 
+## Install
+
+```sh
+npx skills add https://github.com/kelvinschen/skills
+```
+
 ## Skills Overview
 
 ### grill-with-tree
