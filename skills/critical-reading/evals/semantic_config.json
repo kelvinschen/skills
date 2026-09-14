@@ -1,0 +1,16 @@
+{
+  "positive_concepts": {
+    "critical-reading-intent": {
+      "weight": 1.0,
+      "phrases": ["fact-check", "事实核查", "核查这个帖子的事实", "事实可信度", "是否靠谱", "第一性原理审读", "提炼值得沉淀的信息", "内容吸收", "factual credibility", "knowledge worth retaining", "reasoning quality"]
+    }
+  },
+  "negative_concepts": {
+    "explicit-other-task": {
+      "weight": 1.0,
+      "exclusive": true,
+      "phrases": ["只做摘要", "只做翻译", "without analysis", "不分析内容", "不需要分析任何文章"]
+    }
+  },
+  "fallback_positive_concepts": []
+}

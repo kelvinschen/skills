@@ -31,3 +31,6 @@ pnpm-debug.log*
 **/.acpx-orchestrator/drafts/
 **/.acpx-orchestrator/review-html-report/
 skills/acpx-agent-orchestrator/dist/
+benchmarks/
+.agents/skills/
+skills-lock.json
