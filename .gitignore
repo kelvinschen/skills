@@ -34,3 +34,4 @@ skills/acpx-agent-orchestrator/dist/
 benchmarks/
 .agents/skills/
 skills-lock.json
+evals/

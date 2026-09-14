@@ -1,4 +1,0 @@
-interface:
-  display_name: "审读与沉淀"
-  short_description: "核验文章与帖子，提取可靠知识，单独保留有价值的待验证线索"
-  default_prompt: "使用 $critical-reading 审读这份内容：检查关键事实与底层逻辑，仅沉淀值得保留的信息，并区分可靠结论和待验证研究线索，标明来源与边界。"
